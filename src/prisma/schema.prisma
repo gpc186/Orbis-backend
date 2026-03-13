@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  tecnico
+}
+
+enum Criticidade {
+  baixa
+  media
+  alta
+}
+
+enum AlertaStatus {
+  ATIVO
+  EM_ANDAMENTO
+  RESOLVIDO
+}
+
+// --- Modelos de Dados ---
+
+model Usuario {
+  id           Int           @id @default(autoincrement())
+  nome         String
+  email        String        @unique
+  senha        String
+  role         Role          @default(tecnico)
+  manutencoes  Manutencao[]
+  createdAt    DateTime      @default(now())
+}
+
+model Maquina {
+  id           Int           @id @default(autoincrement())
+  nome         String
+  setor        String
+  tipo         String
+  criticidade  Criticidade   @default(media)
+  sensores     Sensor[]
+  alertas      Alerta[]
+}
+
+model Sensor {
+  id                Int       @id @default(autoincrement())
+  tipo              String
+  status            String
+  limiteTemperatura Float
+  limiteVibracao    Float
+  
+  maquina           Maquina   @relation(fields: [maquinaId], references: [id])
+  maquinaId         Int
+  
+  leituras          Leitura[]
+  alertas           Alerta[]
+}
+
+model Leitura {
+  id          Int      @id @default(autoincrement())
+  temperatura Float
+  vibracao    Float
+  criadoEm    DateTime @default(now())
+  
+  sensor      Sensor   @relation(fields: [sensorId], references: [id])
+  sensorId    Int
+}
+
+model Alerta {
+  id          Int           @id @default(autoincrement())
+  tipo        String
+  status      AlertaStatus  @default(ATIVO)
+  mensagem    String        @db.Text
+  criadoEm    DateTime      @default(now())
+  
+  sensor      Sensor        @relation(fields: [sensorId], references: [id])
+  sensorId    Int
+  maquina     Maquina       @relation(fields: [maquinaId], references: [id])
+  maquinaId   Int
+  
+  manutencoes Manutencao[]
+}
+
+model Manutencao {
+  id          Int      @id @default(autoincrement())
+  observacao  String?  @db.Text
+  status      String   // Ex: Pendente, ConcluÃ­da
+  criadoEm    DateTime @default(now())
+  
+  alerta      Alerta   @relation(fields: [alertaId], references: [id])
+  alertaId    Int
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+  usuarioId   Int
+}
