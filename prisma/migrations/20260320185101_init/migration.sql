@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `sensor` MODIFY `status` ENUM('ONLINE', 'OFFLINE', 'INATIVO') NOT NULL DEFAULT 'ONLINE';

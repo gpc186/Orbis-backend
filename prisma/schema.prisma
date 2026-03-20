@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  TECNICO
+}
+
+enum Criticidade {
+  BAIXA
+  MEDIA
+  ALTA
+}
+
+enum StatusSensor {
+  ONLINE
+  OFFLINE
+  INATIVO
+}
+
+enum TipoAlerta {
+  LIMITE_ULTRAPASSADO
+  TENDENCIA_CURTA
+  TENDENCIA_LONGA
+  DEGRADACAO_ACELERADA
+  INSTABILIDADE
+}
+
+enum StatusAlerta {
+  ATIVO
+  EM_ANDAMENTO
+  RESOLVIDO
+  CANCELADO
+}
+
+enum TipoEvento {
+  CRIADO
+  ACEITO
+  ATUALIZADO
+  RESOLVIDO
+  CANCELADO
+}
+
+enum StatusManutencao {
+  EM_ANDAMENTO
+  RESOLVIDO
+}
+
+// ─── MODELS ───────────────────────────────────────────────────────────────────
+
+model Usuario {
+  id            Int      @id @default(autoincrement())
+  nome          String
+  email         String   @unique
+  senha         String
+  role          Role     @default(TECNICO)
+  ativo         Boolean  @default(true)
+  especialidade String?
+  telefone      String?
+  oneSignalId   String?
+  atualizadoEm  DateTime @updatedAt
+  criadoEm      DateTime @default(now())
+
+  alertas       Alerta[]
+  alertaEventos AlertaEvento[]
+  manutencoes   Manutencao[]
+  refreshTokens RefreshToken[]
+}
+
+model Maquina {
+  id                 Int         @id @default(autoincrement())
+  nome               String
+  setor              String
+  tipo               String
+  criticidade        Criticidade @default(BAIXA)
+  ativo              Boolean     @default(true)
+  integridade        Float       @default(100)
+  scoreEstabilidade  Float       @default(100)
+  previsaoManutencao DateTime?
+  janelaManuInicio   DateTime?
+  janelaManuFim      DateTime?
+  criadoEm           DateTime    @default(now())
+
+  sensores Sensor[]
+  alertas  Alerta[]
+}
+
+model Sensor {
+  id                Int          @id @default(autoincrement())
+  maquinaId         Int
+  tipo              String
+  status            StatusSensor @default(ONLINE)
+  limiteTemperatura Float
+  idealTemperatura  Float
+  limiteVibracao    Float
+  idealVibracao     Float
+  desvioMaximo      Float        @default(5.0)
+  ultimaTemperatura Float?
+  ultimaVibracao    Float?
+  ultimaLeituraEm   DateTime?
+  criadoEm          DateTime     @default(now())
+
+  maquina  Maquina   @relation(fields: [maquinaId], references: [id])
+  leituras Leitura[]
+  alertas  Alerta[]
+}
+
+model Leitura {
+  id          Int      @id @default(autoincrement())
+  sensorId    Int
+  temperatura Float
+  vibracao    Float
+  criadoEm    DateTime @default(now())
+
+  sensor Sensor @relation(fields: [sensorId], references: [id])
+
+  @@index([sensorId, criadoEm])
+}
+
+model Alerta {
+  id        Int          @id @default(autoincrement())
+  sensorId  Int
+  maquinaId Int
+  tecnicoId Int?
+  tipo      TipoAlerta
+  status    StatusAlerta @default(ATIVO)
+  mensagem  String       @db.Text
+  criadoEm  DateTime     @default(now())
+
+  sensor      Sensor         @relation(fields: [sensorId], references: [id])
+  maquina     Maquina        @relation(fields: [maquinaId], references: [id])
+  tecnico     Usuario?       @relation(fields: [tecnicoId], references: [id])
+  eventos     AlertaEvento[]
+  manutencoes Manutencao[]
+}
+
+model AlertaEvento {
+  id        Int        @id @default(autoincrement())
+  alertaId  Int
+  usuarioId Int?
+  tipo      TipoEvento
+  descricao String?    @db.Text
+  criadoEm  DateTime   @default(now())
+
+  alerta  Alerta   @relation(fields: [alertaId], references: [id])
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+}
+
+model Manutencao {
+  id         Int              @id @default(autoincrement())
+  alertaId   Int
+  usuarioId  Int
+  observacao String           @db.Text
+  status     StatusManutencao
+  criadoEm   DateTime         @default(now())
+
+  alerta  Alerta  @relation(fields: [alertaId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int
+  token     String   @unique
+  expiresAt DateTime
+  criadoEm  DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+}
