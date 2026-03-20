@@ -1,14 +1,26 @@
-const {PrismaClient} = require('@prisma/client')
-const prisma = new PrismaClient()
+const prisma = require('../prisma/prisma')
 
-const criarLeitura = async (dados) => {
-    return await prisma.leitura.create({
-        data:{
-            sensorId: Number(dados.sensorId),
-            temperatura: Number(dados.temperatura),
-            vibracao: Number(dados.vibracao)
-        }
-    })
+class LeituraModel {
+
+    static async store(dados) {
+        return await prisma.leitura.create({
+            data: {
+                sensorId: Number(dados.sensorId),
+                temperatura: Number(dados.temperatura),
+                vibracao: Number(dados.vibracao)
+            }
+        })
+    }
+
+    static async index(limite) {
+        return await prisma.leitura.findMany({
+            take: limite,
+            orderBy: { criadoEm: 'desc' },
+        })
+    }
+
 }
-console.log("3. Enviando ao Prisma/Banco");
-module.exports = {criarLeitura}
+
+
+
+module.exports = LeituraModel
