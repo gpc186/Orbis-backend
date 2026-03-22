@@ -6,7 +6,7 @@ class RefreshTokenModel {
      * @param {number} usuarioId 
      * @param {string} token 
      * @param {string} expiresAt
-     * @returns {Promise<Object>} usuarioId, token, expiresAt}
+     * @returns {Promise<Object|null>} usuarioId, token, expiresAt
      * @example
      * const tokenNovo = await RefreshTokenModel.create({usuarioId, token, expiresAt});
     */
@@ -16,7 +16,7 @@ class RefreshTokenModel {
     /**
      * Acha o refreshToken pelo próprio refreshToken
      * @param {string} token 
-     * @returns {Promise<Object>} usuarioId, token, expiresAt
+     * @returns {Promise<Object|null>} usuarioId, token, expiresAt
      * @example
      * const usuarioPeloToken = await RefreshTokenModel.findByToken(token);
      */
