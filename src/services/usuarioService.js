@@ -35,4 +35,43 @@ class UsuarioService {
 
         return { usuario, accessToken, refreshToken}
     };
-}
+    /**
+     * Faz o registro no banco de dados do usuário
+     * @param {string} nome
+     * @param {string} email
+     * @param {string} senha
+     * @param {string} role
+     * @returns {Promise<Object|null>} Retorna os dados do usuário que criou
+     * @example
+     * const usuarioNovo = await UsuarioService.register({ nome, email, senha, role })
+     */
+    static async register({ nome, email, senha, role }){
+        if(nome.length < 3){
+            throw new AppError("Nome inválido!", 400);
+        };
+
+        if(!email.test(/^[\w\-\.]+@([\w-]+\.)+[\w-]{2,}$/gm)){
+            throw new AppError("Email inválido!", 400);
+        };
+
+        const emailExist = await UsuarioModel.findByEmail(email);
+        
+        if(emailExist){
+            throw new AppError("Credenciais inválidas!", 400);
+        };
+
+        if(role !== "ADMIN" || role !== "TECNICO"){
+            throw new AppError("Credenciais inválidas!", 400);
+        };
+
+        const senhaHash = await bcrypt.hash(senha, 10);
+
+        const usuario = await UsuarioModel.create({ nome, email, senhaHash, role });
+
+        return { usuario }
+    };
+
+    
+};
+
+module.exports = UsuarioService;
