@@ -50,7 +50,7 @@ class UsuarioService {
             throw new AppError("Nome inválido!", 400);
         };
 
-        if(!email.test(/^[\w\-\.]+@([\w-]+\.)+[\w-]{2,}$/gm)){
+        if(!/^[\w\-\.]+@([\w-]+\.)+[\w-]{2,}$/gm.test(email)){
             throw new AppError("Email inválido!", 400);
         };
 
@@ -60,13 +60,13 @@ class UsuarioService {
             throw new AppError("Credenciais inválidas!", 400);
         };
 
-        if(role !== "ADMIN" || role !== "TECNICO"){
+        if(role !== "ADMIN" && role !== "TECNICO"){
             throw new AppError("Credenciais inválidas!", 400);
         };
 
         const senhaHash = await bcrypt.hash(senha, 10);
 
-        const usuario = await UsuarioModel.create({ nome, email, senhaHash, role });
+        const usuario = await UsuarioModel.create({ nome, email, senha: senhaHash, role });
 
         return { usuario }
     };
