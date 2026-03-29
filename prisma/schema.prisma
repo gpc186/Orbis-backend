@@ -173,5 +173,5 @@ model RefreshToken {
   expiresAt DateTime
   criadoEm  DateTime @default(now())
 
-  usuario Usuario @relation(fields: [usuarioId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 }
