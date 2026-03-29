@@ -8,17 +8,30 @@ class UsuarioModel {
      * @param {string} email
      * @param {string} senha
      * @param {string} role
-     * @returns {Promise<Usuario|null>} Todos os dados anteriores, menos a senha
+     * @returns  Todos os dados anteriores, menos a senha
      * @example
      * const usuarioNovo = await UsuarioModel.create({nome, email, senha, role});
      */
     static async create({ nome, email, senha, role }) {
-        return await prisma.usuario.create({ data: { nome, email, senha, role }, omit: { senha: true } });
+        return await prisma.usuario.create({
+            data: { nome, email, senha, role }, select: {
+                id: true,
+                nome: true,
+                email: true,
+                role: true,
+                ativo: true,
+                especialidade: true,
+                telefone: true,
+                oneSignalId: true,
+                atualizadoEm: true,
+                criadoEm: true
+            }
+        });
     };
     /**
      * Pega os dados de um usuário pelo e-mail, normalmente usado no login
      * @param {string} email 
-     * @returns {Promise<Usuario|null>} Todos os dados do usuário
+     * @returns  Todos os dados do usuário
      * @example
      * const usuario = await UsuarioModel.findByEmail(email)
      */
@@ -28,18 +41,31 @@ class UsuarioModel {
     /**
      * Pega os dados de usuário pelo id dele, normalmente usado em requisições de api
      * @param {number} id 
-     * @returns {Promise<Usuario|null>} Todos os dados do usuário, menos a senha
+     * @returns  Todos os dados do usuário, menos a senha
      * @example
      * const usuario = await UsuarioModel.findById(id);
      */
     static async findById(id) {
-        return await prisma.usuario.findUnique({ where: { id }, omit: { senha: true } })
+        return await prisma.usuario.findUnique({
+            where: { id }, select: {
+                id: true,
+                nome: true,
+                email: true,
+                role: true,
+                ativo: true,
+                especialidade: true,
+                telefone: true,
+                oneSignalId: true,
+                atualizadoEm: true,
+                criadoEm: true
+            }
+        })
     };
     /**
      * Pega todos os usuários que estão ativos com uma função de paginação, tendo o `skip`e `take` para fazer esta função
      * @param {number} skip 
      * @param {number} take 
-     * @returns {Promise<Usuario|null>} Todos os usuários e seus dados, apenas removendo a senha
+     * @returns  Todos os usuários e seus dados, apenas removendo a senha
      * @example
      * const todosUsuarios = await UsuarioModel.findAll(skip, take);
      */
@@ -49,19 +75,44 @@ class UsuarioModel {
             skip,
             take,
             orderBy: { criadoEm: "desc" },
-            omit: { senha: true }
+            select: {
+                id: true,
+                nome: true,
+                email: true,
+                role: true,
+                ativo: true,
+                especialidade: true,
+                telefone: true
+            }
         });
     };
     /**
      * Atualiza campos requisitados pelo service no banco de dados
      * @param {number} id
+     * @param {string} nome
+     * @param {string} role
+     * @param {string} especialidade
+     * @param {string} dados
      * @throws {Error}
-     * @returns {Promise<Usuario|null>} Todos os dados do usuário, menos a senha
+     * @returns Todos os dados do usuário, menos a senha
      * @example
-     * const dadosNovos = await UsuarioModel.update({id, dados});
+     * const dadosNovos = await UsuarioModel.update( id,{ nome, role, especialidade, telefone });
      */
-    static async update({ id, dados }) {
-        return await prisma.usuario.update({ where: { id }, data: dados, omit: { senha: true } });
+    static async update(id, { nome, role, especialidade, telefone }) {
+        return await prisma.usuario.update({
+            where: { id }, data: { nome, role, especialidade, telefone }, select: {
+                id: true,
+                nome: true,
+                email: true,
+                role: true,
+                ativo: true,
+                especialidade: true,
+                telefone: true,
+                oneSignalId: true,
+                atualizadoEm: true,
+                criadoEm: true
+            }
+        });
     };
     /**
      * Deleta um usuario pelo seu ID
@@ -73,8 +124,17 @@ class UsuarioModel {
         return await prisma.usuario.delete({ where: { id } });
     };
     /**
+     * Retorna a quantidade de usuarios cadastrados, serve para a paginação
+     * @returns  O numero de usuários
+     * @example
+     * const quantidadeUsuarios = await UsuarioModel.count();
+     */
+    static async count() {
+        return await prisma.usuario.count()
+    }
+    /**
      * Pega o numero de Admins, isso é pela regra de negócio para sempre ter pelo menos `um admin ativo sempre`
-     * @returns {number} O numero de admins
+     * @returns  O numero de admins
      * @example
      * const adminCount = await UsuarioModel.countAdmins();
      * 
@@ -83,7 +143,9 @@ class UsuarioModel {
      * }
      */
     static async countAdmins() {
-        return await prisma.usuario.count({ where: { role: "ADMIN", ativo: true }, omit: { senha: true } });
+        return await prisma.usuario.count({
+            where: { role: "ADMIN", ativo: true }
+        });
     };
 };
 

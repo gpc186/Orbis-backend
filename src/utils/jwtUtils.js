@@ -1,11 +1,12 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 /**
  * Função helper para criar o `accessToken`
  * @param {number} id 
  * @param {string} role
  * @returns O token com o `JWT_SECRET` e `JWT_EXPIRES_IN` do `.env`
  * @example
- * const accessToken = await generateAccessToken({ id: usuario.id, role: usuario.role });
+ * const accessToken = generateAccessToken({ id: usuario.id, role: usuario.role });
  */
 function generateAccessToken({ id, role }) {
     return jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN });

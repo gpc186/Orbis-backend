@@ -5,7 +5,6 @@ const AppError = require("../utils/appErrorUtils");
  * @param {Request} req 
  * @param {Response} res 
  * @param {Next} next 
- * @returns {Error} Erro com o status e mensagem setada pelo `AppError()`
  * @example
  * router.post('/', errorMiddleware, leituraController.store);
  */
