@@ -150,9 +150,6 @@ class UsuarioService {
      */
     static async findById(id) {
         const usuario = await UsuarioModel.findById(parseInt(id));
-        if (!usuario) {
-            throw new AppError("Usuario não encontrado!", 404);
-        };
         return { usuario }
     };
     /**
@@ -163,48 +160,54 @@ class UsuarioService {
      * @param {string} especialidade
      * @param {number} telefone
      * @example 
-     * const usuarioAtualizado = await UsuarioService.update(id, {nome, role, especialidade, telefone})
+     * const usuarioAtualizado = await UsuarioService.update({ id, dados })
      */
-    static async update( id, { nome, role, especialidade, telefone }) {
+    static async update({ id, dados }) {
+        const { nome, role, especialidade, telefone } = dados;
         const usuario = await UsuarioModel.findById(parseInt(id));
-        
-        if(!usuario){
+
+        if (!usuario) {
             throw new AppError("Usuario não encontrado!", 404);
         };
-        
-        if(usuario.role === "ADMIN" && role === "TECNICO"){
+
+        if (usuario.role === "ADMIN" && role === "TECNICO") {
             const countAdmin = await UsuarioModel.countAdmins();
-            if(countAdmin == 1){
+            if (countAdmin == 1) {
                 throw new AppError("Não é possivel rebaixar o ultimo admin!", 409);
             };
         };
 
-        if (nome.length < 3) {
+        if (nome && nome.length < 3) {
             throw new AppError("Nome inválido!", 400);
         };
 
-        if(especialidade && especialidade.length < 2){
+        if (especialidade && especialidade.length < 2) {
             throw new AppError("Especialidade invalida!", 400);
         };
 
-        if(telefone &&!/^(\(?[0-9]{2}\)?)? ?([0-9]{4,5})-?([0-9]{4})$/gm.test(telefone)){
+        if (telefone && !/^(\(?[0-9]{2}\)?)? ?([0-9]{4,5})-?([0-9]{4})$/gm.test(telefone)) {
             throw new AppError("Telefone inválido!", 400);
         };
 
-        const usuarioAtualizado = await UsuarioModel.update(parseInt(id), { nome, role, especialidade, telefone });
+        const dadosParaAtualizar = {};
 
-        const { oneSignalId, atualizadoEm, criadoEm, email, ...dadosAtualizados } = usuarioAtualizado
+        if (nome !== undefined) dadosParaAtualizar.nome = nome;
+        if (role !== undefined) dadosParaAtualizar.role = role;
+        if (especialidade !== undefined) dadosParaAtualizar.especialidade = especialidade;
+        if (telefone !== undefined) dadosParaAtualizar.telefone = telefone;
 
-        return dadosAtualizados;
+        const usuarioAtualizado = await UsuarioModel.update({ id, dadosParaAtualizar });
+
+        return usuarioAtualizado;
     }
 
-    static async delete(id){
+    static async delete(id) {
         const usuario = await UsuarioModel.findById(parseInt(id));
-        if(!usuario){
+        if (!usuario) {
             throw new AppError("Usuario não encontrado!", 404);
         };
 
-        if(usuario.role === "ADMIN"){
+        if (usuario.role === "ADMIN") {
             throw new AppError("Você não pode deletar outro admin!", 409);
         };
 

@@ -23,9 +23,8 @@ class UsuarioController {
 
     static async update(req, res, next){
         try {
-            const { nome, role, especialidade, telefone } = req.body;
             const { id } = req.params;
-            const resultado = await UsuarioService.update(id, {nome, role, especialidade, telefone});
+            const resultado = await UsuarioService.update({ id, dados: req.body });
             return res.status(200).json(resultado);
         } catch (error) {
             next(error);

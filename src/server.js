@@ -10,6 +10,7 @@ const maquinaRoutes = require('./routes/maquinaRoutes')
 const sensorRoutes = require('./routes/sensorRoutes')
 const authRoutes = require('./routes/authRoutes');
 const usuarioRoutes = require('./routes/usuarioRoutes');
+const perfilRoutes = require('./routes/perfilRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -29,7 +30,9 @@ app.use('/leituras', leituraRoutes)
 app.use('/maquinas', maquinaRoutes)
 app.use('/sensores', sensorRoutes)
 app.use('/auth', authRoutes)
-app
+app.use('/usuarios/', usuarioRoutes)
+app.use('/perfil', perfilRoutes)
+
 app.use(errorMiddleware)
 // Gerenciamento de Conexões Real-time
 io.on('connection', (socket) => {

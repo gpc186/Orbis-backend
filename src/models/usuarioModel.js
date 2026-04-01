@@ -98,9 +98,9 @@ class UsuarioModel {
      * @example
      * const dadosNovos = await UsuarioModel.update( id,{ nome, role, especialidade, telefone });
      */
-    static async update(id, { nome, role, especialidade, telefone }) {
+    static async update({id, dados}) {
         return await prisma.usuario.update({
-            where: { id }, data: { nome, role, especialidade, telefone }, select: {
+            where: { id }, data: dados, select: {
                 id: true,
                 nome: true,
                 email: true,
