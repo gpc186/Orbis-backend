@@ -1,14 +1,45 @@
 const { Prisma } = require('@prisma/client');
-const leituraModel = require('../models/leituraModel')
+const leituraModel = require('../models/leituraModel');
+const SensorModel = require('../models/sensorModel');
+const AppError = require('../utils/appErrorUtils');
+const AlertaService = require('./alertaService');
 
 class leituraService {
     static async processarNovaLeitura(dadosLeitura) {
-        if (dadosLeitura.temperatura > 80) {
-            console.log("⚠️ ALERTA: Temperatura crítica detectada!");
-        } else if (dadosLeitura.vibracao > 10) {
-            console.log("⚠️ ALERTA: Vibração crítica detectada!");
+
+        const sensor = await SensorModel.findById(dadosLeitura.sensorId)
+        if(!sensor) throw new AppError("Sensor não encontrado");
+
+        if (dadosLeitura.temperatura > sensor.limiteTemperatura) {
+            await AlertaService.gerarAlerta(
+                sensor.id,
+                sensor.maquinaId,
+                'LIMITE_ULTRAPASSADO',
+                `Temperatura Crítica: ${dadosLeitura.temperatura}°C (Limite: ${sensor.limiteTemperatura}°C)`
+            )
         }
-        console.log("2. Tratei no Service");
+
+        if (dadosLeitura.vibracao > sensor.limiteVibracao) {
+            await AlertaService.gerarAlerta(
+                sensor.id,
+                sensor.maquinaId,
+                'LIMITE_ULTRAPASSADO',
+                `Vibração Crítica: ${dadosLeitura.vibracao} (Limite: ${sensor.limiteVibracao})`
+            )
+        }
+
+        const desvioTemp = Math.abs(dadosLeitura.temperatura - sensor.idealTemperatura)
+        const desvioVibra = Math.abs(dadosLeitura.vibracao - sensor.idealVibracao)
+
+        if (desvioTemp > sensor.desvioMaximoTemp || desvioVibra > sensor.desvioMaximoVibra) {
+            await AlertaService.gerarAlerta(
+                sensor.id,
+                sensor.maquinaId,
+                'INSTABILIDADE'
+                `Oscilação térmica ou da vibração detectada fora do padrão ideal.`
+            )
+        }
+
         return await leituraModel.store(dadosLeitura)
     }
 

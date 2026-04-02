@@ -3,7 +3,7 @@ const MaquinaService = require('../services/maquinaService');
 class MaquinaController {
     static async store(req, res) {
         try {
-            const nova = await MaquinaService.create(req.body);
+            const nova = await MaquinaService.create(req.body, id, role);
             return res.status(201).json(nova);
         } catch (error) {
             return res.status(400).json({ error: error.message });

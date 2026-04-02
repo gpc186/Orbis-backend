@@ -1,9 +1,11 @@
 const MaquinaModel = require('../models/maquinaModel');
+const UsuarioModel = require('../models/usuarioModel');
+const AppError = require("../utils/appErrorUtils")
 
 class MaquinaService {
     static async create(dados) {
         if (!dados.nome || !dados.setor) {
-            throw new Error("Nome e setor são obrigatórios para cadastrar uma máquina.");
+            throw new AppError("Nome e setor são obrigatórios para cadastrar uma máquina.");
         }
         return await MaquinaModel.create(dados);
     }
@@ -12,7 +14,7 @@ class MaquinaService {
     }
     static async findById(id) {
         const maquina = await MaquinaModel.findById(id);
-        if (!maquina) throw new Error("Máquina não encontrada.");
+        if (!maquina) throw new AppError("Máquina não encontrada.");
         return maquina;
     }
     static async update(id, dados) {
