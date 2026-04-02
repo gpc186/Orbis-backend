@@ -30,7 +30,7 @@ app.use('/leituras', leituraRoutes)
 app.use('/maquinas', maquinaRoutes)
 app.use('/sensores', sensorRoutes)
 app.use('/auth', authRoutes)
-app.use('/usuarios/', usuarioRoutes)
+app.use('/usuarios', usuarioRoutes)
 app.use('/perfil', perfilRoutes)
 
 app.use(errorMiddleware)
