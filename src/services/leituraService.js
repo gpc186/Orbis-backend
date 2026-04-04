@@ -35,7 +35,7 @@ class leituraService {
             await AlertaService.gerarAlerta(
                 sensor.id,
                 sensor.maquinaId,
-                'INSTABILIDADE'
+                'INSTABILIDADE',
                 `Oscilação térmica ou da vibração detectada fora do padrão ideal.`
             )
         }

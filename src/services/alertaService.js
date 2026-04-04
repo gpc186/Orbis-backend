@@ -12,7 +12,17 @@ class AlertaService {
             }
         })
 
-        if (alertaExistente) return null
+        if (alertaExistente) {
+            return await prisma.alerta.update({
+                where: {id: alertaExistente.id},
+                data: {
+                    mensagem: `${mensagem} (Ocorrência repetida em ${new Date().toLocaleDateString})`,
+                    eventos: {
+                        create: {tipo: 'ATUALIZADO', descricao: 'Limite ultrapassado novamente'}
+                    }
+                }
+            })
+        }
 
         const novoAlerta = await prisma.alerta.create({
             data: {
