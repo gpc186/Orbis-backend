@@ -1,6 +1,7 @@
 const cron = require('node-cron')
 const prisma = require('../prisma/prisma')
 const AlertaService = require('../services/alertaService')
+const MaquinaService = require('../services/maquinaService')
 
 // Análise de Tendências e Saúde a cada 30min
 cron.schedule('*/30 * * * *', async () => {
@@ -34,13 +35,10 @@ cron.schedule('*/30 * * * *', async () => {
                 'TENDENCIA_LONGA',
                 `Aumento de 15% na vibração nas ultimas 24h: Média ${media24h.toFixed(2)}`
             )
-            await prisma.maquina.update({
-                where: { id: sensor.maquinaId },
-                data: {
-                    scoreEstabilidade: { decrement: 10 },
-                    integridade: { decrement: 5 }
-                }
-            })
+            await MaquinaService.update(
+                sensor.maquinaId,
+                {scoreEstabilidade: { decrement: 10 }, integridade: { decrement: 5 }}
+            )
         }
 
     }
