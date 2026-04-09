@@ -13,10 +13,10 @@ class AlertaModel {
         })
     }
 
-    static async update(id, mensagem) {
+    static async update(id, data) {
         return await prisma.alerta.update({
             where: { id: parseInt(id) },
-            mensagem
+            data
         })
     }
 

@@ -14,7 +14,6 @@ class LeituraController {
 
             const io = req.app.get('io')
             if (io) io.emit('nova-leitura', novaLeitura)
-            console.log("1. Recebi no Controller");
 
             return res.status(201).json(novaLeitura);
         } catch (error) {
