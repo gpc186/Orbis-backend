@@ -62,7 +62,17 @@ class ManutecaoService {
         return [manutencoes]
     };
 
-    static async update(id, {observacao, status}){
+    static async findById(id){
+        const manutencao = await ManutecaoModel.findById(id);
+        
+        if(!manutencao){
+            throw new AppError("Não foi possivel encontrar a manutenção!", 404);
+        };
+
+        return manutencao;
+    }
+
+    static async update(id, {dados}){
         const manutencao = await ManutecaoModel.findById(id);
         if(!manutencao){
             throw new AppError("Manuteção não foi encontrada!", 404);
@@ -71,15 +81,17 @@ class ManutecaoService {
             throw new AppError("Manutenção já foi resolvida, não é possivel alterar!", 409);
         };
 
-        if(observacao.length < 3){
+        if(dados.observacao.length < 3){
             throw new AppError("Observação não é válida!", 400);
         };
 
-        if(status != "EM_ANDAMENTO" || status != "RESOLVIDO"){
+        if(dados.status != "EM_ANDAMENTO" || dados.status != "RESOLVIDO"){
             throw new AppError("Status não é válido!", 400);
         };
 
-        const resultado = await ManutecaoModel.update({id, dados: {observacao, status}})
+        const resultado = await ManutecaoModel.update({id, dados})
         return resultado;
     };
 }
+
+module.exports = ManutecaoService;
