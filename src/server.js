@@ -11,6 +11,7 @@ const sensorRoutes = require('./routes/sensorRoutes')
 const authRoutes = require('./routes/authRoutes');
 const usuarioRoutes = require('./routes/usuarioRoutes');
 const perfilRoutes = require('./routes/perfilRoutes');
+const manutencaoRoutes = require('./routes/manutencaoRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -29,6 +30,7 @@ app.get('/', (req, res) => res.send("Orbis API - Online"));
 app.use('/leituras', leituraRoutes)
 app.use('/maquinas', maquinaRoutes)
 app.use('/sensores', sensorRoutes)
+app.use('/manutencoes', manutencaoRoutes)
 app.use('/auth', authRoutes)
 app.use('/usuarios', usuarioRoutes)
 app.use('/perfil', perfilRoutes)
