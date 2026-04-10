@@ -26,6 +26,10 @@ cron.schedule('*/30 * * * *', async () => {
                 'TENDENCIA_CURTA',
                 `Aumento repentino de 15% na vibração nas ultimas 2h: Média ${media2h.toFixed(2)}`
             )
+            await MaquinaService.update(
+                sensor.maquinaId,
+                { scoreEstabilidade: { decrement: 5 }, integridade: { decrement: 2 } }
+            )
         }
 
         if (media24h > media7d * 1.15 && media7d > 0) {
@@ -37,7 +41,7 @@ cron.schedule('*/30 * * * *', async () => {
             )
             await MaquinaService.update(
                 sensor.maquinaId,
-                {scoreEstabilidade: { decrement: 10 }, integridade: { decrement: 5 }}
+                { scoreEstabilidade: { decrement: 3 }, integridade: { decrement: 1 } }
             )
         }
 

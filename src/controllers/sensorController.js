@@ -2,54 +2,51 @@ const SensorService = require('../services/sensorService')
 
 
 class SensorController {
-    static async store(req, res) {
+    static async store(req, res, next) {
         try {
-            const { tipo, status, limiteTemperatura, limiteVibracao, maquinaId } = req.body
+            const { tipo, maquinaId } = req.body
 
             if (!tipo || !maquinaId) {
                 return res.status(400).json({ error: "Tipo e maquinaId são obrigatórios" })
             }
-
             const novoSensor = await SensorService.create(req.body)
             return res.status(201).json(novoSensor)
         } catch (error) {
-            console.error("Erro ao criar sensor", error)
-            return res.status(500).json({ error: "Erro interno ao criar sensor" })
+            next(error)
         }
     }
-    static async index(req, res) {
+    static async index(req, res, next) {
         try {
             const sensores = await SensorService.list()
             return res.json(sensores)
         } catch (error) {
-            return res.status(500).json({ error: "Erro ao listar sensores" })
+            next(error)
         }
     }
-    static async delete(req, res) {
+    static async delete(req, res, next) {
         try {
             const { id } = req.params
             await SensorService.delete(id)
             return res.status(204).send()
         } catch (error) {
-            return res.status(500).json({ error: "Erro ao deletar sensor" })
+            next(error)
         }
     }
-    static async update(req, res) {
+    static async update(req, res, next) {
         try {
             // Pegando id da URL e dados do Corpo
             const atualizado = await SensorService.update(req.params.id, req.body);
             return res.status(200).json(atualizado);
         } catch (error) {
-            console.error("❌ Erro no Update Sensor:", error); // ISSO AJUDA A DEBUGAR
-            return res.status(500).json({ error: error.message || "Erro ao atualizar sensor" });
+            next(error)
         }
     }
-    static async show(req, res) {
+    static async show(req, res, next) {
         try {
             const sensor = await SensorService.findById(req.params.id)
             return res.json(sensor)
         } catch (error) {
-            return res.status(500).json({ error: "Erro ao mostrar sensor" })
+            next(error)
         }
     }
 }

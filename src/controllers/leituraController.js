@@ -1,7 +1,7 @@
 const leituraService = require('../services/leituraService')
 
 class LeituraController {
-    static async store(req, res) {
+    static async store(req, res, next) {
         try {
             console.log("Conteúdo recebido:", req.body);
             const { sensorId, temperatura, vibracao } = req.body;
@@ -17,17 +17,15 @@ class LeituraController {
 
             return res.status(201).json(novaLeitura);
         } catch (error) {
-            console.error("Erro no Controller:", error);
-            return res.status(500).json({ error: "Erro interno ao processar leitura" });
+            next(error)
         }
     }
-    static async index(req, res) {
+    static async index(req, res, next) {
         try {
             const leituras = await leituraService.index()
             return res.json(leituras.reverse())
         } catch (error) {
-            console.error("Erro ao buscar leituras:", error)
-            return res.status(500).json({ error: "Erro ao buscar histórico" })
+            next(error)
         }
     }
 
