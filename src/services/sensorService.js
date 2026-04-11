@@ -39,6 +39,10 @@ class SensorService {
     static async delete(id) {
         return await SensorModel.delete(id);
     }
+
+    static async countActive(){
+        return await SensorModel.countActiveSensors()
+    }
 };
 
 module.exports = SensorService;

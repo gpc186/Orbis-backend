@@ -12,6 +12,8 @@ const authRoutes = require('./routes/authRoutes');
 const usuarioRoutes = require('./routes/usuarioRoutes');
 const perfilRoutes = require('./routes/perfilRoutes');
 const manutencaoRoutes = require('./routes/manutencaoRoutes');
+const tecnicoRoutes = require('./routes/tecnicoRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -31,6 +33,8 @@ app.use('/leituras', leituraRoutes)
 app.use('/maquinas', maquinaRoutes)
 app.use('/sensores', sensorRoutes)
 app.use('/manutencoes', manutencaoRoutes)
+app.use('/tecnicos', tecnicoRoutes)
+app.use('/dashboard', dashboardRoutes)
 app.use('/auth', authRoutes)
 app.use('/usuarios', usuarioRoutes)
 app.use('/perfil', perfilRoutes)

@@ -141,6 +141,36 @@ class UsuarioService {
 
         return { dados, total, page: pageNum, totalPages };
     };
+
+    static async listAllTecnicos({ page, limit }) {
+        const pageNum = parseInt(page)
+        const take = parseInt(limit)
+        const skip = (pageNum - 1) * take
+        const [dados, total] = await Promise.all([
+            UsuarioModel.findAllTecnicos({ skip, take }),
+            UsuarioModel.countTecnicos()
+        ])
+
+        const totalPages = Math.ceil(total / limit);
+
+        return { dados, total, page: pageNum, totalPages };
+    };
+    // TODO: Colocar essa função no service de alerta
+    static async findAlertasByTecnicoId(id, { page, limit }) {
+        const pageNum = parseInt(page)
+        const take = parseInt(limit)
+        const tecnicoId = id
+        const skip = (pageNum - 1) * take
+        const [dados, total] = await Promise.all([
+            UsuarioModel.findAlertasByTecnicoId(tecnicoId, { skip, take }),
+            UsuarioModel.countAlertasByTecnico(tecnicoId)
+        ])
+
+        const totalPages = Math.ceil(total / limit);
+
+        return { dados, total, page: pageNum, totalPages };
+    }
+
     /**
      * Retorna todos os dados do usuario pelo id
      * @param {number} id 
@@ -150,8 +180,30 @@ class UsuarioService {
      */
     static async findById(id) {
         const usuario = await UsuarioModel.findById(parseInt(id));
-        return { usuario }
+        if (!usuario) {
+            throw new AppError("Usuario não encontrado!", 404);
+        };
+        return usuario;
     };
+    // TODO: Colocar o model dentro da função no model de alerta
+    static async findTecnicoById(id) {
+        const tecnico = await UsuarioModel.findById(id);
+
+        if(!tecnico){
+            throw new AppError("Tecnico não encontrado!", 404);
+        };
+        
+        const status = await UsuarioModel.findAlertaStatusOfTecnicoById(id);
+
+        const alertaEmAndamento = status ? true : false
+
+        return { ...tecnico, alertaEmAndamento }
+    }
+
+    static async countActiveTecnicos(){
+        return await UsuarioModel.countActiveTecnico()
+    }
+
     /**
      * Pega os dados do usuario e faz um update, junto com verificações extras
      * @param {number} id 

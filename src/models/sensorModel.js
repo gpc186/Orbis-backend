@@ -38,6 +38,9 @@ class SensorModel {
             }
         });
     }
+    static async countActiveSensors(){
+        return await prisma.sensor.count({where: { status: "ONLINE" }})
+    }
 }
 
 module.exports = SensorModel
