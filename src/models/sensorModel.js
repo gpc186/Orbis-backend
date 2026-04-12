@@ -14,9 +14,9 @@ class SensorModel {
             }
         })
     }
-    static async findAll(){
+    static async findAll() {
         return await prisma.sensor.findMany({ include: { maquina: true } })
-    } 
+    }
     static async delete(id) {
         return await prisma.sensor.delete({ where: { id: parseInt(id) } })
     }
@@ -38,8 +38,20 @@ class SensorModel {
             }
         });
     }
-    static async countActiveSensors(){
-        return await prisma.sensor.count({where: { status: "ONLINE" }})
+    static async countActiveSensors() {
+        return await prisma.sensor.count({ where: { status: "ONLINE" } })
+    }
+
+    static async updateStatus(quinzeSegundosAtras) {
+        return await prisma.sensor.updateMany({
+            where: { status: { not: "INATIVO" } },
+            OR: [
+                { ultimaLeituraEm: { lt: quinzeSegundosAtras } },
+                { ultimaLeituraEm: null }
+            ]
+            ,
+            data: { status: "OFFLINE" }
+        })
     }
 }
 
