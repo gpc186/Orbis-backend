@@ -30,6 +30,16 @@ class authController {
             next(error);
         };
     };
+    
+    static async logoutAll(req, res, next){
+        try {
+            const { id } = req.usuario.id;
+            const response = await UsuarioService.logoutAll(id);
+            return res.status(200).json(response);
+        } catch (error) {
+            next(error);
+        };
+    };
 }
 
 module.exports = authController
