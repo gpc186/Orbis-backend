@@ -189,10 +189,10 @@ class UsuarioService {
     static async findTecnicoById(id) {
         const tecnico = await UsuarioModel.findById(id);
 
-        if(!tecnico){
+        if (!tecnico) {
             throw new AppError("Tecnico não encontrado!", 404);
         };
-        
+
         const status = await UsuarioModel.findAlertaStatusOfTecnicoById(id);
 
         const alertaEmAndamento = status ? true : false
@@ -200,7 +200,7 @@ class UsuarioService {
         return { ...tecnico, alertaEmAndamento }
     }
 
-    static async countActiveTecnicos(){
+    static async countActiveTecnicos() {
         return await UsuarioModel.countActiveTecnico()
     }
 
@@ -251,6 +251,18 @@ class UsuarioService {
         const usuarioAtualizado = await UsuarioModel.update({ id, dadosParaAtualizar });
 
         return usuarioAtualizado;
+    }
+
+    static async logoutAll(id) {
+        const usuario = await UsuarioModel.findById(id);
+
+        if (!usuario) {
+            throw new AppError("Usuario não encontrado!", 404);
+        };
+
+        await RefreshTokenModel.logoutAll(id);
+
+        return { mensagem: "usuario deletado com sucesso!" };
     }
 
     static async delete(id) {

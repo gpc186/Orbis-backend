@@ -30,6 +30,12 @@ class RefreshTokenModel {
     static async delete(token){
         return await prisma.refreshToken.delete({ where: {token} })
     };
+
+    static async logoutAll(id){
+        return await prisma.refreshToken.deleteMany({
+            where: { usuarioId: parseInt(id) }
+        });
+    };
 };
 
 module.exports = RefreshTokenModel;
