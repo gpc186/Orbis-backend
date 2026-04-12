@@ -5,6 +5,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const errorMiddleware = require("./middlewares/errorMiddleware")
 require('./jobs/limpezaJob');
+require('./jobs/sensorOfflineJob');
 
 const leituraRoutes = require('./routes/leituraRoutes')
 const maquinaRoutes = require('./routes/maquinaRoutes')
