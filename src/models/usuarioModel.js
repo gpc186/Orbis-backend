@@ -86,6 +86,52 @@ class UsuarioModel {
             }
         });
     };
+    // TODO: colocar a função dentro do model de alerta
+    static async findAlertaStatusOfTecnicoById(id) {
+        return await prisma.alerta.findFirst({
+            where: {
+                tecnicoId: parseInt(id),
+                status: 'EM_ANDAMENTO'
+            }
+        })
+    }
+
+    static async findAllTecnicos({ skip, take }) {
+        return await prisma.usuario.findMany({
+            where: { ativo: true, role: "TECNICO" },
+            skip,
+            take,
+            orderBy: { criadoEm: "desc" },
+            select: {
+                id: true,
+                nome: true,
+                email: true,
+                role: true,
+                ativo: true,
+                especialidade: true,
+                telefone: true
+            }
+        });
+    };
+    // TODO: Colocar essa função no model de alerta
+    static async findAlertasByTecnico(tecnicoId, { skip, take }) {
+        return prisma.alerta.findMany({
+            where: { tecnicoId },
+            skip,
+            take,
+            orderBy: { criadoEm: "desc" },
+            select: {
+                id: true,
+                nome: true,
+                email: true,
+                role: true,
+                ativo: true,
+                especialidade: true,
+                telefone: true
+            }
+        });
+    }
+
     /**
      * Atualiza campos requisitados pelo service no banco de dados
      * @param {number} id
@@ -98,7 +144,7 @@ class UsuarioModel {
      * @example
      * const dadosNovos = await UsuarioModel.update( id,{ nome, role, especialidade, telefone });
      */
-    static async update({id, dados}) {
+    static async update({ id, dados }) {
         return await prisma.usuario.update({
             where: { id }, data: dados, select: {
                 id: true,
@@ -131,6 +177,17 @@ class UsuarioModel {
      */
     static async count() {
         return await prisma.usuario.count()
+    }
+    static async countTecnicos() {
+        return await prisma.usuario.count({ where: { role: "TECNICO" } })
+    }
+    // TODO: Colocar essa função no model de alerta
+    static async countAlertasByTecnicoId(tecnicoId) {
+        return await prisma.alerta.count({ where: { tecnicoId } })
+    }
+
+    static async countActiveTecnico(){
+        return await prisma.usuario.count({where: {role: "TECNICO", ativo: true}})
     }
     /**
      * Pega o numero de Admins, isso é pela regra de negócio para sempre ter pelo menos `um admin ativo sempre`

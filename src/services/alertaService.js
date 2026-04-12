@@ -14,11 +14,11 @@ class AlertaService {
 
         if (alertaExistente) {
             return await prisma.alerta.update({
-                where: {id: alertaExistente.id},
+                where: { id: alertaExistente.id },
                 data: {
                     mensagem: `${mensagem} (Ocorrência repetida em ${new Date().toLocaleDateString})`,
                     eventos: {
-                        create: {tipo: 'ATUALIZADO', descricao: 'Limite ultrapassado novamente'}
+                        create: { tipo: 'ATUALIZADO', descricao: 'Limite ultrapassado novamente' }
                     }
                 }
             })
@@ -36,6 +36,34 @@ class AlertaService {
 
         console.log(`🚨 NOVO ALERTA [${tipo}]: ${mensagem}`);
         return novoAlerta;
+    }
+    // TODO: Implementar função no model
+    static async countMaquinasWithAlerta() {
+        return await prisma.alerta.findMany({
+            where: { status: 'ATIVO' },
+            select: { maquinaId: true },
+            distinct: ['maquinaId']
+        }).length
+    }
+    // TODO: Implementar função no model
+    static async countActiveAlertas(){
+        return await prisma.alerta.count({where: {status: "ATIVO"}});
+    };
+    // TODO: Implementar função no model
+    static async countAlertasToday(){
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        return await prisma.alerta.count({ where: { criadoEm: { gte: hoje } }});
+    };
+    // TODO: Implementar função no model
+    static async countAlertaSemAtendimento(){
+        return await prisma.alerta.count({where: { status: "ATIVO", tecnicoId: null }});
+    };
+    // TODO: Implementar função no model
+    static async countAtendedToday(){
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        return await prisma.alerta.count({ where: { status: "EM_ANDAMENTO", criadoEm: { gte: hoje }} });
     }
 }
 
