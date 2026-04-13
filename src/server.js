@@ -31,6 +31,7 @@ app.set('io', io);
 
 // Rota Principal
 app.get('/', (req, res) => res.send("Orbis API - Online"));
+app.get('/health', (req, res)=> res.status(200).json({ok: true}))
 
 app.use('/leituras', leituraRoutes)
 app.use('/maquinas', maquinaRoutes)
