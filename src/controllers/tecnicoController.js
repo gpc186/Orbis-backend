@@ -14,7 +14,7 @@ class TecnicoController {
     static async findById(req, res, next){
         try {
             const { id } = req.params;
-            const response = await UsuarioService.findById(id);
+            const response = await UsuarioService.findTecnicoById(id);
             return res.status(200).json(response);
         } catch (error) {
             next(error);
@@ -25,7 +25,7 @@ class TecnicoController {
         try {
             const { id } = req.params;
             const { page, limit } = req.query;
-            const response = await UsuarioService.findAlertasByTecnico(id, { page, limit });
+            const response = await UsuarioService.findAlertasByTecnicoId(id, { page, limit });
             return res.status(200).json(response);
         } catch (error) {
             next(error);

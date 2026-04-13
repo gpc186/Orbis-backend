@@ -1,5 +1,6 @@
 const RefreshTokenModel = require("../models/refreshTokenModel");
 const UsuarioModel = require("../models/usuarioModel");
+const AlertaModel = require("../models/alertaModel");
 const AppError = require("../utils/appErrorUtils");
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
@@ -155,15 +156,14 @@ class UsuarioService {
 
         return { dados, total, page: pageNum, totalPages };
     };
-    // TODO: Colocar essa função no service de alerta
     static async findAlertasByTecnicoId(id, { page, limit }) {
         const pageNum = parseInt(page)
         const take = parseInt(limit)
-        const tecnicoId = id
+        const tecnicoId = parseInt(id)
         const skip = (pageNum - 1) * take
         const [dados, total] = await Promise.all([
-            UsuarioModel.findAlertasByTecnicoId(tecnicoId, { skip, take }),
-            UsuarioModel.countAlertasByTecnico(tecnicoId)
+            AlertaModel.findAlertasByTecnico(tecnicoId, { skip, take }),
+            AlertaModel.countAlertasByTecnicoId(tecnicoId)
         ])
 
         const totalPages = Math.ceil(total / limit);
@@ -185,7 +185,6 @@ class UsuarioService {
         };
         return usuario;
     };
-    // TODO: Colocar o model dentro da função no model de alerta
     static async findTecnicoById(id) {
         const tecnico = await UsuarioModel.findById(id);
 
@@ -193,7 +192,7 @@ class UsuarioService {
             throw new AppError("Tecnico não encontrado!", 404);
         };
 
-        const status = await UsuarioModel.findAlertaStatusOfTecnicoById(id);
+        const status = await AlertaModel.findAlertaStatusOfTecnicoById(id);
 
         const alertaEmAndamento = status ? true : false
 

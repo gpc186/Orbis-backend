@@ -86,15 +86,6 @@ class UsuarioModel {
             }
         });
     };
-    // TODO: colocar a função dentro do model de alerta
-    static async findAlertaStatusOfTecnicoById(id) {
-        return await prisma.alerta.findFirst({
-            where: {
-                tecnicoId: parseInt(id),
-                status: 'EM_ANDAMENTO'
-            }
-        })
-    }
 
     static async findAllTecnicos({ skip, take }) {
         return await prisma.usuario.findMany({
@@ -113,24 +104,6 @@ class UsuarioModel {
             }
         });
     };
-    // TODO: Colocar essa função no model de alerta
-    static async findAlertasByTecnico(tecnicoId, { skip, take }) {
-        return prisma.alerta.findMany({
-            where: { tecnicoId },
-            skip,
-            take,
-            orderBy: { criadoEm: "desc" },
-            select: {
-                id: true,
-                nome: true,
-                email: true,
-                role: true,
-                ativo: true,
-                especialidade: true,
-                telefone: true
-            }
-        });
-    }
 
     /**
      * Atualiza campos requisitados pelo service no banco de dados
@@ -180,10 +153,6 @@ class UsuarioModel {
     }
     static async countTecnicos() {
         return await prisma.usuario.count({ where: { role: "TECNICO" } })
-    }
-    // TODO: Colocar essa função no model de alerta
-    static async countAlertasByTecnicoId(tecnicoId) {
-        return await prisma.alerta.count({ where: { tecnicoId } })
     }
 
     static async countActiveTecnico(){
