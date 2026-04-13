@@ -1,44 +1,44 @@
 const MaquinaService = require('../services/maquinaService');
 
 class MaquinaController {
-    static async store(req, res) {
+    static async store(req, res, next) {
         try {
             const nova = await MaquinaService.create(req.body, id, role);
             return res.status(201).json(nova);
         } catch (error) {
-            return res.status(400).json({ error: error.message });
+            next(error)
         }
     }
-    static async index(req, res) {
+    static async index(req, res, next) {
         try {
             const todas = await MaquinaService.list();
             return res.json(todas);
         } catch (error) {
-            return res.status(500).json({ error: "Erro ao listar máquinas" });
+            next(error)
         }
     }
-    static async delete(req, res) {
+    static async delete(req, res, next) {
         try {
             await MaquinaService.delete(req.params.id);
             return res.status(200).json({ message: "Máquina removida" });
         } catch (error) {
-            return res.status(500).json({ error: "Erro ao deletar" });
+            next(error)
         }
     }
-    static async show(req, res) {
+    static async show(req, res, next) {
         try {
             const maquina = await MaquinaService.findById(req.params.id)
             return res.status(200).json(maquina);
         } catch (error) {
-            return res.status(500).json({ error: "Erro ao mostrar" });
+            next(error)
         }
     }
-    static async update(req, res) {
+    static async update(req, res, next) {
         try {
             const atualizada = await MaquinaService.update(req.params.id, req.body)
             return res.status(200).json(atualizada);
         } catch (error) {
-            return res.status(500).json({ error: "Erro ao atualizar" });
+            next(error)
         }
     }
 };
