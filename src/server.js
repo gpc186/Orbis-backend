@@ -5,6 +5,8 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const errorMiddleware = require("./middlewares/errorMiddleware")
+require('./jobs/limpezaJob');
+require('./jobs/sensorOfflineJob');
 
 const leituraRoutes = require('./routes/leituraRoutes')
 const maquinaRoutes = require('./routes/maquinaRoutes')
@@ -12,6 +14,9 @@ const sensorRoutes = require('./routes/sensorRoutes')
 const authRoutes = require('./routes/authRoutes');
 const usuarioRoutes = require('./routes/usuarioRoutes');
 const perfilRoutes = require('./routes/perfilRoutes');
+const manutencaoRoutes = require('./routes/manutencaoRoutes');
+const tecnicoRoutes = require('./routes/tecnicoRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -30,6 +35,9 @@ app.get('/', (req, res) => res.send("Orbis API - Online"));
 app.use('/leituras', leituraRoutes)
 app.use('/maquinas', maquinaRoutes)
 app.use('/sensores', sensorRoutes)
+app.use('/manutencoes', manutencaoRoutes)
+app.use('/tecnicos', tecnicoRoutes)
+app.use('/dashboard', dashboardRoutes)
 app.use('/auth', authRoutes)
 app.use('/usuarios', usuarioRoutes)
 app.use('/perfil', perfilRoutes)
