@@ -44,12 +44,17 @@ class SensorModel {
 
     static async updateStatus(quinzeSegundosAtras) {
         return await prisma.sensor.updateMany({
-            where: { status: { not: "INATIVO" } },
-            OR: [
-                { ultimaLeituraEm: { lt: quinzeSegundosAtras } },
-                { ultimaLeituraEm: null }
-            ]
-            ,
+            where: {
+                AND: [
+                    { status: { not: "INATIVO" } },
+                    {
+                        OR: [
+                            { ultimaLeituraEm: { lt: quinzeSegundosAtras } },
+                            { ultimaLeituraEm: null }
+                        ]
+                    }
+                ]
+            },
             data: { status: "OFFLINE" }
         })
     }

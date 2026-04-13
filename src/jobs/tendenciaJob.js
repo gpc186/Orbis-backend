@@ -56,13 +56,3 @@ async function calcularMedia(sensorId, dataInicio) {
     })
     return resultado._avg.vibracao || 0
 }
-
-// Sensor Offline 5min
-cron.schedule('*/5 * * * *', async () => {
-    const cincoMinAtras = new Date(Date.now() - 5 * 60 * 1000)
-
-    await prisma.sensor.updateMany({
-        where: { status: 'ONLINE', ultimaLeituraEm: { lt: cincoMinAtras } },
-        data: { status: 'OFFLINE' }
-    })
-})
