@@ -2,7 +2,6 @@ const RefreshTokenModel = require("../models/refreshTokenModel");
 const UsuarioModel = require("../models/usuarioModel");
 const AppError = require("../utils/appErrorUtils");
 const bcrypt = require('bcrypt');
-const crypto = require('crypto');
 const { generateAccessToken, generateRefreshTokenData } = require("../utils/jwtUtils");
 
 class UsuarioService {

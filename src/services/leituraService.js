@@ -1,4 +1,3 @@
-const { Prisma } = require('@prisma/client');
 const leituraModel = require('../models/leituraModel');
 const SensorModel = require('../models/sensorModel');
 const AppError = require('../utils/appErrorUtils');

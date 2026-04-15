@@ -1,5 +1,4 @@
 const MaquinaModel = require('../models/maquinaModel');
-const UsuarioModel = require('../models/usuarioModel');
 const AppError = require("../utils/appErrorUtils")
 
 class MaquinaService {
