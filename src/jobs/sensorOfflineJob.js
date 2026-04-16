@@ -7,5 +7,7 @@ cron.schedule('*/5 * * * *', async () => {
 
     const response = await SensorModel.updateStatus(quinzeSegundosAtras);
 
-    console.log(`Foram marcados como OFFLINE ${response.count} sensores`);
+    if(response.count > 0){
+        console.log(`Foram marcados como OFFLINE ${response.count} sensores`);
+    }
 })
