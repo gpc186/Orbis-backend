@@ -46,7 +46,7 @@ class SensorModel {
         return await prisma.sensor.updateMany({
             where: {
                 AND: [
-                    { status: { not: "INATIVO" } },
+                    { status: { notIn: ["INATIVO", "OFFLINE"] } },
                     {
                         OR: [
                             { ultimaLeituraEm: { lt: quinzeSegundosAtras } },
