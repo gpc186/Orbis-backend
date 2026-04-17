@@ -19,6 +19,17 @@ class LeituraModel {
         })
     }
 
+    static async findUnique(maquinaId, date) {
+        return await prisma.leitura.findFirst({
+            where: {
+                sensor: {maquinaId: maquinaId},
+                criadoEm: {gte: date}
+            },
+            include: {sensor: true},
+            orderBy: {criadoEm: 'asc'}
+        })
+    }
+
 }
 
 

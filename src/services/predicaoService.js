@@ -1,3 +1,4 @@
+const LeituraModel = require('../models/leituraModel')
 const MaquinaModel = require('../models/maquinaModel')
 
 class PredicaoService {
@@ -37,6 +38,24 @@ class PredicaoService {
 
     static async previsaoManutencao(maquinaId) {
         const maquina = await MaquinaModel.findById(maquinaId)
-        const 
+        const umDiaAtras = new Date(Date.now() - 24 * 60 * 60 * 1000)
+
+        const leituraOntem = await LeituraModel.findUnique(maquinaId, umDiaAtras)
+
+        if(!maquina || ! leituraOntem) return null
+
+        const dadosOntem = {...leituraOntem.sensor, ...leituraOntem}
+        const scoreOntem = this.calcularHealthScore(dadosOntem)
+        const scoreHoje = maquina.integridade
+
+        const quedaUltimas24h = scoreOntem - scoreHoje
+        if (quedaUltimas24h <= 0) {
+            return await MaquinaModel.update(maquinaId, {previsaoManutencao: null})
+        }
+        const diasRestantes = Math.floor(scoreHoje / quedaUltimas24h)
+        const dataPrevisao = new Date()
+        dataPrevisao.setDate(dataPrevisao.getDate() + diasRestantes)
+
+        return await MaquinaModel.update(maquinaId, {previsaoManutencao: dataPrevisao})
     }
 }
