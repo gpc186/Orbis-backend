@@ -1,5 +1,4 @@
 const prisma = require('../prisma/prisma');
-const { options } = require('../routes/leituraRoutes');
 
 class MaquinaModel {
     static async create(data) {
@@ -10,8 +9,8 @@ class MaquinaModel {
         return await prisma.maquina.findMany({include: {sensores: true}});
     }
 
-    static async findById(id) {
-        return await prisma.maquina.findUnique({where: {id: parseInt(id)}}, ...options);
+    static async findById(id, options = {}) {
+        return await prisma.maquina.findUnique({where: {id: parseInt(id)}, ...options});
     }
 
     static async update(id, data) {

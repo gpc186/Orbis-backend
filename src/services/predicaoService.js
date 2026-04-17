@@ -1,61 +1,85 @@
-const LeituraModel = require('../models/leituraModel')
-const MaquinaModel = require('../models/maquinaModel')
-
 class PredicaoService {
     static async calcularHealthScore(sensor) {
-        const { ultimaTemperatura, ultimaVibracao, limiteTemperatura, limiteVibracao, idealTemperatura, idealVibracao } = sensor
+        // Pegamos os valores que vieram da leitura atual ou os que já estavam no sensor
+        const temp = sensor.temperatura || sensor.ultimaTemperatura || 0;
+        const vibra = sensor.vibracao || sensor.ultimaVibracao || 0;
 
-        let scoreTemp = 1 - (ultimaTemperatura - idealTemperatura) / (limiteTemperatura - idealTemperatura)
-        let scoreVibra = 1 - (ultimaVibracao - idealVibracao) / (limiteVibracao - idealVibracao)
+        // Evitar divisão por zero se os limites não estiverem configurados
+        const diffTemp = (sensor.limiteTemperatura - sensor.idealTemperatura) || 1;
+        const diffVibra = (sensor.limiteVibracao - sensor.idealVibracao) || 1;
 
-        scoreTemp = Math.max(0, Math.min(1, scoreTemp))
-        scoreVibra = Math.max(0, Math.min(1, scoreVibra))
+        let scoreTemp = 1 - (temp - sensor.idealTemperatura) / diffTemp;
+        let scoreVibra = 1 - (vibra - sensor.idealVibracao) / diffVibra;
 
-        const pesoTemp = 0.4
-        const pesoVibra = 0.6
+        // Trava entre 0 e 1
+        scoreTemp = Math.max(0, Math.min(1, scoreTemp));
+        scoreVibra = Math.max(0, Math.min(1, scoreVibra));
 
-        let healthScoreFinal = ((scoreTemp * pesoTemp) + (scoreVibra * pesoVibra)) * 100
-
-        return parseFloat(healthScoreFinal.toFixed(2))
+        const total = ((scoreTemp * 0.4) + (scoreVibra * 0.6)) * 100;
+        return parseFloat(total.toFixed(2)) || 0;
     }
 
     static async atualizarSaudeMaquina(maquinaId) {
-        const maquina = await MaquinaModel.findById(maquinaId, { include: { sensores: true } })
+        const MaquinaModel = require('../models/maquinaModel');
+        const maquina = await MaquinaModel.findById(maquinaId, { include: { sensores: true } });
 
-        // Se a máquina não existir ou não tiver sensores, definimos integridade como 100 ou 0
-        if (!maquina || !maquina.sensores || maquina.sensores.length === 0) {
-            await MaquinaModel.update(maquinaId, { integridade: 100 });
-            return 100;
-        }
+        if (!maquina || !maquina.sensores || maquina.sensores.length === 0) return 100;
 
-        const scores = maquina.sensores.map(s => this.calcularHealthScore(s))
-        const mediaSaude = parseFloat((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2))
+        // Passamos os dados atuais para o cálculo
+        const scores = maquina.sensores.map(s => this.calcularHealthScore(s));
 
-        await MaquinaModel.update(maquinaId, { integridade: mediaSaude })
+        // Garante que mediaSaude seja um número válido (0 a 100)
+        let mediaSaude = scores.reduce((a, b) => a + b, 0) / scores.length;
+        mediaSaude = isNaN(mediaSaude) ? 0 : parseFloat(mediaSaude.toFixed(2));
 
-        return mediaSaude
+        console.log(`--- ATUALIZANDO MÁQUINA ${maquinaId} | SCORE: ${mediaSaude} ---`);
+
+        await MaquinaModel.update(maquinaId, { integridade: mediaSaude });
+
+        return mediaSaude;
     }
 
     static async previsaoManutencao(maquinaId) {
-        const maquina = await MaquinaModel.findById(maquinaId)
-        const umDiaAtras = new Date(Date.now() - 24 * 60 * 60 * 1000)
+        const MaquinaModel = require('../models/maquinaModel');
+        const LeituraModel = require('../models/leituraModel');
 
-        const leituraOntem = await LeituraModel.findUnique(maquinaId, umDiaAtras)
+        const maquina = await MaquinaModel.findById(maquinaId);
+        const umDiaAtras = new Date(Date.now() - 2 * 60 * 1000); // 2 minutos para teste
 
-        if(!maquina || ! leituraOntem) return null
+        const leituraOntem = await LeituraModel.findUnique(maquinaId, umDiaAtras);
 
-        const dadosOntem = {...leituraOntem.sensor, ...leituraOntem}
-        const scoreOntem = this.calcularHealthScore(dadosOntem)
-        const scoreHoje = maquina.integridade
+        // Se não houver leitura anterior, não temos como calcular a velocidade de queda
+        if (!maquina || !leituraOntem) return null;
 
-        const quedaUltimas24h = scoreOntem - scoreHoje
-        if (quedaUltimas24h <= 0) {
-            return await MaquinaModel.update(maquinaId, {previsaoManutencao: null})
+        const dadosOntem = { ...leituraOntem.sensor, ...leituraOntem };
+        const scoreOntem = this.calcularHealthScore(dadosOntem);
+        const scoreHoje = maquina.integridade;
+
+        const quedaPeriodo = scoreOntem - scoreHoje;
+
+        // SÓ calcula se houve queda real e se a saúde atual não é zero
+        if (quedaPeriodo <= 0 || scoreHoje <= 0) {
+            return await MaquinaModel.update(maquinaId, { previsaoManutencao: null });
         }
-        const diasRestantes = Math.floor(scoreHoje / quedaUltimas24h)
-        const dataPrevisao = new Date()
-        dataPrevisao.setDate(dataPrevisao.getDate() + diasRestantes)
 
-        return await MaquinaModel.update(maquinaId, {previsaoManutencao: dataPrevisao})
+        const tempoRestante = Math.floor(scoreHoje / quedaPeriodo);
+
+        // Proteção: se o cálculo der um número absurdo, ignoramos
+        if (!isFinite(tempoRestante) || isNaN(tempoRestante)) {
+            return await MaquinaModel.update(maquinaId, { previsaoManutencao: null });
+        }
+
+        const dataPrevisao = new Date();
+        // No teste estamos usando Minutos. No real, mude para setDate
+        dataPrevisao.setMinutes(dataPrevisao.getMinutes() + tempoRestante);
+
+        // Validação extra antes de enviar ao Prisma
+        if (isNaN(dataPrevisao.getTime())) {
+            return await MaquinaModel.update(maquinaId, { previsaoManutencao: null });
+        }
+
+        return await MaquinaModel.update(maquinaId, { previsaoManutencao: dataPrevisao });
     }
 }
+
+module.exports = PredicaoService;
