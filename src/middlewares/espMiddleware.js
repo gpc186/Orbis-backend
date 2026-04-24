@@ -1,7 +1,6 @@
 const AppError = require("../utils/appErrorUtils");
-const { verifyAccessToken } = require("../utils/jwtUtils");
 
-function authMiddleware(req, res, next) {
+function espMiddleware(req, res, next) {
     const apiKey = req.headers["x-api-key"]
 
     if (!apiKey) {
@@ -15,4 +14,4 @@ function authMiddleware(req, res, next) {
     next();
 };
 
-module.exports = authMiddleware;
+module.exports = espMiddleware;

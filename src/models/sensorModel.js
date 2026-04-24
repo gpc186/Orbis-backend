@@ -29,11 +29,25 @@ class SensorModel {
             data: {
                 tipo: data.tipo,
                 status: data.status,
-                // Garante que os números sejam Float e Int
                 limiteTemperatura: parseFloat(data.limiteTemperatura),
                 limiteVibracao: parseFloat(data.limiteVibracao),
                 maquina: {
                     connect: { id: parseInt(data.maquinaId) }
+                }
+            }
+        });
+    }
+
+    static async updateDisconnect(id, data) {
+        return await prisma.sensor.update({
+            where: { id: parseInt(id) },
+            data: {
+                tipo: data.tipo,
+                status: "INATIVO",
+                limiteTemperatura: data.limiteTemperatura ? parseFloat(data.limiteTemperatura) : undefined,
+                limiteVibracao: data.limiteVibracao ? parseFloat(data.limiteVibracao) : undefined,
+                maquina: {
+                    disconnect: true
                 }
             }
         });

@@ -4,24 +4,32 @@ const AppError = require("../utils/appErrorUtils")
 
 class SensorService {
     static async create(dados) {
-        // Validação crucial: A máquina pai existe?
-        const maquinaExiste = await MaquinaModel.findById(dados.maquinaId);
-        if (!maquinaExiste) {
-            throw new AppError("Não é possível criar o sensor: Máquina selecionada não existe.");
+        try {
+            // Validação crucial: A máquina pai existe?
+            const maquinaExiste = await MaquinaModel.findById(dados.maquinaId);
+            if (!maquinaExiste) {
+                throw new AppError("Não é possível criar o sensor: Máquina selecionada não existe.", 400);
+            }
+
+            // Garante que os limites sejam números
+            const dadosFormatados = {
+                ...dados,
+                limiteTemperatura: parseFloat(dados.limiteTemperatura) || 0,
+                limiteVibracao: parseFloat(dados.limiteVibracao) || 0,
+                maquinaId: parseInt(dados.maquinaId)
+            };
+
+            return await SensorModel.create(dadosFormatados);
+        } catch (error) {
+            throw new AppError("Erro ao criar sensor.", 500);
         }
-
-        // Garante que os limites sejam números
-        const dadosFormatados = {
-            ...dados,
-            limiteTemperatura: parseFloat(dados.limiteTemperatura) || 0,
-            limiteVibracao: parseFloat(dados.limiteVibracao) || 0,
-            maquinaId: parseInt(dados.maquinaId)
-        };
-
-        return await SensorModel.create(dadosFormatados);
     }
     static async list() {
-        return await SensorModel.findAll();
+        try {
+            return await SensorModel.findAll();
+        } catch (error) {
+            throw new AppError("Erro ao listar sensores.", 500);
+        }
     }
     static async findById(id) {
         try {
@@ -38,7 +46,17 @@ class SensorService {
             const sensorExiste = await SensorModel.findById(id);
             if (!sensorExiste) throw new AppError("Sensor não encontrado.", 404);
 
-            // Se o maquinaId mudou, o model vai tratar no connect
+            // Se maquinaId for null ou undefined, marca sensor como INATIVO
+            if (!dados.maquinaId || dados.maquinaId === null || dados.maquinaId === undefined) {
+                return await SensorModel.updateDisconnect(id, { ...dados, status: "INATIVO" });
+            }
+
+            // Valida se a nova máquina existe
+            const maquinaExiste = await MaquinaModel.findById(dados.maquinaId);
+            if (!maquinaExiste) {
+                throw new AppError("Máquina selecionada não existe.", 400);
+            }
+
             return await SensorModel.update(id, dados);
         } catch (error) {
             throw new AppError("Erro ao atualizar sensor.", 500);
@@ -55,7 +73,11 @@ class SensorService {
     }
 
     static async countActive(){
-        return await SensorModel.countActiveSensors()
+        try {
+            return await SensorModel.countActiveSensors()
+        } catch (error) {
+            throw new AppError("Erro ao contar sensores ativos.", 500);
+        }
     }
 };
 

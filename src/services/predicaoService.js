@@ -1,7 +1,8 @@
+const { get } = require('node:http');
 const AppError = require('../utils/appErrorUtils');
 
 class PredicaoService {
-    static async calcularHealthScore(sensor) {
+    static calcularHealthScore(sensor) {
         // Pegamos os valores que vieram da leitura atual ou os que já estavam no sensor
         const temp = sensor.temperatura || sensor.ultimaTemperatura || 0;
         const vibra = sensor.vibracao || sensor.ultimaVibracao || 0;
@@ -51,7 +52,7 @@ class PredicaoService {
             const LeituraModel = require('../models/leituraModel');
 
             const maquina = await MaquinaModel.findById(maquinaId);
-            const umDiaAtras = new Date(Date.now() - 2 * 60 * 1000); // 2 minutos para teste
+            const umDiaAtras = new Date(Date.now() - 24 * 60 * 60 * 1000); // 2 minutos para teste
 
             const leituraOntem = await LeituraModel.findUnique(maquinaId, umDiaAtras);
 
@@ -69,23 +70,30 @@ class PredicaoService {
                 return await MaquinaModel.update(maquinaId, { previsaoManutencao: null });
             }
 
-            const tempoRestante = Math.floor(scoreHoje / quedaPeriodo);
+            // 1. Data de Falha (0%)
+            const tempoAteZero = Math.floor(scoreHoje / quedaPeriodo);
+            const dataFalha = new Date();
+            dataFalha.setDate(dataFalha.getDate() + tempoAteZero);
 
-            // Proteção: se o cálculo der um número absurdo, ignoramos
-            if (!isFinite(tempoRestante) || isNaN(tempoRestante)) {
-                return await MaquinaModel.update(maquinaId, { previsaoManutencao: null });
+            // 2. Janela de Início (70%)
+            let ManuInicio = new Date();
+            if (scoreHoje > 70) {
+                const quedaNecessariaPara70 = scoreHoje - 70;
+                const tempoAte70 = Math.floor(quedaNecessariaPara70 / quedaPeriodo);
+                ManuInicio.setDate(ManuInicio.getDate() + tempoAte70);
             }
 
-            const dataPrevisao = new Date();
-            // No teste estamos usando Minutos. No real, mude para setDate
-            dataPrevisao.setMinutes(dataPrevisao.getMinutes() + tempoRestante);
+            // 3. Janela de Fim (Data da falha menos 2 dias)
+            const ManuFim = new Date(dataFalha.getTime());
+            ManuFim.setDate(ManuFim.getDate() - 2);
 
-            // Validação extra antes de enviar ao Prisma
-            if (isNaN(dataPrevisao.getTime())) {
-                return await MaquinaModel.update(maquinaId, { previsaoManutencao: null });
-            }
+            console.log(`[PREDIÇÃO] Máquina ${maquinaId}: Falha em ${tempoAteZero}min | Início: ${ManuInicio.toLocaleTimeString()}`);
 
-            return await MaquinaModel.update(maquinaId, { previsaoManutencao: dataPrevisao });
+            return await MaquinaModel.update(maquinaId, {
+                previsaoManutencao: dataFalha,
+                janelaManuInicio: ManuInicio,
+                janelaManuFim: ManuFim
+            });
         } catch (error) {
             throw new AppError("Erro ao calcular previsão de manutenção.", 500);
         }
