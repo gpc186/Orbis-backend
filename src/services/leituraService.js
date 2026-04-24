@@ -1,14 +1,14 @@
-const { Prisma } = require('@prisma/client');
 const leituraModel = require('../models/leituraModel');
 const SensorModel = require('../models/sensorModel');
 const AppError = require('../utils/appErrorUtils');
-const AlertaService = require('./alertaService');
+const AlertaService = require('../services/alertaService');
+const PredicaoService = require('./predicaoService')
 
 class leituraService {
     static async processarNovaLeitura(dadosLeitura) {
 
         const sensor = await SensorModel.findById(dadosLeitura.sensorId)
-        if(!sensor) throw new AppError("Sensor não encontrado");
+        if (!sensor) throw new AppError("Sensor não encontrado");
 
         if (dadosLeitura.temperatura > sensor.limiteTemperatura) {
             await AlertaService.gerarAlerta(
@@ -40,7 +40,18 @@ class leituraService {
             )
         }
 
-        return await leituraModel.store(dadosLeitura)
+        // 1. Primeiro salva no banco
+        const novaLeitura = await leituraModel.store(dadosLeitura);
+
+        // 2. Depois processa a inteligência (com os dados já no banco)
+        try {
+            await PredicaoService.atualizarSaudeMaquina(sensor.maquinaId);
+            await PredicaoService.previsaoManutencao(sensor.maquinaId);
+        } catch (error) {
+            console.error("Erro no processamento preditivo:", error.message);
+        }
+
+        return novaLeitura;
     }
 
     static async index(limite = 20) {

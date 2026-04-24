@@ -1,7 +1,5 @@
-const MaquinaModel = require('../models/maquinaModel');
 const AlertaModel = require('../models/alertaModel')
-const AppError = require("../utils/appErrorUtils")
-const prisma = require("../prisma/prisma")
+
 
 class AlertaService {
     static async gerarAlerta(sensorId, maquinaId, tipo, mensagem) {
