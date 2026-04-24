@@ -43,8 +43,14 @@ async function gerarLeituras() {
                     vibracao: parseFloat(vibracao.toFixed(2))
                 };
 
+                const config = {
+                    headers: {
+                        'x-api-key': 'chavezinha-legal'
+                    }
+                }
+
                 // 2. Envia para a rota no servidor (HTTP POST) [cite: 7, 72]
-                const response = await axios.post(API_URL, dadosLeitura);
+                const response = await axios.post(API_URL, dadosLeitura, config);
 
                 // 3. Atualiza o estado do Sensor (Última leitura)
                 await prisma.sensor.update({
