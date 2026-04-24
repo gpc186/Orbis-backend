@@ -24,20 +24,34 @@ class SensorService {
         return await SensorModel.findAll();
     }
     static async findById(id) {
-        const sensor = await SensorModel.findById(id);
-        if (!sensor) throw new AppError("Sensor não encontrado.");
-        return sensor;
+        try {
+            const sensor = await SensorModel.findById(id);
+            if (!sensor) throw new AppError("Sensor não encontrado.", 404);
+            return sensor;
+        } catch (error) {
+            throw new AppError("Erro ao buscar sensor.", 500);
+        }
     }
     static async update(id, dados) {
-        // Verifica se o sensor existe
-        const sensorExiste = await SensorModel.findById(id);
-        if (!sensorExiste) throw new AppError("Sensor não encontrado");
+        try {
+            // Verifica se o sensor existe
+            const sensorExiste = await SensorModel.findById(id);
+            if (!sensorExiste) throw new AppError("Sensor não encontrado.", 404);
 
-        // Se o maquinaId mudou, o model vai tratar no connect
-        return await SensorModel.update(id, dados);
+            // Se o maquinaId mudou, o model vai tratar no connect
+            return await SensorModel.update(id, dados);
+        } catch (error) {
+            throw new AppError("Erro ao atualizar sensor.", 500);
+        }
     }
     static async delete(id) {
-        return await SensorModel.delete(id);
+        try {
+            const sensor = await SensorModel.findById(id);
+            if (!sensor) throw new AppError("Sensor não encontrado.", 404);
+            return await SensorModel.delete(id);
+        } catch (error) {
+            throw new AppError("Erro ao deletar sensor.", 500);
+        }
     }
 
     static async countActive(){
