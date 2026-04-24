@@ -6,11 +6,16 @@ class MaquinaModel {
     }
 
     static async findAll() {
-        return await prisma.maquina.findMany({include: {sensores: true}});
+        return await prisma.maquina.findMany({
+            where: { ativo: true },
+            include: {sensores: true}
+        });
     }
 
-    static async findById(id, options = {}) {
-        return await prisma.maquina.findUnique({where: {id: parseInt(id)}, ...options});
+    static async findById(id) {
+        return await prisma.maquina.findUnique({
+            where: {id: parseInt(id)},
+        });
     }
 
     static async update(id, data) {
@@ -18,7 +23,10 @@ class MaquinaModel {
     }
 
     static async delete(id) {
-        return await prisma.maquina.delete({where: {id: parseInt(id)}});
+        return await prisma.maquina.update({
+            where: {id: parseInt(id)},
+            data: { ativo: false }
+        });
     }
 
     static async count(){
