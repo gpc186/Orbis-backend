@@ -1,5 +1,6 @@
 const RefreshTokenModel = require("../models/refreshTokenModel");
 const UsuarioModel = require("../models/usuarioModel");
+const AlertaModel = require("../models/alertaModel");
 const AppError = require("../utils/appErrorUtils");
 const bcrypt = require('bcrypt');
 const { generateAccessToken, generateRefreshTokenData } = require("../utils/jwtUtils");
@@ -140,6 +141,35 @@ class UsuarioService {
 
         return { dados, total, page: pageNum, totalPages };
     };
+
+    static async listAllTecnicos({ page, limit }) {
+        const pageNum = parseInt(page)
+        const take = parseInt(limit)
+        const skip = (pageNum - 1) * take
+        const [dados, total] = await Promise.all([
+            UsuarioModel.findAllTecnicos({ skip, take }),
+            UsuarioModel.countTecnicos()
+        ])
+
+        const totalPages = Math.ceil(total / limit);
+
+        return { dados, total, page: pageNum, totalPages };
+    };
+    static async findAlertasByTecnicoId(id, { page, limit }) {
+        const pageNum = parseInt(page)
+        const take = parseInt(limit)
+        const tecnicoId = parseInt(id)
+        const skip = (pageNum - 1) * take
+        const [dados, total] = await Promise.all([
+            AlertaModel.findAlertasByTecnico(tecnicoId, { skip, take }),
+            AlertaModel.countAlertasByTecnicoId(tecnicoId)
+        ])
+
+        const totalPages = Math.ceil(total / limit);
+
+        return { dados, total, page: pageNum, totalPages };
+    }
+
     /**
      * Retorna todos os dados do usuario pelo id
      * @param {number} id 
@@ -149,8 +179,29 @@ class UsuarioService {
      */
     static async findById(id) {
         const usuario = await UsuarioModel.findById(parseInt(id));
-        return { usuario }
+        if (!usuario) {
+            throw new AppError("Usuario não encontrado!", 404);
+        };
+        return usuario;
     };
+    static async findTecnicoById(id) {
+        const tecnico = await UsuarioModel.findById(id);
+
+        if (!tecnico) {
+            throw new AppError("Tecnico não encontrado!", 404);
+        };
+
+        const status = await AlertaModel.findAlertaStatusOfTecnicoById(id);
+
+        const alertaEmAndamento = status ? true : false
+
+        return { ...tecnico, alertaEmAndamento }
+    }
+
+    static async countActiveTecnicos() {
+        return await UsuarioModel.countActiveTecnico()
+    }
+
     /**
      * Pega os dados do usuario e faz um update, junto com verificações extras
      * @param {number} id 
@@ -198,6 +249,18 @@ class UsuarioService {
         const usuarioAtualizado = await UsuarioModel.update({ id, dadosParaAtualizar });
 
         return usuarioAtualizado;
+    }
+
+    static async logoutAll(id) {
+        const usuario = await UsuarioModel.findById(id);
+
+        if (!usuario) {
+            throw new AppError("Usuario não encontrado!", 404);
+        };
+
+        await RefreshTokenModel.logoutAll(id);
+
+        return { mensagem: "usuario deletado com sucesso!" };
     }
 
     static async delete(id) {

@@ -86,6 +86,25 @@ class UsuarioModel {
             }
         });
     };
+
+    static async findAllTecnicos({ skip, take }) {
+        return await prisma.usuario.findMany({
+            where: { ativo: true, role: "TECNICO" },
+            skip,
+            take,
+            orderBy: { criadoEm: "desc" },
+            select: {
+                id: true,
+                nome: true,
+                email: true,
+                role: true,
+                ativo: true,
+                especialidade: true,
+                telefone: true
+            }
+        });
+    };
+
     /**
      * Atualiza campos requisitados pelo service no banco de dados
      * @param {number} id
@@ -98,7 +117,7 @@ class UsuarioModel {
      * @example
      * const dadosNovos = await UsuarioModel.update( id,{ nome, role, especialidade, telefone });
      */
-    static async update({id, dados}) {
+    static async update({ id, dados }) {
         return await prisma.usuario.update({
             where: { id }, data: dados, select: {
                 id: true,
@@ -131,6 +150,13 @@ class UsuarioModel {
      */
     static async count() {
         return await prisma.usuario.count()
+    }
+    static async countTecnicos() {
+        return await prisma.usuario.count({ where: { role: "TECNICO" } })
+    }
+
+    static async countActiveTecnico(){
+        return await prisma.usuario.count({where: {role: "TECNICO", ativo: true}})
     }
     /**
      * Pega o numero de Admins, isso é pela regra de negócio para sempre ter pelo menos `um admin ativo sempre`

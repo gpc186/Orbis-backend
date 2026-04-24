@@ -15,7 +15,30 @@ class AlertaService {
         }
 
         return await AlertaModel.create(sensorId, maquinaId, tipo, mensagem)
+    }
 
+    static async countMaquinasWithAlerta() {
+        return await AlertaModel.countMaquinasWithAlerta();
+    }
+
+    static async countActiveAlertas(){
+        return await AlertaModel.countActiveAlertas();
+    };
+
+    static async countAlertasToday(){
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        return await AlertaModel.countAlertasToday(hoje);
+    };
+
+    static async countAlertaSemAtendimento(){
+        return await AlertaModel.countAlertaSemAtendimento();
+    };
+
+    static async countAtendedToday(){
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        return await AlertaModel.countAtendedToday(hoje)
     }
 }
 

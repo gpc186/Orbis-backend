@@ -30,6 +30,11 @@ class LeituraModel {
         })
     }
 
+    static async limpeza(trintaDiasAtras){
+        return await prisma.leitura.deleteMany({
+            where: { criadoEm: { lt: trintaDiasAtras }}
+        })
+    }
 }
 
 

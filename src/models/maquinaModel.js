@@ -20,6 +20,17 @@ class MaquinaModel {
     static async delete(id) {
         return await prisma.maquina.delete({where: {id: parseInt(id)}});
     }
+
+    static async count(){
+        return await prisma.maquina.count();
+    }
+
+    static async calculateAverageIntegrity(){
+        return await prisma.maquina.aggregate({
+            where: { ativo: true },
+            _avg: { integridade: true }
+        })
+    }
 }
 
 

@@ -21,6 +21,12 @@ class MaquinaService {
         await this.findById(id);
         return await MaquinaModel.update(id, dados);
     }
+    static async count(){
+        return await MaquinaModel.count();
+    }
+    static async calculateAverageIntegrity(){
+        return await MaquinaModel.calculateAverageIntegrity()
+    }
     static async delete(id) {
         return await MaquinaModel.delete(id);
     }
