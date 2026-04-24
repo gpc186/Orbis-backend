@@ -2,6 +2,22 @@ const AlertaService = require('../services/alertaService');
 const AppError = require('../utils/appErrorUtils');
 
 class AlertaController {
+    static async summary(req, res, next) {
+        try {
+            const [maquinasEmAlerta, alertasAtivos, alertasHoje, alertaSemAtendimento, alertasAtendidosHoje] = await Promise.all([
+                AlertaService.countMaquinasWithAlerta(),
+                AlertaService.countActiveAlertas(),
+                AlertaService.countAlertasToday(),
+                AlertaService.countAlertaSemAtendimento(),
+                AlertaService.countAtendedToday()
+            ]);
+            const resumo = { maquinasEmAlerta, alertasAtivos, alertasHoje, alertaSemAtendimento, alertasAtendidosHoje };
+            return res.status(200).json(resumo);
+        } catch (error) {
+            next(error);
+        }
+    }
+
     static async list(req, res, next) {
         try {
             const alertas = await AlertaService.findAll();
@@ -21,51 +37,6 @@ class AlertaController {
             }
 
             return res.status(200).json(alerta);
-        } catch (error) {
-            next(error);
-        }
-    }
-
-    static async countMaquinasWithAlerta(req, res, next) {
-        try {
-            const maquinasEmAlerta = await AlertaService.countMaquinasWithAlerta();
-            return res.status(200).json({ maquinasEmAlerta });
-        } catch (error) {
-            next(error);
-        }
-    }
-
-    static async countActiveAlertas(req, res, next) {
-        try {
-            const alertasAtivos = await AlertaService.countActiveAlertas();
-            return res.status(200).json({ alertasAtivos });
-        } catch (error) {
-            next(error);
-        }
-    }
-
-    static async countAlertasToday(req, res, next) {
-        try {
-            const alertasHoje = await AlertaService.countAlertasToday();
-            return res.status(200).json({ alertasHoje });
-        } catch (error) {
-            next(error);
-        }
-    }
-
-    static async countAlertaSemAtendimento(req, res, next) {
-        try {
-            const alertaSemAtendimento = await AlertaService.countAlertaSemAtendimento();
-            return res.status(200).json({ alertaSemAtendimento });
-        } catch (error) {
-            next(error);
-        }
-    }
-
-    static async countAtendedToday(req, res, next) {
-        try {
-            const alertasAtendidosHoje = await AlertaService.countAtendedToday();
-            return res.status(200).json({ alertasAtendidosHoje });
         } catch (error) {
             next(error);
         }
