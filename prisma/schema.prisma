@@ -57,17 +57,19 @@ enum StatusManutencao {
 // ─── MODELS ───────────────────────────────────────────────────────────────────
 
 model Usuario {
-  id            Int      @id @default(autoincrement())
-  nome          String
-  email         String   @unique
-  senha         String
-  role          Role     @default(TECNICO)
-  ativo         Boolean  @default(true)
-  especialidade String?
-  telefone      String?
-  oneSignalId   String?
-  atualizadoEm  DateTime @updatedAt
-  criadoEm      DateTime @default(now())
+  id                  Int      @id @default(autoincrement())
+  nome                String
+  email               String   @unique
+  senha               String
+  role                Role     @default(TECNICO)
+  ativo               Boolean  @default(true)
+  especialidade       String?
+  telefone            String?
+  oneSignalId         String?
+  fotoPerfil          String?
+  caminhoFoto         String?
+  atualizadoEm        DateTime @updatedAt
+  criadoEm            DateTime @default(now())
 
   alertas       Alerta[]
   alertaEventos AlertaEvento[]
@@ -76,18 +78,20 @@ model Usuario {
 }
 
 model Maquina {
-  id                 Int         @id @default(autoincrement())
-  nome               String
-  setor              String
-  tipo               String
-  criticidade        Criticidade @default(BAIXA)
-  ativo              Boolean     @default(true)
-  integridade        Float       @default(100)
-  scoreEstabilidade  Float       @default(100)
-  previsaoManutencao DateTime?
-  janelaManuInicio   DateTime?
-  janelaManuFim      DateTime?
-  criadoEm           DateTime    @default(now())
+  id                    Int         @id @default(autoincrement())
+  nome                  String
+  setor                 String
+  tipo                  String
+  criticidade           Criticidade @default(BAIXA)
+  ativo                 Boolean     @default(true)
+  integridade           Float       @default(100)
+  scoreEstabilidade     Float       @default(100)
+  previsaoManutencao    DateTime?
+  janelaManuInicio      DateTime?
+  janelaManuFim         DateTime?
+  imagem                String?
+  caminhoImagem         String?
+  criadoEm              DateTime    @default(now())
 
   sensores Sensor[]
   alertas  Alerta[]
