@@ -40,6 +40,14 @@ class AlertaService {
         hoje.setHours(0, 0, 0, 0);
         return await AlertaModel.countAtendedToday(hoje)
     }
+
+    static async findAll(){
+        return await AlertaModel.findAll();
+    }
+
+    static async findById(id){
+        return await AlertaModel.findById(id);
+    }
 }
 
 module.exports = AlertaService

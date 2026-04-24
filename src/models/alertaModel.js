@@ -30,6 +30,19 @@ class AlertaModel {
         })
     }
 
+    static async findById(id) {
+        return await prisma.alerta.findUnique({
+            where: { id: parseInt(id) },
+            include: {
+                sensor: true,
+                maquina: true,
+                tecnico: { select: { nome: true } },
+                eventos: true,
+                manutencoes: true
+            }
+        });
+    }
+
     static async findAll() {
         return await prisma.alerta.findMany({
             include: {
