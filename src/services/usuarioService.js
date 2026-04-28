@@ -4,6 +4,7 @@ const AlertaModel = require("../models/alertaModel");
 const AppError = require("../utils/appErrorUtils");
 const bcrypt = require('bcrypt');
 const { generateAccessToken, generateRefreshTokenData } = require("../utils/jwtUtils");
+const StorageService = require("./storageService");
 
 class UsuarioService {
     /**
@@ -249,6 +250,14 @@ class UsuarioService {
         const usuarioAtualizado = await UsuarioModel.update({ id, dadosParaAtualizar });
 
         return usuarioAtualizado;
+    }
+
+    static async update({usuarioId, buffer}){
+
+        const { caminhoImagem, url } = await StorageService.uploadFotoPerfil({ usuarioId, buffer });
+
+        await UsuarioModel.update({ id: usuarioId, dados: { fotoPerfil: url, caminhoFoto: caminhoImagem } });
+
     }
 
     static async logoutAll(id) {

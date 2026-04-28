@@ -8,10 +8,10 @@ const upload = multer({
     storage: multer.memoryStorage(),
     fileFilter: (req, file, cb) => {
         if (!allowedMimeTypes.includes(file.mimetype)) {
-            cb(new AppError("Tipo de imagem não suportada!", 400))
+            return cb(new AppError("Tipo de imagem não suportada!", 400), false)
         };
 
-        cb(null, true);
+        return cb(null, true);
     },
     limits: {
         fileSize: 15 * 1024 * 1024
@@ -41,7 +41,10 @@ async function imagemProcessada(req, res, next) {
         req.file.buffer = imagemProcessada;
         req.file.mimetype = "image/webp";
         
+        return next();
     } catch (error) {
-        next(new AppError("Erro ao processar imagem!", 500))
-    }
-}
+        return next(new AppError("Erro ao processar imagem!", 500));
+    };
+};
+
+module.exports = { uploadImagemUnica: upload.single("imagem"), imagemProcessada };

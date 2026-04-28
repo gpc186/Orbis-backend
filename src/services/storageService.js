@@ -20,7 +20,6 @@ class StorageService {
             throw new AppError("Erro ao tentar dar upload da imagem!", 500);
         };
 
-
         const { data: urlData } = supabase.storage.from("profile-images").getPublicUrl(data.path);
 
         return { caminhoImagem: data.path, url: urlData.publicUrl };
@@ -57,7 +56,7 @@ class StorageService {
 
         const { data, error } = await supabase.storage.from(bucket).remove([caminho]);
 
-        if (error){
+        if (error) {
             throw new AppError("Não foi possivel deletar a imagem, por favor, tente novamente depois!", 500);
         };
 
