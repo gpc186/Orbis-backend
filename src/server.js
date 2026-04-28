@@ -18,6 +18,7 @@ const manutencaoRoutes = require('./routes/manutencaoRoutes');
 const tecnicoRoutes = require('./routes/tecnicoRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const alertaRoutes = require('./routes/alertaRoutes');
+const connectMQTT = require('./services/mqttService')
 
 const app = express();
 const server = http.createServer(app);
@@ -29,6 +30,9 @@ app.use(express.json());
 
 // Compartilha o 'io' globalmente se precisar usar nos controllers
 app.set('io', io);
+
+// Inicializa o MQTT
+connectMQTT(app)
 
 // Rota Principal
 app.get('/', (req, res) => res.send("Orbis API - Online"));
