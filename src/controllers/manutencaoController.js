@@ -25,7 +25,7 @@ class ManutecaoController {
     static async findByAlertaId(req, res, next){
         try {
             const { alertaId } = req.params;
-            const response = await ManutecaoService.findByalertaId(alertaId);
+            const response = await ManutecaoService.findByAlertaId(alertaId);
             return res.status(200).json(response);
         } catch (error) {
             next(error);

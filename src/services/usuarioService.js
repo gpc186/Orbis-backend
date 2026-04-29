@@ -214,7 +214,7 @@ class UsuarioService {
      * const usuarioAtualizado = await UsuarioService.update({ id, dados })
      */
     static async update({ id, dados }) {
-        const { nome, role, especialidade, telefone, status } = dados;
+        const { nome, role, especialidade, telefone, ativo } = dados;
         const usuario = await UsuarioModel.findById(parseInt(id));
 
         if (!usuario) {
@@ -246,26 +246,49 @@ class UsuarioService {
         if (role !== undefined) dadosParaAtualizar.role = role;
         if (especialidade !== undefined) dadosParaAtualizar.especialidade = especialidade;
         if (telefone !== undefined) dadosParaAtualizar.telefone = telefone;
-        if (status !== undefined) dadosParaAtualizar.status = status;
+        if (ativo !== undefined) dadosParaAtualizar.ativo = ativo;
 
         const usuarioAtualizado = await UsuarioModel.update({ id, dados: dadosParaAtualizar });
 
         return usuarioAtualizado;
     }
 
-    static async updateFotoPerfil({usuarioId, buffer}){
-
+    static async updateFotoPerfil({ usuarioId, buffer }) {
         const usuario = await UsuarioModel.findById(usuarioId);
 
-        if(!usuario){
+        if (!usuario) {
             throw new AppError("Usuario não encontrado!", 404);
+        };
+
+        let uploadResult = null;
+
+        try {
+            uploadResult = await StorageService.uploadFotoPerfil({ usuarioId, buffer });
+
+            const usuarioAtualizado = await UsuarioModel.update({
+                id: usuarioId,
+                dados: { fotoPerfil: uploadResult.url, caminhoFoto: uploadResult.caminhoImagem }
+            });
+
+            if (usuario.caminhoFoto) {
+                try {
+                    await StorageService.deleteFoto({ bucket: "profile-images", caminho: usuario.caminhoFoto });
+                } catch (errorDelete) {
+                    console.error("Falha ao limpar upload após erro:", errorDelete);
+                };
+            }
+
+            return usuarioAtualizado;
+        } catch (error) {
+            if (uploadResult?.caminhoImagem) {
+                try {
+                    await StorageService.deleteFoto({ bucket: "profile-images", caminho: uploadResult.caminhoImagem });
+                } catch (errorDelete) {
+                    console.error("Falha ao limpar upload após erro:", errorDelete);
+                }
+            }
+            throw error;
         }
-
-        const { caminhoImagem, url } = await StorageService.uploadFotoPerfil({ usuarioId, buffer });
-
-        const usuarioAtualizado = await UsuarioModel.update({ id: usuarioId, dados: { fotoPerfil: url, caminhoFoto: caminhoImagem } });
-
-        return usuarioAtualizado;
     }
 
     static async logoutAll(id) {

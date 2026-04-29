@@ -3,7 +3,12 @@ const prisma = require("../prisma/prisma");
 class ManutecaoModel {
     static async create({ alertaId, usuarioId, observacao, status }) {
         return await prisma.manutencao.create({
-            data: alertaId, usuarioId, observacao, status
+            data: {
+                alertaId,
+                usuarioId,
+                observacao,
+                status
+            }
         });
     };
 
@@ -47,13 +52,26 @@ class ManutecaoModel {
 
     static async findById(id) {
         return await prisma.manutencao.findUnique({
-            where: { id: id }
+            where: { id: parseInt(id) },
+            include: {
+                alerta: true,
+                usuario: {
+                    select: {
+                        id: true,
+                        nome: true,
+                        email: true,
+                        role: true,
+                        telefone: true,
+                        especialidade: true
+                    }
+                }
+            }
         });
     };
 
     static async update({ id, dados }) {
         return await prisma.manutencao.update({
-            where: { id: id },
+            where: { id: parseInt(id) },
             data: dados
         });
     };

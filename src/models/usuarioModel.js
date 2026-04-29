@@ -71,7 +71,7 @@ class UsuarioModel {
      * @example
      * const todosUsuarios = await UsuarioModel.findAll(skip, take);
      */
-    static async findAll(skip, take) {
+    static async findAll({skip, take}) {
         return await prisma.usuario.findMany({
             where: { ativo: true },
             skip,

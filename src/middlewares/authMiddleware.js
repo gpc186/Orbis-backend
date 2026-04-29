@@ -5,7 +5,7 @@ function authMiddleware(req, res, next) {
     const authHeader = req.headers.authorization;
 
     if (!authHeader) {
-        next(new AppError("Token não encontrado!", 401));
+        return next(new AppError("Token não encontrado!", 401));
     };
 
     try {
@@ -15,9 +15,9 @@ function authMiddleware(req, res, next) {
         
         req.usuario = { id: user.id, role: user.role };
         
-        next();
+        return next();
     } catch (error) {
-        next(new AppError("Token não é válido!", 401));
+        return next(new AppError("Token não é válido!", 401));
     };
 };
 

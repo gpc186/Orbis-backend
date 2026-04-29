@@ -1,5 +1,4 @@
 const UsuarioService = require("../services/usuarioService");
-const StorageService = require("../services/storageService");
 const AppError = require("../utils/appErrorUtils");
 
 class UsuarioController {
@@ -60,7 +59,7 @@ class UsuarioController {
         try {
             const usuarioId = req.usuario.id;
             const buffer = req.file.buffer;
-            const response = await StorageService.uploadFotoPerfil({ usuarioId, buffer });
+            const response = await UsuarioService.updateFotoPerfil({ usuarioId, buffer });
             return res.status(200).json(response);
         } catch (error) {
             next(error);

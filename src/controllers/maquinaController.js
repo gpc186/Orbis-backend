@@ -1,5 +1,4 @@
 const MaquinaService = require('../services/maquinaService');
-const StorageService = require('../services/storageService');
 const AppError = require('../utils/appErrorUtils');
 class MaquinaController {
     static async store(req, res, next) {
@@ -49,7 +48,7 @@ class MaquinaController {
         try {
             const maquinaId = req.params.id;
             const buffer = req.file.buffer;
-            const response = await StorageService.uploadFotoMaquina({ maquinaId, buffer });
+            const response = await MaquinaService.updateFotoMaquina({ maquinaId, buffer });
             return res.status(200).json(response);
         } catch (error) {
             next(error);

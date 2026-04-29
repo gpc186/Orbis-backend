@@ -22,27 +22,49 @@ class MaquinaService {
         await this.findById(id);
         return await MaquinaModel.update(id, dados);
     }
-    static async updateFotoMaquina({ maquinaId, buffer }){
+    static async updateFotoMaquina({ maquinaId, buffer }) {
         const maquina = await MaquinaModel.findById(maquinaId);
-        if(!maquina || maquina.ativo == false){
+        
+        if (!maquina || maquina.ativo == false) {
             throw new AppError("Maquina não encontrada ou desativada!", 404);
         };
 
-        const { caminhoImagem, url } = await StorageService.uploadFotoMaquina({maquinaId, buffer});
+        let uploadResult = null;
 
-        const id = maquinaId
-        const data = {
-            imagem: url,
-            caminhoImagem
+        try {
+            uploadResult = await StorageService.uploadFotoMaquina({ maquinaId, buffer });
+            const id = maquinaId;
+            const data = {
+                imagem: uploadResult.url,
+                caminhoImagem: uploadResult.caminhoImagem
+            }
+
+            const maquinaAtualizada = await MaquinaModel.update(id, data);
+
+            if (maquina.caminhoImagem) {
+                try {
+                    await StorageService.deleteFoto({ bucket: "machine-images", caminho: maquina.caminhoImagem });
+                } catch (errorDelete) {
+                    console.error("Não foi possivel deletar a imagem antiga!", errorDelete);
+                }
+            };
+
+            return maquinaAtualizada;
+        } catch (error) {
+            if (uploadResult?.caminhoImagem) {
+                try {
+                    await StorageService.deleteFoto({ bucket: "machine-images", caminho: uploadResult.caminhoImagem });
+                } catch (errorDelete) {
+                    console.error("Não foi possivel deletar a imagem antiga!", errorDelete)
+                }
+            }
+            throw error;
         }
-        const maquinaAtualizada = await MaquinaModel.update(id, data);
-
-        return maquinaAtualizada
     }
-    static async count(){
+    static async count() {
         return await MaquinaModel.count();
     }
-    static async calculateAverageIntegrity(){
+    static async calculateAverageIntegrity() {
         return await MaquinaModel.calculateAverageIntegrity()
     }
     static async delete(id) {
