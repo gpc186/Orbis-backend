@@ -213,7 +213,7 @@ class UsuarioService {
      * const usuarioAtualizado = await UsuarioService.update({ id, dados })
      */
     static async update({ id, dados }) {
-        const { nome, role, especialidade, telefone } = dados;
+        const { nome, role, especialidade, telefone, ativo } = dados;
         const usuario = await UsuarioModel.findById(parseInt(id));
 
         if (!usuario) {
@@ -245,8 +245,13 @@ class UsuarioService {
         if (role !== undefined) dadosParaAtualizar.role = role;
         if (especialidade !== undefined) dadosParaAtualizar.especialidade = especialidade;
         if (telefone !== undefined) dadosParaAtualizar.telefone = telefone;
+        if (ativo !== undefined) dadosParaAtualizar.ativo = ativo;
 
-        const usuarioAtualizado = await UsuarioModel.update({ id, dadosParaAtualizar });
+        if (Object.keys(dadosParaAtualizar).length === 0) {
+            throw new AppError("Nenhum campo válido para atualizar!", 400);
+        }
+
+        const usuarioAtualizado = await UsuarioModel.update({ id: parseInt(id), dados: dadosParaAtualizar });
 
         return usuarioAtualizado;
     }
