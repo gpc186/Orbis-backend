@@ -1,4 +1,5 @@
 const AlertaModel = require('../models/alertaModel')
+const AppError = require('../utils/appErrorUtils')
 
 
 class AlertaService {
@@ -18,27 +19,61 @@ class AlertaService {
     }
 
     static async countMaquinasWithAlerta() {
-        return await AlertaModel.countMaquinasWithAlerta();
+        try {
+            return await AlertaModel.countMaquinasWithAlerta();
+        } catch (error) {
+            throw new AppError("Erro ao contar máquinas com alerta.", 500);
+        }
     }
 
     static async countActiveAlertas(){
-        return await AlertaModel.countActiveAlertas();
+        try {
+            return await AlertaModel.countActiveAlertas();
+        } catch (error) {
+            throw new AppError("Erro ao contar alertas ativos.", 500);
+        }
     };
 
     static async countAlertasToday(){
-        const hoje = new Date();
-        hoje.setHours(0, 0, 0, 0);
-        return await AlertaModel.countAlertasToday(hoje);
+        try {
+            const hoje = new Date();
+            hoje.setHours(0, 0, 0, 0);
+            return await AlertaModel.countAlertasToday(hoje);
+        } catch (error) {
+            throw new AppError("Erro ao contar alertas de hoje.", 500);
+        }
     };
 
     static async countAlertaSemAtendimento(){
-        return await AlertaModel.countAlertaSemAtendimento();
+        try {
+            return await AlertaModel.countAlertaSemAtendimento();
+        } catch (error) {
+            throw new AppError("Erro ao contar alertas sem atendimento.", 500);
+        }
     };
 
     static async countAtendedToday(){
-        const hoje = new Date();
-        hoje.setHours(0, 0, 0, 0);
-        return await AlertaModel.countAtendedToday(hoje)
+        try {
+            const hoje = new Date();
+            hoje.setHours(0, 0, 0, 0);
+            return await AlertaModel.countAtendedToday(hoje)
+        } catch (error) {
+            throw new AppError("Erro ao contar alertas atendidos hoje.", 500);
+        }
+    }
+
+    static async findAll(){
+        return await AlertaModel.findAll();
+    }
+
+    static async findById(id){
+        try {
+            const alerta = await AlertaModel.findById(id);
+            if (!alerta) throw new AppError("Alerta não encontrada.", 404);
+            return alerta;
+        } catch (error) {
+            throw new AppError("Erro ao buscar alerta.", 500);
+        }
     }
 }
 
