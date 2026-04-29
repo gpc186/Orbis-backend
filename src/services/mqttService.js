@@ -12,7 +12,7 @@ const connectMQTT = (app) => {
 
     cliente.on('connect', () => {
         console.log('Conectado ao Broker com sucesso')
-        cliente.subscribe('orbis/sensores/leituras', (err) => {
+        cliente.subscribe('orbis/leituras', (err) => {
             if (!err) console.log('Inscrito no tópico de leituras')
         })
     })
