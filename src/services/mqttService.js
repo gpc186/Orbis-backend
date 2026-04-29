@@ -17,7 +17,7 @@ const connectMQTT = (app) => {
         })
     })
 
-    cliente.io('message', async (rota, message) => {
+    cliente.on('message', async (rota, message) => {
         try {
             const leitura = JSON.parse(message.toString())
             console.log(`MQTT [${rota}]:`, leitura)
