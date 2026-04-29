@@ -214,7 +214,7 @@ class UsuarioService {
      * const usuarioAtualizado = await UsuarioService.update({ id, dados })
      */
     static async update({ id, dados }) {
-        const { nome, role, especialidade, telefone } = dados;
+        const { nome, role, especialidade, telefone, status } = dados;
         const usuario = await UsuarioModel.findById(parseInt(id));
 
         if (!usuario) {
@@ -246,18 +246,26 @@ class UsuarioService {
         if (role !== undefined) dadosParaAtualizar.role = role;
         if (especialidade !== undefined) dadosParaAtualizar.especialidade = especialidade;
         if (telefone !== undefined) dadosParaAtualizar.telefone = telefone;
+        if (status !== undefined) dadosParaAtualizar.status = status;
 
-        const usuarioAtualizado = await UsuarioModel.update({ id, dadosParaAtualizar });
+        const usuarioAtualizado = await UsuarioModel.update({ id, dados: dadosParaAtualizar });
 
         return usuarioAtualizado;
     }
 
-    static async update({usuarioId, buffer}){
+    static async updateFotoPerfil({usuarioId, buffer}){
+
+        const usuario = await UsuarioModel.findById(usuarioId);
+
+        if(!usuario){
+            throw new AppError("Usuario não encontrado!", 404);
+        }
 
         const { caminhoImagem, url } = await StorageService.uploadFotoPerfil({ usuarioId, buffer });
 
-        await UsuarioModel.update({ id: usuarioId, dados: { fotoPerfil: url, caminhoFoto: caminhoImagem } });
+        const usuarioAtualizado = await UsuarioModel.update({ id: usuarioId, dados: { fotoPerfil: url, caminhoFoto: caminhoImagem } });
 
+        return usuarioAtualizado;
     }
 
     static async logoutAll(id) {

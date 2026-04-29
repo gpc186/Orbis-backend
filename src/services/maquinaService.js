@@ -1,5 +1,6 @@
 const MaquinaModel = require('../models/maquinaModel');
-const AppError = require("../utils/appErrorUtils")
+const AppError = require("../utils/appErrorUtils");
+const StorageService = require('./storageService');
 
 class MaquinaService {
     static async create(dados) {
@@ -20,6 +21,23 @@ class MaquinaService {
         // Verifica se a máquina existe antes de tentar atualizar
         await this.findById(id);
         return await MaquinaModel.update(id, dados);
+    }
+    static async updateFotoMaquina({ maquinaId, buffer }){
+        const maquina = await MaquinaModel.findById(maquinaId);
+        if(!maquina || maquina.ativo == false){
+            throw new AppError("Maquina não encontrada ou desativada!", 404);
+        };
+
+        const { caminhoImagem, url } = await StorageService.uploadFotoMaquina({maquinaId, buffer});
+
+        const id = maquinaId
+        const data = {
+            imagem: url,
+            caminhoImagem
+        }
+        const maquinaAtualizada = await MaquinaModel.update(id, data);
+
+        return maquinaAtualizada
     }
     static async count(){
         return await MaquinaModel.count();
