@@ -19,6 +19,7 @@ const tecnicoRoutes = require('./routes/tecnicoRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const validarEnv = require('./utils/validarEnv');
 validarEnv();
+const alertaRoutes = require('./routes/alertaRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -41,6 +42,7 @@ app.use('/sensores', sensorRoutes)
 app.use('/manutencoes', manutencaoRoutes)
 app.use('/tecnicos', tecnicoRoutes)
 app.use('/dashboard', dashboardRoutes)
+app.use('/alertas', alertaRoutes)
 app.use('/auth', authRoutes)
 app.use('/usuarios', usuarioRoutes)
 app.use('/perfil', perfilRoutes)

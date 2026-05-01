@@ -13,14 +13,22 @@ class MaquinaService {
         return await MaquinaModel.findAll();
     }
     static async findById(id) {
-        const maquina = await MaquinaModel.findById(id);
-        if (!maquina) throw new AppError("Máquina não encontrada.");
-        return maquina;
+        try {
+            const maquina = await MaquinaModel.findById(id);
+            if (!maquina) throw new AppError("Máquina não encontrada.", 404);
+            return maquina;
+        } catch (error) {
+            throw new AppError("Erro ao buscar máquina.", 500);
+        }
     }
     static async update(id, dados) {
-        // Verifica se a máquina existe antes de tentar atualizar
-        await this.findById(id);
-        return await MaquinaModel.update(id, dados);
+        try {
+            // Verifica se a máquina existe antes de tentar atualizar
+            await this.findById(id);
+            return await MaquinaModel.update(id, dados);
+        } catch (error) {
+            throw new AppError("Erro ao atualizar máquina.", 500);
+        }
     }
     static async updateFotoMaquina({ maquinaId, buffer }) {
         const maquina = await MaquinaModel.findById(maquinaId);
@@ -68,7 +76,13 @@ class MaquinaService {
         return await MaquinaModel.calculateAverageIntegrity()
     }
     static async delete(id) {
-        return await MaquinaModel.delete(id);
+        try {
+            const maquina = await MaquinaModel.findById(id);
+            if (!maquina) throw new AppError("Máquina não encontrada.", 404);
+            return await MaquinaModel.delete(id);
+        } catch (error) {
+            throw new AppError("Erro ao deletar máquina.", 500);
+        }
     }
 };
 
