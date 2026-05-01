@@ -1,5 +1,4 @@
 const UsuarioService = require("../services/usuarioService");
-const AppError = require("../utils/appErrorUtils");
 
 class UsuarioController {
     static async list(req, res, next){
@@ -47,20 +46,6 @@ class UsuarioController {
             const { id } = req.params;
             const resultado = await UsuarioService.delete(id);
             return res.status(200).json(resultado);
-        } catch (error) {
-            next(error);
-        };
-    };
-
-    static async updateFoto(req, res, next){
-        if (!req.file){
-            return next(new AppError("Arquivo não foi enviado!", 400));
-        };
-        try {
-            const usuarioId = req.usuario.id;
-            const buffer = req.file.buffer;
-            const response = await UsuarioService.updateFotoPerfil({ usuarioId, buffer });
-            return res.status(200).json(response);
         } catch (error) {
             next(error);
         };

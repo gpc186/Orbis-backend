@@ -73,7 +73,6 @@ class UsuarioModel {
      */
     static async findAll({skip, take}) {
         return await prisma.usuario.findMany({
-            where: { ativo: true },
             skip,
             take,
             orderBy: { criadoEm: "desc" },
@@ -93,7 +92,7 @@ class UsuarioModel {
 
     static async findAllTecnicos({ skip, take }) {
         return await prisma.usuario.findMany({
-            where: { ativo: true, role: "TECNICO" },
+            where: { role: "TECNICO" },
             skip,
             take,
             orderBy: { criadoEm: "desc" },
@@ -178,7 +177,7 @@ class UsuarioModel {
      */
     static async countAdmins() {
         return await prisma.usuario.count({
-            where: { role: "ADMIN", ativo: true }
+            where: { role: "ADMIN"}
         });
     };
 };
