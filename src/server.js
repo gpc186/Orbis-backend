@@ -17,6 +17,8 @@ const perfilRoutes = require('./routes/perfilRoutes');
 const manutencaoRoutes = require('./routes/manutencaoRoutes');
 const tecnicoRoutes = require('./routes/tecnicoRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const validarEnv = require('./utils/validarEnv');
+validarEnv();
 const alertaRoutes = require('./routes/alertaRoutes');
 
 const app = express();

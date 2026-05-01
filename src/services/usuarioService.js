@@ -31,7 +31,7 @@ class UsuarioService {
 
         const accessToken = generateAccessToken({ id: usuario.id, role: usuario.role });
 
-        const { token, expiresAt } = generateRefreshTokenData()
+        const { token, expiresAt } = generateRefreshTokenData();
 
         const refreshToken = await RefreshTokenModel.create({ usuarioId: usuario.id, token, expiresAt });
 
@@ -48,6 +48,7 @@ class UsuarioService {
      * const usuarioNovo = await UsuarioService.register({ nome, email, senha, role })
      */
     static async register({ nome, email, senha, role }) {
+
         if (nome.length < 3) {
             throw new AppError("Nome inválido!", 400);
         };
@@ -65,6 +66,14 @@ class UsuarioService {
         if (role !== "ADMIN" && role !== "TECNICO") {
             throw new AppError("Credenciais inválidas!", 400);
         };
+
+        if(!senha || typeof senha !== "string"){
+            throw new AppError("Senha inválida!", 400);
+        }
+
+        if(!/^((?=\S*?[A-Z])(?=\S*?[a-z])(?=\S*?[0-9]).{6,})\S$/.test(senha)){
+            throw new AppError("Senha inválida!", 400);
+        }
 
         const senhaHash = await bcrypt.hash(senha, 10);
 
@@ -94,7 +103,7 @@ class UsuarioService {
 
         const usuario = await UsuarioModel.findById(refreshToken.usuarioId);
 
-        if (!usuario.ativo) {
+        if (!usuario) {
             throw new AppError("Não foi encontrado o usuario!", 404);
         };
 
@@ -114,6 +123,12 @@ class UsuarioService {
 
         if (!refreshToken) {
             throw new AppError("Token não válido!", 401);
+        };
+
+        const usuario = await UsuarioModel.findById(refreshToken.usuarioId);
+        
+        if(!usuario){
+            throw new AppError("Usuario não encontrado!", 404);
         };
 
         await RefreshTokenModel.delete(token);
@@ -156,9 +171,24 @@ class UsuarioService {
         return { dados, total, page: pageNum, totalPages };
     };
     static async findAlertasByTecnicoId(id, { page, limit }) {
+        if(!page || !limit){
+            throw new AppError("Paginação não usada corretamente!", 400);
+        }
+        
+        const tecnicoId = parseInt(id)
+
+        const tecnico = await UsuarioModel.findById(tecnicoId);
+        
+        if(!tecnico){
+            throw new AppError("Tecnico não encontrado!", 404);
+        }
+
+        if(tecnico.role != "TECNICO"){
+            throw new AppError("Usuario não é técnico!", 401);
+        }
+
         const pageNum = parseInt(page)
         const take = parseInt(limit)
-        const tecnicoId = parseInt(id)
         const skip = (pageNum - 1) * take
         const [dados, total] = await Promise.all([
             AlertaModel.findAlertasByTecnico(tecnicoId, { skip, take }),
@@ -191,6 +221,10 @@ class UsuarioService {
             throw new AppError("Tecnico não encontrado!", 404);
         };
 
+        if(tecnico.role != "TECNICO"){
+            throw new AppError("Usuario não é técnico!", 403);
+        }
+
         const status = await AlertaModel.findAlertaStatusOfTecnicoById(id);
 
         const alertaEmAndamento = status ? true : false
@@ -213,7 +247,7 @@ class UsuarioService {
      * const usuarioAtualizado = await UsuarioService.update({ id, dados })
      */
     static async update({ id, dados }) {
-        const { nome, role, especialidade, telefone } = dados;
+        const { nome, role, especialidade, telefone, ativo } = dados;
         const usuario = await UsuarioModel.findById(parseInt(id));
 
         if (!usuario) {
@@ -239,14 +273,19 @@ class UsuarioService {
             throw new AppError("Telefone inválido!", 400);
         };
 
+        if(role !== "ADMIN" && role !== "TECNICO"){
+            throw new AppError("Role inválido!", 400);
+        };
+
         const dadosParaAtualizar = {};
 
         if (nome !== undefined) dadosParaAtualizar.nome = nome;
         if (role !== undefined) dadosParaAtualizar.role = role;
         if (especialidade !== undefined) dadosParaAtualizar.especialidade = especialidade;
         if (telefone !== undefined) dadosParaAtualizar.telefone = telefone;
+        if (ativo !== undefined) dadosParaAtualizar.ativo = ativo;
 
-        const usuarioAtualizado = await UsuarioModel.update({ id, dadosParaAtualizar });
+        const usuarioAtualizado = await UsuarioModel.update({ id, dados: dadosParaAtualizar });
 
         return usuarioAtualizado;
     }
@@ -260,7 +299,7 @@ class UsuarioService {
 
         await RefreshTokenModel.logoutAll(id);
 
-        return { mensagem: "usuario deletado com sucesso!" };
+        return { mensagem: "usuario deslogado com sucesso!" };
     }
 
     static async delete(id) {

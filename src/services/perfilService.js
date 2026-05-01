@@ -1,5 +1,6 @@
 const UsuarioModel = require("../models/usuarioModel");
-const AppError = require("../utils/appErrorUtils")
+const AppError = require("../utils/appErrorUtils");
+const StorageService = require("./storageService");
 
 class PerfilService {
     static async findPerfil(id) {
@@ -41,24 +42,63 @@ class PerfilService {
             throw new AppError("Nenhum campo válido para atualizar!", 400);
         }
 
-        const contaAtualizada = await UsuarioModel.update({id, dados: dadosParaAtualizar});
+        const contaAtualizada = await UsuarioModel.update({ id, dados: dadosParaAtualizar });
 
         return contaAtualizada;
     }
 
     static async putOneSignalId({ id, oneSignalId }) {
         const usuario = await UsuarioModel.findById(id);
+
         if (!usuario) {
             throw new AppError("Perfil não encontrado!", 404);
         };
 
-        if (usuario.oneSignalId) {
-            throw new AppError("one signal id já colocado no perfil!", 409);
-        };
+        if (!oneSignalId || typeof oneSignalId !== "string" || oneSignalId.trim().length === 0) {
+            throw new AppError("OneSignalId inválido!", 400);
+        }
 
-        const contaAtualizada = await UsuarioModel.update({ id, dados: oneSignalId });
+        const contaAtualizada = await UsuarioModel.update({ id, dados: { oneSignalId: oneSignalId.trim() } });
         return contaAtualizada;
     };
+
+    static async updateFotoPerfil({ usuarioId, buffer }) {
+        const usuario = await UsuarioModel.findById(usuarioId);
+
+        if (!usuario) {
+            throw new AppError("Usuario não encontrado!", 404);
+        };
+
+        let uploadResult = null;
+
+        try {
+            uploadResult = await StorageService.uploadFotoPerfil({ usuarioId, buffer });
+
+            const usuarioAtualizado = await UsuarioModel.update({
+                id: usuarioId,
+                dados: { fotoPerfil: uploadResult.url, caminhoFoto: uploadResult.caminhoImagem }
+            });
+
+            if (usuario.caminhoFoto) {
+                try {
+                    await StorageService.deleteFoto({ bucket: "profile-images", caminho: usuario.caminhoFoto });
+                } catch (errorDelete) {
+                    console.error("Falha ao limpar upload após erro:", errorDelete);
+                };
+            }
+
+            return usuarioAtualizado;
+        } catch (error) {
+            if (uploadResult?.caminhoImagem) {
+                try {
+                    await StorageService.deleteFoto({ bucket: "profile-images", caminho: uploadResult.caminhoImagem });
+                } catch (errorDelete) {
+                    console.error("Falha ao limpar upload após erro:", errorDelete);
+                }
+            }
+            throw error;
+        }
+    }
 };
 
 module.exports = PerfilService;

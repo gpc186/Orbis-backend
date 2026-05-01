@@ -6,7 +6,7 @@ const router = express.Router();
 
 router.get('/', authMiddleware, roleMiddleware("ADMIN"), ManutecaoController.list);
 router.post('/', authMiddleware, roleMiddleware("ADMIN", "TECNICO"), ManutecaoController.create);
-router.get('/:alertaId', authMiddleware, roleMiddleware("TECNICO"), ManutecaoController.findByAlertaId);
+router.get('/alerta/:id', authMiddleware, roleMiddleware("ADMIN", "TECNICO"), ManutecaoController.findByAlertaId);
 router.get('/:id', authMiddleware, roleMiddleware("ADMIN", "TECNICO"), ManutecaoController.findById);
 router.put('/:id', authMiddleware, roleMiddleware("TECNICO"), ManutecaoController.update);
 

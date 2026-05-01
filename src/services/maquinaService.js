@@ -1,5 +1,6 @@
 const MaquinaModel = require('../models/maquinaModel');
-const AppError = require("../utils/appErrorUtils")
+const AppError = require("../utils/appErrorUtils");
+const StorageService = require('./storageService');
 
 class MaquinaService {
     static async create(dados) {
@@ -29,19 +30,50 @@ class MaquinaService {
             throw new AppError("Erro ao atualizar máquina.", 500);
         }
     }
-    static async count(){
+    static async updateFotoMaquina({ maquinaId, buffer }) {
+        const maquina = await MaquinaModel.findById(maquinaId);
+        
+        if (!maquina || maquina.ativo == false) {
+            throw new AppError("Maquina não encontrada ou desativada!", 404);
+        };
+
+        let uploadResult = null;
+
         try {
-            return await MaquinaModel.count();
+            uploadResult = await StorageService.uploadFotoMaquina({ maquinaId, buffer });
+            const id = maquinaId;
+            const data = {
+                imagem: uploadResult.url,
+                caminhoImagem: uploadResult.caminhoImagem
+            }
+
+            const maquinaAtualizada = await MaquinaModel.update(id, data);
+
+            if (maquina.caminhoImagem) {
+                try {
+                    await StorageService.deleteFoto({ bucket: "machine-images", caminho: maquina.caminhoImagem });
+                } catch (errorDelete) {
+                    console.error("Não foi possivel deletar a imagem antiga!", errorDelete);
+                }
+            };
+
+            return maquinaAtualizada;
         } catch (error) {
-            throw new AppError("Erro ao contar máquinas.", 500);
+            if (uploadResult?.caminhoImagem) {
+                try {
+                    await StorageService.deleteFoto({ bucket: "machine-images", caminho: uploadResult.caminhoImagem });
+                } catch (errorDelete) {
+                    console.error("Não foi possivel deletar a imagem antiga!", errorDelete)
+                }
+            }
+            throw error;
         }
     }
-    static async calculateAverageIntegrity(){
-        try {
-            return await MaquinaModel.calculateAverageIntegrity()
-        } catch (error) {
-            throw new AppError("Erro ao calcular integridade média.", 500);
-        }
+    static async count() {
+        return await MaquinaModel.count();
+    }
+    static async calculateAverageIntegrity() {
+        return await MaquinaModel.calculateAverageIntegrity()
     }
     static async delete(id) {
         try {

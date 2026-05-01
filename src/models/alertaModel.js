@@ -20,6 +20,10 @@ class AlertaModel {
         })
     }
 
+    static async findById(id){
+        return await prisma.alerta.findFirst({where: { id: parseInt(id) }});
+    }
+
     static async findAtivo(sensorId, tipo) {
         return await prisma.alerta.findFirst({
             where: {
@@ -69,24 +73,6 @@ class AlertaModel {
                 status: 'EM_ANDAMENTO'
             }
         })
-    }
-
-    static async findAlertasByTecnico(tecnicoId, { skip, take }) {
-        return await prisma.alerta.findMany({
-            where: { tecnicoId },
-            skip,
-            take,
-            orderBy: { criadoEm: "desc" },
-            select: {
-                id: true,
-                nome: true,
-                email: true,
-                role: true,
-                ativo: true,
-                especialidade: true,
-                telefone: true
-            }
-        });
     }
 
     static async countActiveAlertas(){

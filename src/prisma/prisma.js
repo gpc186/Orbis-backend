@@ -4,6 +4,7 @@ const prismaRaw = new PrismaClient();
 const MAX_RETRIES = 4;
 const INITIAL_DELAY = 1000;
 
+/** @type {PrismaClient} */
 const prisma = prismaRaw.$extends({
     query: {
         $allModels: {

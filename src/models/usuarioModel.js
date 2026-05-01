@@ -57,6 +57,8 @@ class UsuarioModel {
                 telefone: true,
                 oneSignalId: true,
                 atualizadoEm: true,
+                fotoPerfil: true,
+                caminhoFoto: true,
                 criadoEm: true
             }
         })
@@ -69,9 +71,8 @@ class UsuarioModel {
      * @example
      * const todosUsuarios = await UsuarioModel.findAll(skip, take);
      */
-    static async findAll(skip, take) {
+    static async findAll({skip, take}) {
         return await prisma.usuario.findMany({
-            where: { ativo: true },
             skip,
             take,
             orderBy: { criadoEm: "desc" },
@@ -82,14 +83,16 @@ class UsuarioModel {
                 role: true,
                 ativo: true,
                 especialidade: true,
-                telefone: true
+                telefone: true,
+                fotoPerfil: true,
+                caminhoFoto: true
             }
         });
     };
 
     static async findAllTecnicos({ skip, take }) {
         return await prisma.usuario.findMany({
-            where: { ativo: true, role: "TECNICO" },
+            where: { role: "TECNICO" },
             skip,
             take,
             orderBy: { criadoEm: "desc" },
@@ -100,6 +103,8 @@ class UsuarioModel {
                 role: true,
                 ativo: true,
                 especialidade: true,
+                fotoPerfil: true,
+                caminhoFoto: true,
                 telefone: true
             }
         });
@@ -129,6 +134,8 @@ class UsuarioModel {
                 telefone: true,
                 oneSignalId: true,
                 atualizadoEm: true,
+                fotoPerfil: true,
+                caminhoFoto: true,
                 criadoEm: true
             }
         });
@@ -155,8 +162,8 @@ class UsuarioModel {
         return await prisma.usuario.count({ where: { role: "TECNICO" } })
     }
 
-    static async countActiveTecnico(){
-        return await prisma.usuario.count({where: {role: "TECNICO", ativo: true}})
+    static async countActiveTecnico() {
+        return await prisma.usuario.count({ where: { role: "TECNICO", ativo: true } })
     }
     /**
      * Pega o numero de Admins, isso é pela regra de negócio para sempre ter pelo menos `um admin ativo sempre`
@@ -170,7 +177,7 @@ class UsuarioModel {
      */
     static async countAdmins() {
         return await prisma.usuario.count({
-            where: { role: "ADMIN", ativo: true }
+            where: { role: "ADMIN"}
         });
     };
 };
