@@ -12,6 +12,7 @@ class StorageService {
         if (!usuario) {
             throw new AppError("Usuario não encontrado!", 404);
         };
+
         const caminhoImagem = `perfil/${usuario.id}/perfil-${Date.now()}.webp`;
 
         const { data, error } = await supabase.storage.from("profile-images").upload(caminhoImagem, buffer);
@@ -50,7 +51,7 @@ class StorageService {
             throw new AppError("Bucket de imagem inválido!", 400);
         };
 
-        if (caminho.trim().length == 0) {
+        if ( typeof caminho !== "string" || caminho.trim().length == 0) {
             throw new AppError("Caminho de imagem inválido!", 400);
         };
 
@@ -60,7 +61,7 @@ class StorageService {
             throw new AppError("Não foi possivel deletar a imagem, por favor, tente novamente depois!", 500);
         };
 
-        return { message: "Foto deletada com sucesso!" };
+        return { mensagem: "Foto deletada com sucesso!" };
     };
 }
 
