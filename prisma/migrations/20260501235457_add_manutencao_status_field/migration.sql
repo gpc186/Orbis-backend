@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "StatusManutencao" ADD VALUE 'ENCERRADO_SEM_SOLUCAO';
