@@ -46,7 +46,8 @@ class ManutecaoModel {
                         especialidade: true
                     }
                 }
-            }
+            },
+            orderBy: { criadoEm: "desc" }
         });
     };
 
@@ -73,6 +74,60 @@ class ManutecaoModel {
         return await prisma.manutencao.update({
             where: { id: parseInt(id) },
             data: dados
+        });
+    };
+
+    static async createWithAlertSync({ alertaId, usuarioId, observacao, status }) {
+        return await prisma.$transaction(async (tx) => {
+            const manutencao = await tx.manutencao.create({
+                data: {
+                    alertaId,
+                    usuarioId,
+                    observacao,
+                    status
+                }
+            });
+
+            await tx.alerta.update({
+                where: { id: alertaId },
+                data: {
+                    tecnicoId: usuarioId,
+                    status: "EM_ANDAMENTO"
+                }
+            });
+
+            return manutencao;
+        });
+    };
+
+    static async updateWithAlertSync({ manutencaoId, alertaId, usuarioId, dados }) {
+        return await prisma.$transaction(async (tx) => {
+            const manutencaoAtualizada = await tx.manutencao.update({
+                where: { id: parseInt(manutencaoId) },
+                data: dados
+            });
+
+            if (dados.status) {
+                const dadosAlerta = {};
+
+                if (dados.status === "RESOLVIDO") {
+                    dadosAlerta.status = "RESOLVIDO";
+                    dadosAlerta.tecnicoId = usuarioId;
+                } else if (dados.status === "ENCERRADO_SEM_SOLUCAO") {
+                    dadosAlerta.status = "ATIVO";
+                    dadosAlerta.tecnicoId = null;
+                } else {
+                    dadosAlerta.status = "EM_ANDAMENTO";
+                    dadosAlerta.tecnicoId = usuarioId;
+                }
+
+                await tx.alerta.update({
+                    where: { id: parseInt(alertaId) },
+                    data: dadosAlerta
+                });
+            }
+
+            return manutencaoAtualizada;
         });
     };
 

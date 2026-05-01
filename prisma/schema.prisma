@@ -52,6 +52,7 @@ enum TipoEvento {
 enum StatusManutencao {
   EM_ANDAMENTO
   RESOLVIDO
+  ENCERRADO_SEM_SOLUCAO
 }
 
 // ─── MODELS ───────────────────────────────────────────────────────────────────

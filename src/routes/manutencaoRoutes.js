@@ -6,8 +6,8 @@ const router = express.Router();
 
 router.get('/', authMiddleware, roleMiddleware("ADMIN"), ManutecaoController.list);
 router.post('/', authMiddleware, roleMiddleware("ADMIN", "TECNICO"), ManutecaoController.create);
+router.get('/alerta/:id', authMiddleware, roleMiddleware("ADMIN", "TECNICO"), ManutecaoController.findByAlertaId);
 router.get('/:id', authMiddleware, roleMiddleware("ADMIN", "TECNICO"), ManutecaoController.findById);
-router.get('/alerta/:alertaId', authMiddleware, roleMiddleware("ADMIN", "TECNICO"), ManutecaoController.findByAlertaId);
 router.put('/:id', authMiddleware, roleMiddleware("TECNICO"), ManutecaoController.update);
 
 module.exports = router
