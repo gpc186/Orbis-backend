@@ -4,6 +4,7 @@ const AlertaModel = require("../models/alertaModel");
 const AppError = require("../utils/appErrorUtils");
 const bcrypt = require('bcrypt');
 const { generateAccessToken, generateRefreshTokenData } = require("../utils/jwtUtils");
+const StorageService = require("./storageService");
 
 class UsuarioService {
     /**
@@ -67,11 +68,11 @@ class UsuarioService {
             throw new AppError("Credenciais inválidas!", 400);
         };
 
-        if(!senha || typeof senha !== "string"){
+        if (!senha || typeof senha !== "string") {
             throw new AppError("Senha inválida!", 400);
         }
 
-        if(!/^((?=\S*?[A-Z])(?=\S*?[a-z])(?=\S*?[0-9]).{6,})\S$/.test(senha)){
+        if (!/^((?=\S*?[A-Z])(?=\S*?[a-z])(?=\S*?[0-9]).{6,})\S$/.test(senha)) {
             throw new AppError("Senha inválida!", 400);
         }
 
@@ -126,8 +127,8 @@ class UsuarioService {
         };
 
         const usuario = await UsuarioModel.findById(refreshToken.usuarioId);
-        
-        if(!usuario){
+
+        if (!usuario) {
             throw new AppError("Usuario não encontrado!", 404);
         };
 
@@ -171,19 +172,19 @@ class UsuarioService {
         return { dados, total, page: pageNum, totalPages };
     };
     static async findAlertasByTecnicoId(id, { page, limit }) {
-        if(!page || !limit){
+        if (!page || !limit) {
             throw new AppError("Paginação não usada corretamente!", 400);
         }
-        
+
         const tecnicoId = parseInt(id)
 
         const tecnico = await UsuarioModel.findById(tecnicoId);
-        
-        if(!tecnico){
+
+        if (!tecnico) {
             throw new AppError("Tecnico não encontrado!", 404);
         }
 
-        if(tecnico.role != "TECNICO"){
+        if (tecnico.role != "TECNICO") {
             throw new AppError("Usuario não é técnico!", 401);
         }
 
@@ -221,7 +222,7 @@ class UsuarioService {
             throw new AppError("Tecnico não encontrado!", 404);
         };
 
-        if(tecnico.role != "TECNICO"){
+        if (tecnico.role != "TECNICO") {
             throw new AppError("Usuario não é técnico!", 403);
         }
 
@@ -252,30 +253,47 @@ class UsuarioService {
 
         if (!usuario) {
             throw new AppError("Usuario não encontrado!", 404);
-        };
+        }
 
         if (usuario.role === "ADMIN" && role === "TECNICO") {
             const countAdmin = await UsuarioModel.countAdmins();
-            if (countAdmin == 1) {
+            if (countAdmin === 1) {
                 throw new AppError("Não é possivel rebaixar o ultimo admin!", 409);
-            };
-        };
+            }
+        }
 
-        if (nome && nome.length < 3) {
-            throw new AppError("Nome inválido!", 400);
-        };
+        if (nome !== undefined) {
+            if (typeof nome !== "string" || nome.trim().length < 3) {
+                throw new AppError("Nome inválido!", 400);
+            }
+        }
 
-        if (especialidade && especialidade.length < 2) {
-            throw new AppError("Especialidade invalida!", 400);
-        };
+        if (especialidade !== undefined) {
+            if (typeof especialidade !== "string" || especialidade.trim().length < 2) {
+                throw new AppError("Especialidade invalida!", 400);
+            }
+        }
 
-        if (telefone && !/^(\(?[0-9]{2}\)?)? ?([0-9]{4,5})-?([0-9]{4})$/gm.test(telefone)) {
-            throw new AppError("Telefone inválido!", 400);
-        };
+        if (telefone !== undefined) {
+            if (
+                typeof telefone !== "string" ||
+                !/^(\(?[0-9]{2}\)?) ?([0-9]{4,5})-?([0-9]{4})$/gm.test(telefone)
+            ) {
+                throw new AppError("Telefone inválido!", 400);
+            }
+        }
 
-        if(role !== "ADMIN" && role !== "TECNICO"){
-            throw new AppError("Role inválido!", 400);
-        };
+        if (role !== undefined) {
+            if (role !== "ADMIN" && role !== "TECNICO") {
+                throw new AppError("Role inválido!", 400);
+            }
+        }
+
+        if (ativo !== undefined) {
+            if (typeof ativo !== "boolean") {
+                throw new AppError("Ativo não é válido!", 400);
+            }
+        }
 
         const dadosParaAtualizar = {};
 
@@ -313,6 +331,14 @@ class UsuarioService {
         };
 
         await UsuarioModel.delete(parseInt(id));
+
+        if (usuario.caminhoFoto) {
+            try {
+                await StorageService.deleteFoto({ bucket: "profile-images", caminho: usuario.caminhoFoto });
+            } catch (error) {
+                console.error("Não foi possivel deletar a foto!", error);
+            }
+        };
 
         return { mensagem: "Usuario deletado com sucesso!" };
     };

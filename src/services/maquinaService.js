@@ -18,29 +18,54 @@ class MaquinaService {
             if (!maquina) throw new AppError("Máquina não encontrada.", 404);
             return maquina;
         } catch (error) {
+            if (error instanceof AppError) throw error;
             throw new AppError("Erro ao buscar máquina.", 500);
         }
     }
     static async update(id, dados) {
         try {
             // Verifica se a máquina existe antes de tentar atualizar
-            await this.findById(id);
-            return await MaquinaModel.update(id, dados);
+            const maquina = await this.findById(id);
+
+            const dadosParaAtualizar = { ...dados };
+
+            if (dados.ativo === false) {
+                dadosParaAtualizar.imagem = null;
+                dadosParaAtualizar.caminhoImagem = null;
+            }
+
+            const maquinaAtualizada = await MaquinaModel.update(id, dadosParaAtualizar);
+
+            if (dados.ativo === false && maquina.caminhoImagem) {
+                try {
+                    await StorageService.deleteFoto({
+                        bucket: "machine-images",
+                        caminho: maquina.caminhoImagem
+                    });
+                } catch (error) {
+                    console.error("Falha ao remover imagem antiga:", error);
+                }
+            }
+            return maquinaAtualizada;
         } catch (error) {
+            if (error instanceof AppError) throw error;
             throw new AppError("Erro ao atualizar máquina.", 500);
         }
     }
     static async updateFotoMaquina({ maquinaId, buffer }) {
-        const maquina = await MaquinaModel.findById(maquinaId);
-        
+        const maquina = await this.findById(maquinaId);
+
         if (!maquina || maquina.ativo == false) {
             throw new AppError("Maquina não encontrada ou desativada!", 404);
         };
 
         let uploadResult = null;
 
+        const caminho = `maquina/${maquina.id}/maquina-${Date.now()}.webp`;
+        const bucket = "machine-images";
+
         try {
-            uploadResult = await StorageService.uploadFotoMaquina({ maquinaId, buffer });
+            uploadResult = await StorageService.uploadFoto({ bucket, caminho, buffer });
             const id = maquinaId;
             const data = {
                 imagem: uploadResult.url,
@@ -76,13 +101,23 @@ class MaquinaService {
         return await MaquinaModel.calculateAverageIntegrity()
     }
     static async delete(id) {
-        try {
-            const maquina = await MaquinaModel.findById(id);
-            if (!maquina) throw new AppError("Máquina não encontrada.", 404);
-            return await MaquinaModel.delete(id);
-        } catch (error) {
-            throw new AppError("Erro ao deletar máquina.", 500);
+        const maquina = await MaquinaModel.findById(id);
+        if (!maquina) throw new AppError("Máquina não encontrada.", 404);
+
+        await MaquinaModel.delete(id);
+
+        if (maquina.caminhoImagem) {
+            try {
+                await StorageService.deleteFoto({
+                    bucket: "machine-images",
+                    caminho: maquina.caminhoImagem
+                });
+            } catch (error) {
+                console.error("Falha ao remover arquivo órfão:", error);
+            }
         }
+
+        return { mensagem: "Máquina deletada com sucesso!" };
     }
 };
 

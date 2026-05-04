@@ -43,7 +43,7 @@ async function imagemProcessada(req, res, next) {
         
         return next();
     } catch (error) {
-        return next(new AppError("Erro ao processar imagem!", 500));
+        return next(new AppError("Arquivo de imagem inválida!", 400));
     };
 };
 

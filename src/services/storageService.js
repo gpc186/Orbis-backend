@@ -1,57 +1,44 @@
 const { createClient } = require("@supabase/supabase-js");
-const UsuarioModel = require("../models/usuarioModel");
 const AppError = require("../utils/appErrorUtils");
-const MaquinaModel = require("../models/maquinaModel");
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE)
 
 class StorageService {
-    static async uploadFotoPerfil({ usuarioId, buffer }) {
-        const usuario = await UsuarioModel.findById(usuarioId);
 
-        if (!usuario) {
-            throw new AppError("Usuario não encontrado!", 404);
-        };
+    static async uploadFoto({ bucket, caminho, buffer }) {
+        if (bucket !== "profile-images" && bucket !== "machine-images") {
+            throw new AppError("Bucket de imagem inválido!", 400);
+        }
 
-        const caminhoImagem = `perfil/${usuario.id}/perfil-${Date.now()}.webp`;
+        if (typeof caminho !== "string" || caminho.trim().length === 0) {
+            throw new AppError("Caminho de imagem inválido!", 400);
+        }
 
-        const { data, error } = await supabase.storage.from("profile-images").upload(caminhoImagem, buffer);
+        if (!Buffer.isBuffer(buffer)) {
+            throw new AppError("Buffer inválido!", 400);
+        }
 
-        if (error) {
-            throw new AppError("Erro ao tentar dar upload da imagem!", 500);
-        };
-
-        const { data: urlData } = supabase.storage.from("profile-images").getPublicUrl(data.path);
-
-        return { caminhoImagem: data.path, url: urlData.publicUrl };
-    };
-
-    static async uploadFotoMaquina({ maquinaId, buffer }) {
-        const maquina = await MaquinaModel.findById(maquinaId);
-
-        if (!maquina || maquina.ativo == false) {
-            throw new AppError("Maquina não foi encontrada!", 404);
-        };
-
-        const caminhoImagem = `maquina/${maquinaId}/maquina-${Date.now()}.webp`;
-
-        const { data, error } = await supabase.storage.from("machine-images").upload(caminhoImagem, buffer);
+        const { data, error } = await supabase.storage.from(bucket).upload(caminho, buffer, {
+            contentType: "image/webp",
+            cacheControl: "3600",
+            upsert: false
+        });
 
         if (error) {
             throw new AppError("Erro ao tentar dar upload da imagem!", 500);
-        };
+        }
 
-        const { data: urlData } = supabase.storage.from("machine-images").getPublicUrl(data.path);
+        const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(data.path);
 
         return { caminhoImagem: data.path, url: urlData.publicUrl };
-    };
+    }
 
     static async deleteFoto({ bucket, caminho }) {
         if (bucket !== "profile-images" && bucket !== "machine-images") {
             throw new AppError("Bucket de imagem inválido!", 400);
         };
 
-        if ( typeof caminho !== "string" || caminho.trim().length == 0) {
+        if (typeof caminho !== "string" || caminho.trim().length == 0) {
             throw new AppError("Caminho de imagem inválido!", 400);
         };
 

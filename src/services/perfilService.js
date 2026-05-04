@@ -71,8 +71,11 @@ class PerfilService {
 
         let uploadResult = null;
 
+        const caminho = `perfil/${usuario.id}/perfil-${Date.now()}.webp`
+        const bucket = "profile-images"
+
         try {
-            uploadResult = await StorageService.uploadFotoPerfil({ usuarioId, buffer });
+            uploadResult = await StorageService.uploadFoto({bucket , caminho, buffer});
 
             const usuarioAtualizado = await UsuarioModel.update({
                 id: usuarioId,
