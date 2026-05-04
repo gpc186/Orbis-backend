@@ -1,45 +1,53 @@
-const mqtt = require('mqtt')
-const leituraService = require('./leituraService')
-const { error } = require('node:console')
-const { ModuleKind } = require('typescript')
+const mqtt = require('mqtt');
+const leituraService = require('./leituraService');
 
 const connectMQTT = (app) => {
+    // Configuração para o Broker Público do HiveMQ
     const cliente = mqtt.connect(process.env.MQTT_URL, {
-        username: process.env.MQTT_USER,
-        password: process.env.MQTT_PASS,
-        rejectUnauthorized: false
-    })
+        keepalive: 60,
+        reconnectPeriod: 1000,
+        connectTimeout: 30 * 1000,
+    });
 
     cliente.on('connect', () => {
-        console.log('Conectado ao Broker com sucesso')
+        console.log('✅ API conectada ao Broker Público do HiveMQ');
+        
+        // Assina o tópico que o seu ESP32 está usando
         cliente.subscribe('orbis/leituras', (err) => {
-            if (!err) console.log('Inscrito no tópico de leituras')
-        })
-    })
-
-    cliente.on('message', async (rota, message) => {
-        try {
-            const leitura = JSON.parse(message.toString())
-            console.log(`MQTT [${rota}]:`, leitura)
-
-            const novaLeitura = await leituraService.processarNovaLeitura({
-                sensorId: leitura.sensorId,
-                temperatura: leitura.temperatura,
-                vibracao: leitura.vibracao
-            })
-
-            const io = app.get('io')
-            if (io) {
-                io.emit('novaLeitura', novaLeitura)
+            if (!err) {
+                console.log('📡 Monitorando tópico: orbis/leituras');
             }
+        });
+    });
+
+    cliente.on('message', async (topic, message) => {
+        try {
+            const data = JSON.parse(message.toString());
+            console.log("📥 Leitura recebida do ESP32:", data);
+
+            // Mapeia os dados do ESP32 para o formato do seu Banco de Dados
+            // O seu ESP32 envia 'vibracao_rms' e 'temperatura'
+            const novaLeitura = await leituraService.processarNovaLeitura({
+                sensorId: 1, // ID padrão para o sensor físico
+                temperatura: data.temperatura,
+                vibracao: data.vibracao_rms 
+            });
+
+            // Envia para o Dashboard em tempo real via Socket.io
+            const io = app.get('io');
+            if (io) {
+                io.emit('novaLeitura', novaLeitura);
+                console.log("🚀 Dados enviados para o Dashboard via WebSocket");
+            }
+
         } catch (error) {
-            console.log('Erro ao processar menssagem MQTT:', error.message)
+            console.error('❌ Erro ao processar leitura do ESP32:', error.message);
         }
-    })
+    });
 
     cliente.on('error', (err) => {
-        console.error('Erro no cliente MQTT:', err)
-    })
-}
+        console.error('⚠️ Erro de conexão MQTT na API:', err.message);
+    });
+};
 
-module.exports = connectMQTT
+module.exports = connectMQTT;
