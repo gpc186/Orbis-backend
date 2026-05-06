@@ -303,7 +303,11 @@ class UsuarioService {
         if (telefone !== undefined) dadosParaAtualizar.telefone = telefone;
         if (ativo !== undefined) dadosParaAtualizar.ativo = ativo;
 
-        const usuarioAtualizado = await UsuarioModel.update({ id, dados: dadosParaAtualizar });
+        if (Object.keys(dadosParaAtualizar).length === 0) {
+            throw new AppError("Nenhum campo válido para atualizar!", 400);
+        }
+
+        const usuarioAtualizado = await UsuarioModel.update({ id: parseInt(id), dados: dadosParaAtualizar });
 
         return usuarioAtualizado;
     }
