@@ -15,7 +15,9 @@ class AlertaService {
             })
         }
 
-        return await AlertaModel.create(sensorId, maquinaId, tipo, mensagem)
+        const novoAlerta =  await AlertaModel.create(sensorId, maquinaId, tipo, mensagem);
+
+        
     }
 
     static async countMaquinasWithAlerta() {
