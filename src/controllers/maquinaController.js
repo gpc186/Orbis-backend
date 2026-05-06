@@ -3,7 +3,7 @@ const AppError = require('../utils/appErrorUtils');
 class MaquinaController {
     static async store(req, res, next) {
         try {
-            const nova = await MaquinaService.create(req.body, id, role);
+            const nova = await MaquinaService.create(req.body);
             return res.status(201).json(nova);
         } catch (error) {
             next(error)
