@@ -1,258 +1,328 @@
-# Orbis — API
+# Orbis API
 
-Back-end do sistema de monitoramento industrial preditivo Orbis, desenvolvido como TCC do curso de Desenvolvimento de Sistemas no SENAI.
+Back-end do sistema **Orbis**, desenvolvido como TCC no SENAI para monitoramento industrial preditivo, gestão de alertas e fluxo de manutenção.
 
----
+## Visão geral
+
+A API é responsável por:
+
+- autenticação com JWT e refresh token;
+- cadastro e gestão de usuários, técnicos, máquinas e sensores;
+- recebimento de leituras de sensores;
+- geração de alertas operacionais;
+- controle de manutenções vinculadas aos alertas;
+- upload de imagens de perfil e de máquinas;
+- consolidação de dados para dashboard.
 
 ## Tecnologias
 
-- **Node.js + JavaScript** — runtime e linguagem
-- **Express** — framework HTTP
-- **Prisma ORM** — acesso ao banco de dados
-- **MySQL** — banco de dados relacional
-- **Socket.io** — alertas em tempo real via WebSocket
-- **JWT + Refresh Token** — autenticação
-- **node-cron** — tarefas agendadas
-- **OneSignal** — notificações push (via FCM)
+- **Node.js** com **JavaScript**
+- **Express**
+- **Prisma ORM**
+- **PostgreSQL**
+- **JWT**
+- **Socket.IO**
+- **node-cron**
+- **Supabase Storage**
+- **Multer** e **Sharp**
 
----
+## Requisitos
 
-## Como rodar localmente
+- Node.js 18 ou superior
+- Banco PostgreSQL acessível pela `DATABASE_URL`
+- Buckets no Supabase Storage para imagens:
+  - `profile-images`
+  - `machine-images`
 
-### Pré-requisitos
-
-- Node.js 18+
-- MySQL rodando localmente ou acesso ao Aiven
-
-### Instalação
+## Como executar
 
 ```bash
-# Clone o repositório
-git clone https://github.com/seu-usuario/orbis-api.git
-cd orbis-api
-
-# Instale as dependências
 npm install
-
-# Configure as variáveis de ambiente
-cp .env.example .env
-# edite o .env com suas credenciais
-
-# Rode as migrations do banco
 npx prisma migrate dev
-
-# Inicie o servidor
 npm run dev
 ```
 
-A API estará disponível em `http://localhost:3333`.
+Por padrão, a aplicação sobe em:
 
----
+```txt
+http://localhost:3333
+```
 
-## Variáveis de Ambiente
+## Variáveis de ambiente
 
-Crie um arquivo `.env` na raiz do projeto baseado no `.env.example`:
+Crie um arquivo `.env` com base no `.env.example`.
+
+### Obrigatórias
 
 ```env
-# Banco de dados
-DATABASE_URL="mysql://usuario:senha@host:porta/orbis?ssl-mode=REQUIRED"
+DATABASE_URL="sua_url_do_postgres"
+JWT_SECRET="sua_chave_jwt"
+SUPABASE_URL="sua_url_do_supabase"
+SUPABASE_SERVICE_ROLE="sua_service_role"
+```
 
-# JWT
-JWT_SECRET="sua-chave-secreta-aqui"
+### Utilizadas pela aplicação
+
+```env
 JWT_EXPIRES_IN="30m"
-REFRESH_TOKEN_EXPIRES_IN="7d"
-
-# ESP32
-ESP32_API_KEY="chave-do-esp32-aqui"
-
-# OneSignal
-ONESIGNAL_APP_ID="seu-app-id"
-ONESIGNAL_API_KEY="sua-api-key"
-
-# Servidor
+REFRESH_TOKEN_EXPIRES_IN_DAYS="7"
+ESP32_API_KEY="chave_do_esp32"
 PORT=3333
+NODE_ENV="DEVELOPMENT"
 ```
 
->  Nunca suba o `.env` ou o `ca.pem` para o repositório!
+## Scripts
 
----
-
-## Estrutura de Pastas
-
+```bash
+npm run dev
+npm start
 ```
+
+## Estrutura do projeto
+
+```txt
 src/
-├── controllers/        → recebe req e devolve res
-├── services/           → lógica de negócio
-├── models/             → acesso ao banco via Prisma
-│   ├── prisma.js            ← instância única do Prisma client
-│   ├── usuarioModel.js
-│   ├── maquinaModel.js
-│   ├── sensorModel.js
-│   ├── leituraModel.js
-│   ├── alertaModel.js
-│   ├── manutencaoModel.js
-│   └── refreshTokenModel.js
-├── routes/             → definição das rotas
-├── middlewares/
-│   ├── authMiddleware.js    ← valida JWT
-│   └── apiKeyMiddleware.js  ← valida chave do ESP32
-├── socket/
-│   └── index.js            ← configuração do Socket.io
-├── jobs/
-│   ├── tendenciaJob.js     ← detecta tendência de alta em 2h (30min)
-│   ├── sensorOfflineJob.js ← marca sensores inativos offline (5min)
-│   └── limpezaJob.js       ← remove leituras com +30 dias (diário)
-└── server.js
+├── controllers/     # Camada HTTP
+├── jobs/            # Rotinas agendadas
+├── middlewares/     # Autenticação, roles, upload e erros
+├── models/          # Acesso ao banco via Prisma
+├── prisma/          # Cliente Prisma
+├── routes/          # Definição das rotas
+├── services/        # Regras de negócio
+├── utils/           # Utilitários e validação de ambiente
+└── server.js        # Bootstrap da aplicação
 ```
 
----
+## Modelo de dados
 
-## Banco de Dados
+### Usuário
 
-```
-USUARIO       id, nome, email, senha, role (ADMIN|TECNICO), ativo,
-              especialidade, telefone, oneSignalId, atualizadoEm
+- `id`
+- `nome`
+- `email`
+- `senha`
+- `role`: `ADMIN` | `TECNICO`
+- `ativo`
+- `especialidade`
+- `telefone`
+- `oneSignalId`
+- `fotoPerfil`
+- `caminhoFoto`
+- `criadoEm`
+- `atualizadoEm`
 
-MAQUINA       id, nome, setor, tipo, criticidade (BAIXA|MEDIA|ALTA)
+### Máquina
 
-SENSOR        id, maquinaId*, tipo, status (ONLINE|OFFLINE),
-              limiteTemperatura, limiteVibracao, ultimaLeituraEm
+- `id`
+- `nome`
+- `setor`
+- `tipo`
+- `criticidade`: `BAIXA` | `MEDIA` | `ALTA`
+- `ativo`
+- `integridade`
+- `scoreEstabilidade`
+- `previsaoManutencao`
+- `janelaManuInicio`
+- `janelaManuFim`
+- `imagem`
+- `caminhoImagem`
+- `criadoEm`
 
-LEITURA       id, sensorId*, temperatura, vibracao, criadoEm
+### Sensor
 
-ALERTA        id, sensorId*, maquinaId*, tipo, status, mensagem, criadoEm
-              tipo: LIMITE_ULTRAPASSADO | TENDENCIA_CURTA | TENDENCIA_LONGA
-              status: ATIVO | EM_ANDAMENTO | RESOLVIDO
+- `id`
+- `maquinaId`
+- `tipo`
+- `status`: `ONLINE` | `OFFLINE` | `INATIVO`
+- `limiteTemperatura`
+- `idealTemperatura`
+- `limiteVibracao`
+- `idealVibracao`
+- `desvioMaximoTemp`
+- `desvioMaximoVibra`
+- `ultimaTemperatura`
+- `ultimaVibracao`
+- `ultimaLeituraEm`
+- `criadoEm`
 
-MANUTENCAO    id, alertaId*, usuarioId*, observacao, status, criadoEm
-              status: EM_ANDAMENTO | RESOLVIDO
+### Leitura
 
-REFRESH_TOKEN id, usuarioId*, token, expiresAt, criadoEm
-```
+- `id`
+- `sensorId`
+- `temperatura`
+- `vibracao`
+- `criadoEm`
 
-`*` chave estrangeira (FK)
+### Alerta
 
----
+- `id`
+- `sensorId`
+- `maquinaId`
+- `tecnicoId`
+- `tipo`: `LIMITE_ULTRAPASSADO` | `TENDENCIA_CURTA` | `TENDENCIA_LONGA` | `DEGRADACAO_ACELERADA` | `INSTABILIDADE`
+- `status`: `ATIVO` | `EM_ANDAMENTO` | `RESOLVIDO` | `CANCELADO`
+- `mensagem`
+- `criadoEm`
 
-## Contratos da API
+### AlertaEvento
 
-> **Base URL desenvolvimento:** `http://localhost:3333`
-> **Base URL produção:** `https://orbis-api.fly.dev`
+- `id`
+- `alertaId`
+- `usuarioId`
+- `tipo`: `CRIADO` | `ACEITO` | `ATUALIZADO` | `RESOLVIDO` | `CANCELADO`
+- `descricao`
+- `criadoEm`
+
+### Manutenção
+
+- `id`
+- `alertaId`
+- `usuarioId`
+- `observacao`
+- `status`: `EM_ANDAMENTO` | `RESOLVIDO` | `ENCERRADO_SEM_SOLUCAO`
+- `criadoEm`
+
+### RefreshToken
+
+- `id`
+- `usuarioId`
+- `token`
+- `expiresAt`
+- `criadoEm`
+
+## Regras de negócio importantes
 
 ### Autenticação
 
-Rotas protegidas exigem o header:
-```
-Authorization: Bearer <accessToken>
-```
+- rotas protegidas exigem `Authorization: Bearer <token>`;
+- o fluxo de autenticação usa access token e refresh token;
+- o middleware de autenticação valida o token e confere o usuário no banco.
 
-Rota de leituras do ESP32 exige:
-```
-x-api-key: <chave>
-```
+### Perfil e imagens
 
-### Paginação
+- o usuário autenticado pode consultar e editar o próprio perfil;
+- a foto de perfil é processada com `Sharp` antes do upload;
+- imagens são armazenadas no Supabase Storage.
 
-Endpoints de listagem aceitam `?page=1&limit=20` e retornam:
-```json
-{
-  "dados": [...],
-  "total": 100,
-  "page": 1,
-  "totalPages": 5
-}
-```
+### Manutenção e alerta
 
----
+- um alerta pode ter várias manutenções ao longo do tempo;
+- apenas uma manutenção pode ficar `EM_ANDAMENTO` por alerta;
+- quando a manutenção é `RESOLVIDO`, o alerta é encerrado como `RESOLVIDO`;
+- quando a manutenção é `ENCERRADO_SEM_SOLUCAO`, o alerta volta para `ATIVO` e o técnico é desvinculado.
+
+## Rotas
+
+### Healthcheck
+
+| Método | Rota | Acesso |
+|---|---|---|
+| GET | `/` | Público |
+| GET | `/health` | Público |
 
 ### Auth
-| Método | Rota | Acesso | Entrada | Saída |
-|---|---|---|---|---|
-| POST | /auth/login | Público | `{ email, senha }` | `{ accessToken, refreshToken, usuario }` |
-| POST | /auth/refresh | Público | `{ refreshToken }` | `{ accessToken }` |
-| POST | /auth/logout | Autenticado | `{ refreshToken }` | `{ mensagem }` |
+
+| Método | Rota | Acesso |
+|---|---|---|
+| POST | `/auth/login` | Público |
+| POST | `/auth/refresh` | Público |
+| POST | `/auth/logout` | Autenticado |
+| DELETE | `/auth/logout-all` | Autenticado |
 
 ### Perfil
-| Método | Rota | Acesso | Entrada | Saída |
-|---|---|---|---|---|
-| GET | /perfil | Autenticado | — | `{ id, nome, email, role, especialidade, telefone, ativo }` |
-| PUT | /perfil | Autenticado | `{ nome, telefone, especialidade, senha }` | `{ id, nome, telefone, especialidade }` |
-| POST | /perfil/device-token | Autenticado | `{ oneSignalId }` | `{ mensagem }` |
+
+| Método | Rota | Acesso |
+|---|---|---|
+| GET | `/perfil` | Autenticado |
+| PUT | `/perfil` | Autenticado |
+| PUT | `/perfil/foto` | Autenticado |
+| POST | `/perfil/device-token` | Autenticado |
 
 ### Usuários
-| Método | Rota | Acesso | Entrada | Saída |
-|---|---|---|---|---|
-| GET | /usuarios | Admin | `?page&limit` | paginado |
-| GET | /usuarios/:id | Admin | — | `{ id, nome, email, role, especialidade, telefone, ativo }` |
-| GET | /usuarios/:id/historico | Admin | `?page&limit` | paginado |
-| POST | /usuarios | Admin | `{ nome, email, senha, role, especialidade, telefone }` | `{ id, nome, email, role }` |
-| PUT | /usuarios/:id | Admin | `{ nome, email, role, especialidade, telefone }` | `{ id, nome, email, role }` |
-| DELETE | /usuarios/:id | Admin | — | `{ mensagem }` |
 
-> Admin não pode excluir outro Admin nem rebaixar o único Admin existente.
+| Método | Rota | Acesso |
+|---|---|---|
+| GET | `/usuarios` | Admin |
+| GET | `/usuarios/:id` | Admin |
+| POST | `/usuarios` | Admin |
+| PUT | `/usuarios/:id` | Admin |
+| DELETE | `/usuarios/:id` | Admin |
 
 ### Técnicos
-| Método | Rota | Acesso | Entrada | Saída |
-|---|---|---|---|---|
-| GET | /tecnicos | Admin | `?page&limit` | paginado |
-| GET | /tecnicos/:id | Admin | — | `{ id, nome, especialidade, ativo, alertaEmAndamento }` |
+
+| Método | Rota | Acesso |
+|---|---|---|
+| GET | `/tecnicos` | Admin |
+| GET | `/tecnicos/:id` | Admin |
+| GET | `/tecnicos/:id/alertas` | Admin |
 
 ### Máquinas
-| Método | Rota | Acesso | Entrada | Saída |
-|---|---|---|---|---|
-| GET | /maquinas | Admin, Técnico | `?page&limit` | paginado |
-| GET | /maquinas/:id | Admin, Técnico | — | `{ id, nome, setor, tipo, criticidade, sensores }` |
-| POST | /maquinas | Admin | `{ nome, setor, tipo, criticidade }` | `{ id, nome, setor, tipo, criticidade }` |
-| PUT | /maquinas/:id | Admin | `{ nome, setor, tipo, criticidade }` | `{ id, nome, setor, tipo, criticidade }` |
-| DELETE | /maquinas/:id | Admin | — | `{ mensagem }` |
+
+| Método | Rota | Acesso |
+|---|---|---|
+| POST | `/maquinas` | Autenticado |
+| GET | `/maquinas` | Autenticado |
+| GET | `/maquinas/:id` | Autenticado |
+| PUT | `/maquinas/:id` | Autenticado |
+| PUT | `/maquinas/:id/foto` | Autenticado |
+| DELETE | `/maquinas/:id` | Autenticado |
 
 ### Sensores
-| Método | Rota | Acesso | Entrada | Saída |
-|---|---|---|---|---|
-| GET | /sensores | Admin | `?page&limit` | paginado |
-| GET | /sensores/:id | Admin, Técnico | — | `{ id, maquinaId, tipo, status, limites }` |
-| POST | /sensores | Admin | `{ maquinaId, tipo, limiteTemperatura, limiteVibracao }` | `{ id, maquinaId, tipo, status }` |
-| PUT | /sensores/:id | Admin | `{ limiteTemperatura, limiteVibracao, status }` | `{ id, limites, status }` |
-| DELETE | /sensores/:id | Admin | — | `{ mensagem }` |
+
+| Método | Rota | Acesso |
+|---|---|---|
+| POST | `/sensores` | Autenticado |
+| GET | `/sensores` | Autenticado |
+| GET | `/sensores/:id` | Autenticado |
+| PUT | `/sensores/:id` | Autenticado |
+| DELETE | `/sensores/:id` | Autenticado |
 
 ### Leituras
-| Método | Rota | Acesso | Entrada | Saída |
-|---|---|---|---|---|
-| POST | /leituras | ESP32 (x-api-key) | `{ sensor_id, timestamp, temperatura, vibracao }` | `{ id, criadoEm }` |
-| GET | /leituras/:sensorId | Admin, Técnico | `?periodo=24h\|7d&page&limit` | paginado |
 
-### Alertas
-| Método | Rota | Acesso | Entrada | Saída |
-|---|---|---|---|---|
-| GET | /alertas | Admin, Técnico | `?page&limit` | paginado |
-| GET | /alertas/:id | Admin, Técnico | — | `{ id, maquinaId, sensorId, tipo, status, mensagem, criadoEm }` |
-| GET | /alertas/maquina/:maquinaId | Admin, Técnico | `?page&limit` | paginado |
-| PATCH | /alertas/:id/status | Admin, Técnico | `{ status }` | `{ id, status }` |
+| Método | Rota | Acesso |
+|---|---|---|
+| POST | `/leituras` | Público na branch atual |
+| GET | `/leituras` | Público na branch atual |
 
-> Alertas ordenados por criticidade da máquina (ALTA → MEDIA → BAIXA).
+> Observação: a proteção do endpoint de leituras pode variar de acordo com a branch em uso. Em outras branches do projeto, esse fluxo já está sendo tratado com `x-api-key` para integração com ESP32.
 
 ### Manutenções
-| Método | Rota | Acesso | Entrada | Saída |
-|---|---|---|---|---|
-| GET | /manutencoes | Admin | `?page&limit` | paginado |
-| GET | /manutencoes/:alertaId | Admin, Técnico | — | `[{ id, usuarioId, observacao, status, criadoEm }]` |
-| POST | /manutencoes | Técnico | `{ alertaId, observacao, status }` | `{ id, alertaId, status, criadoEm }` |
-| PUT | /manutencoes/:id | Técnico | `{ observacao, status }` | `{ id, observacao, status }` |
+
+| Método | Rota | Acesso |
+|---|---|---|
+| GET | `/manutencoes` | Admin |
+| POST | `/manutencoes` | Admin, Técnico |
+| GET | `/manutencoes/alerta/:id` | Admin, Técnico |
+| GET | `/manutencoes/:id` | Admin, Técnico |
+| PUT | `/manutencoes/:id` | Técnico |
 
 ### Dashboard
-| Método | Rota | Acesso | Entrada | Saída |
-|---|---|---|---|---|
-| GET | /dashboard/resumo | Admin | — | `{ totalMaquinas, maquinasEmAlerta, alertasAtivos, alertasHoje, tecnicosAtivos }` |
 
----
+| Método | Rota | Acesso |
+|---|---|---|
+| GET | `/dashboard/resumo` | Admin |
 
-## WebSocket
+## Upload de imagens
 
-Evento emitido pela API ao gerar um alerta:
-```
-alerta → { id, maquinaId, mensagem, tipo, status }
-```
+- campo esperado no multipart: `imagem`
+- formatos aceitos:
+  - `image/png`
+  - `image/jpg`
+  - `image/jpeg`
+  - `image/webp`
+- tamanho máximo: `15 MB`
+- a imagem é convertida para `webp`
 
-Conectar usando o `accessToken` no momento da conexão para autenticação.
+## Jobs agendados
 
-E o mais importante, lembre-se de se divertir! 😁
+Ao iniciar o servidor, a aplicação também carrega:
+
+- `tendenciaJob`
+- `limpezaJob`
+- `sensorOfflineJob`
+
+## Observações
+
+- o projeto utiliza `validarEnv()` no bootstrap para impedir subida com ambiente incompleto;
+- o repositório ainda não possui suíte formal de testes automatizados;
+- o `README` descreve o estado atual desta branch.

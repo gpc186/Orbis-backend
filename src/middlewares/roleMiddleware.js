@@ -5,10 +5,10 @@ function roleMiddleware(...roles){
         const userRole = req.usuario.role;
 
         if(!roles.includes(userRole)){
-            next(new AppError("Credenciais inválidas!", 403))
+            return next(new AppError("Credenciais inválidas!", 403))
         };
 
-        next();
+        return next();
     };
 };
 
