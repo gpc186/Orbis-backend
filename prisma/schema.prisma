@@ -45,6 +45,7 @@ enum TipoEvento {
   CRIADO
   ACEITO
   ATUALIZADO
+  REABERTO
   RESOLVIDO
   CANCELADO
 }
@@ -58,19 +59,19 @@ enum StatusManutencao {
 // ─── MODELS ───────────────────────────────────────────────────────────────────
 
 model Usuario {
-  id                  Int      @id @default(autoincrement())
-  nome                String
-  email               String   @unique
-  senha               String
-  role                Role     @default(TECNICO)
-  ativo               Boolean  @default(true)
-  especialidade       String?
-  telefone            String?
-  oneSignalId         String?
-  fotoPerfil          String?
-  caminhoFoto         String?
-  atualizadoEm        DateTime @updatedAt
-  criadoEm            DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  nome          String
+  email         String   @unique
+  senha         String
+  role          Role     @default(TECNICO)
+  ativo         Boolean  @default(true)
+  especialidade String?
+  telefone      String?
+  oneSignalId   String?
+  fotoPerfil    String?
+  caminhoFoto   String?
+  atualizadoEm  DateTime @updatedAt
+  criadoEm      DateTime @default(now())
 
   alertas       Alerta[]
   alertaEventos AlertaEvento[]
@@ -79,20 +80,20 @@ model Usuario {
 }
 
 model Maquina {
-  id                    Int         @id @default(autoincrement())
-  nome                  String
-  setor                 String
-  tipo                  String
-  criticidade           Criticidade @default(BAIXA)
-  ativo                 Boolean     @default(true)
-  integridade           Float       @default(100)
-  scoreEstabilidade     Float       @default(100)
-  previsaoManutencao    DateTime?
-  janelaManuInicio      DateTime?
-  janelaManuFim         DateTime?
-  imagem                String?
-  caminhoImagem         String?
-  criadoEm              DateTime    @default(now())
+  id                 Int         @id @default(autoincrement())
+  nome               String
+  setor              String
+  tipo               String
+  criticidade        Criticidade @default(BAIXA)
+  ativo              Boolean     @default(true)
+  integridade        Float       @default(100)
+  scoreEstabilidade  Float       @default(100)
+  previsaoManutencao DateTime?
+  janelaManuInicio   DateTime?
+  janelaManuFim      DateTime?
+  imagem             String?
+  caminhoImagem      String?
+  criadoEm           DateTime    @default(now())
 
   sensores Sensor[]
   alertas  Alerta[]
@@ -132,14 +133,16 @@ model Leitura {
 }
 
 model Alerta {
-  id        Int          @id @default(autoincrement())
-  sensorId  Int
-  maquinaId Int
-  tecnicoId Int?
-  tipo      TipoAlerta
-  status    StatusAlerta @default(ATIVO)
-  mensagem  String       @db.Text
-  criadoEm  DateTime     @default(now())
+  id           Int          @id @default(autoincrement())
+  sensorId     Int
+  maquinaId    Int
+  tecnicoId    Int?
+  tipo         TipoAlerta
+  status       StatusAlerta @default(ATIVO)
+  mensagem     String       @db.Text
+  encerradoEm  DateTime?
+  atualizadoEm DateTime     @updatedAt
+  criadoEm     DateTime     @default(now())
 
   sensor      Sensor         @relation(fields: [sensorId], references: [id])
   maquina     Maquina        @relation(fields: [maquinaId], references: [id])
@@ -149,15 +152,24 @@ model Alerta {
 }
 
 model AlertaEvento {
-  id        Int        @id @default(autoincrement())
-  alertaId  Int
-  usuarioId Int?
-  tipo      TipoEvento
-  descricao String?    @db.Text
-  criadoEm  DateTime   @default(now())
+  id             Int           @id @default(autoincrement())
+  alertaId       Int
+  usuarioId      Int?
+  manutencaoId   Int?
+  tipo           TipoEvento
+  statusAnterior StatusAlerta?
+  statusNovo     StatusAlerta?
+  mensagem       String?       @db.Text
+  descricao      String?       @db.Text
+  criadoEm       DateTime      @default(now())
 
-  alerta  Alerta   @relation(fields: [alertaId], references: [id])
-  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+  alerta     Alerta      @relation(fields: [alertaId], references: [id])
+  usuario    Usuario?    @relation(fields: [usuarioId], references: [id])
+  manutencao Manutencao? @relation(fields: [manutencaoId], references: [id])
+
+  @@index([alertaId, criadoEm])
+  @@index([usuarioId])
+  @@index([manutencaoId])
 }
 
 model Manutencao {
@@ -168,8 +180,9 @@ model Manutencao {
   status     StatusManutencao
   criadoEm   DateTime         @default(now())
 
-  alerta  Alerta  @relation(fields: [alertaId], references: [id])
-  usuario Usuario @relation(fields: [usuarioId], references: [id])
+  alerta  Alerta         @relation(fields: [alertaId], references: [id])
+  usuario Usuario        @relation(fields: [usuarioId], references: [id])
+  eventos AlertaEvento[]
 }
 
 model RefreshToken {

@@ -79,6 +79,10 @@ class ManutecaoModel {
 
     static async createWithAlertSync({ alertaId, usuarioId, observacao, status }) {
         return await prisma.$transaction(async (tx) => {
+            const alerta = await tx.alerta.findUnique({
+                where: { id: alertaId }
+            });
+
             const manutencao = await tx.manutencao.create({
                 data: {
                     alertaId,
@@ -92,7 +96,21 @@ class ManutecaoModel {
                 where: { id: alertaId },
                 data: {
                     tecnicoId: usuarioId,
-                    status: "EM_ANDAMENTO"
+                    status: "EM_ANDAMENTO",
+                    encerradoEm: null
+                }
+            });
+
+            await tx.alertaEvento.create({
+                data: {
+                    alertaId,
+                    usuarioId,
+                    manutencaoId: manutencao.id,
+                    tipo: "ACEITO",
+                    statusAnterior: alerta?.status,
+                    statusNovo: "EM_ANDAMENTO",
+                    mensagem: alerta?.mensagem,
+                    descricao: observacao
                 }
             });
 
@@ -102,10 +120,18 @@ class ManutecaoModel {
 
     static async updateWithAlertSync({ manutencaoId, alertaId, usuarioId, dados }) {
         return await prisma.$transaction(async (tx) => {
+            const alerta = await tx.alerta.findUnique({
+                where: { id: parseInt(alertaId) }
+            });
+
             const manutencaoAtualizada = await tx.manutencao.update({
                 where: { id: parseInt(manutencaoId) },
                 data: dados
             });
+
+            let tipoEvento = "ATUALIZADO";
+            let statusNovo = alerta?.status;
+            let descricao = dados.observacao ?? "Manutencao atualizada";
 
             if (dados.status) {
                 const dadosAlerta = {};
@@ -113,12 +139,23 @@ class ManutecaoModel {
                 if (dados.status === "RESOLVIDO") {
                     dadosAlerta.status = "RESOLVIDO";
                     dadosAlerta.tecnicoId = usuarioId;
+                    dadosAlerta.encerradoEm = new Date();
+                    tipoEvento = "RESOLVIDO";
+                    statusNovo = "RESOLVIDO";
+                    descricao = dados.observacao ?? "Alerta resolvido";
                 } else if (dados.status === "ENCERRADO_SEM_SOLUCAO") {
                     dadosAlerta.status = "ATIVO";
                     dadosAlerta.tecnicoId = null;
+                    dadosAlerta.encerradoEm = null;
+                    tipoEvento = "REABERTO";
+                    statusNovo = "ATIVO";
+                    descricao = dados.observacao ?? "Manutencao encerrada sem solucao";
                 } else {
                     dadosAlerta.status = "EM_ANDAMENTO";
                     dadosAlerta.tecnicoId = usuarioId;
+                    dadosAlerta.encerradoEm = null;
+                    statusNovo = "EM_ANDAMENTO";
+                    descricao = dados.observacao ?? "Manutencao em andamento";
                 }
 
                 await tx.alerta.update({
@@ -126,6 +163,19 @@ class ManutecaoModel {
                     data: dadosAlerta
                 });
             }
+
+            await tx.alertaEvento.create({
+                data: {
+                    alertaId: parseInt(alertaId),
+                    usuarioId,
+                    manutencaoId: parseInt(manutencaoId),
+                    tipo: tipoEvento,
+                    statusAnterior: alerta?.status,
+                    statusNovo,
+                    mensagem: alerta?.mensagem,
+                    descricao
+                }
+            });
 
             return manutencaoAtualizada;
         });
