@@ -2,15 +2,29 @@ const prisma = require('../prisma/prisma')
 
 class AlertaModel {
     static async create(sensorId, maquinaId, tipo, mensagem) {
-        return await prisma.alerta.create({
-            data: {
-                sensorId,
-                maquinaId,
-                tipo,
-                mensagem,
-                status: 'ATIVO'
-            }
-        })
+        return await prisma.$transaction(async (tx) => {
+            const alerta = await tx.alerta.create({
+                data: {
+                    sensorId,
+                    maquinaId,
+                    tipo,
+                    mensagem,
+                    status: 'ATIVO'
+                }
+            });
+
+            await tx.alertaEvento.create({
+                data: {
+                    alertaId: alerta.id,
+                    tipo: 'CRIADO',
+                    statusNovo: 'ATIVO',
+                    mensagem,
+                    descricao: 'Alerta criado automaticamente'
+                }
+            });
+
+            return alerta;
+        });
     }
 
     static async update(id, data) {
@@ -41,7 +55,13 @@ class AlertaModel {
                 sensor: true,
                 maquina: true,
                 tecnico: { select: { nome: true } },
-                eventos: true,
+                eventos: {
+                    include: {
+                        usuario: { select: { id: true, nome: true, email: true, role: true } },
+                        manutencao: true
+                    },
+                    orderBy: { criadoEm: 'desc' }
+                },
                 manutencoes: true
             }
         });

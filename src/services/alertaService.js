@@ -10,7 +10,13 @@ class AlertaService {
             return await AlertaModel.update(alertaExistente.id, {
                 mensagem: `${mensagem} (Ocorrência repetida em ${new Date().toLocaleDateString()})`,
                 eventos: {
-                    create: { tipo: 'ATUALIZADO', descricao: 'Limite ultrapassado novamente' }
+                    create: {
+                        tipo: 'ATUALIZADO',
+                        statusAnterior: alertaExistente.status,
+                        statusNovo: alertaExistente.status,
+                        mensagem,
+                        descricao: 'Limite ultrapassado novamente'
+                    }
                 }
             })
         }
