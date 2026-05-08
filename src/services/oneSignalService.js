@@ -1,3 +1,4 @@
+const { default: axios } = require("axios");
 const AppError = require("../utils/appErrorUtils");
 
 // src/services/oneSignalService.js
@@ -23,10 +24,10 @@ class OneSignalService {
         }
 
         if(typeof message != "string" || message.trim().length < 3){
-            throw new AppError("Titulo de push inválido!", 400);
+            throw new AppError("Message de push inválido!", 400);
         }
 
-        if(typeof data != "object"){
+        if(typeof data != "object" || !data){
             throw new AppError("Data de push inválido!", 400);
         }
         
@@ -39,11 +40,59 @@ class OneSignalService {
             data
         }
 
+        const url = process.env.ONESIGNAL_API_URL || "https://api.onesignal.com/notifications";
 
-        
-        // TODO: chamar API do OneSignal
-        // TODO: tratar erro técnico sem vazar segredo
-        throw new Error("Not implemented");
+        try {
+            const response = await axios.post(url, payload, {
+                headers: {
+                    Authorization: `Key ${apiKey}`,
+                    "Content-Type": "application/json",
+                    Accept: "application/json"
+                },
+                timeout: 10000,
+            })
+    
+            const recipients = Number(response.data?.recipients ?? 0);
+            
+            if(recipients === 0){
+                console.log("Push não enviado para nenhum recipiente!");
+            }
+    
+            return { sent: recipients, failed: Math.max(oneSignalIds.length - recipients, 0), providerResponse: response.data };
+        } catch (error) {
+            if(error.response){
+                const status = error.response.status;
+                const providerErrors = error.response.data?.errors;
+
+                if(status === 400){
+                    throw new AppError(`Erro de payload!: ${JSON.stringify(providerErrors || [])}`, 400);
+                }
+
+                if(status === 401 || status === 403){
+                    throw new AppError("Falha de autenticação do onesignal", 502);
+                }
+
+                if(status === 429){
+                    throw new AppError("Onesginal atigiu limite de taxas!", 503);
+                }
+
+                throw new AppError(
+                    "Falha ao enviar push pelo OneSignal.",
+                    502
+                );
+            }
+            if (error.request) {
+                throw new AppError(
+                    "OneSignal não respondeu à requisição.",
+                    504
+                );
+            }
+
+            throw new AppError(
+                "Erro interno ao preparar o envio do push.",
+                500
+            );
+        }
     }
 
     // /**
