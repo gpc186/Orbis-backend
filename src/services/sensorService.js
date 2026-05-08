@@ -5,8 +5,28 @@ const AppError = require("../utils/appErrorUtils")
 class SensorService {
     static async create(dados) {
         try {
+            const maquinaId = parseInt(dados.maquinaId);
+            if (!Number.isInteger(maquinaId)) {
+                throw new AppError("maquinaId deve ser um numero inteiro valido.", 400);
+            }
+
+            const camposNumericosObrigatorios = [
+                "limiteTemperatura",
+                "idealTemperatura",
+                "limiteVibracao",
+                "idealVibracao"
+            ];
+
+            const dadosNumericos = {};
+            for (const campo of camposNumericosObrigatorios) {
+                const valor = parseFloat(dados[campo]);
+                if (!Number.isFinite(valor)) {
+                    throw new AppError(`${campo} e obrigatorio e deve ser um numero valido.`, 400);
+                }
+                dadosNumericos[campo] = valor;
+            }
             // Validação crucial: A máquina pai existe?
-            const maquinaExiste = await MaquinaModel.findById(dados.maquinaId);
+            const maquinaExiste = await MaquinaModel.findById(maquinaId);
             if (!maquinaExiste) {
                 throw new AppError("Não é possível criar o sensor: Máquina selecionada não existe.", 400);
             }
@@ -14,13 +34,13 @@ class SensorService {
             // Garante que os limites sejam números
             const dadosFormatados = {
                 ...dados,
-                limiteTemperatura: parseFloat(dados.limiteTemperatura) || 0,
-                limiteVibracao: parseFloat(dados.limiteVibracao) || 0,
-                maquinaId: parseInt(dados.maquinaId)
+                ...dadosNumericos,
+                maquinaId
             };
 
             return await SensorModel.create(dadosFormatados);
         } catch (error) {
+            if (error instanceof AppError) throw error;
             throw new AppError("Erro ao criar sensor.", 500);
         }
     }
