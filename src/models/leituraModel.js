@@ -3,13 +3,31 @@ const prisma = require('../prisma/prisma')
 class LeituraModel {
 
     static async store(dados) {
-        return await prisma.leitura.create({
-            data: {
-                sensorId: Number(dados.sensorId),
-                temperatura: Number(dados.temperatura),
-                vibracao: Number(dados.vibracao)
-            }
-        })
+        const sensorId = Number(dados.sensorId);
+        const temperatura = Number(dados.temperatura);
+        const vibracao = Number(dados.vibracao);
+        const agora = new Date();
+
+        const [novaLeitura] = await prisma.$transaction([
+            prisma.leitura.create({
+                data: {
+                    sensorId,
+                    temperatura,
+                    vibracao
+                }
+            }),
+            prisma.sensor.update({
+                where: { id: sensorId },
+                data: {
+                    status: "ONLINE",
+                    ultimaTemperatura: temperatura,
+                    ultimaVibracao: vibracao,
+                    ultimaLeituraEm: agora
+                }
+            })
+        ]);
+
+        return novaLeitura;
     }
 
     static async index(limite) {
@@ -18,6 +36,7 @@ class LeituraModel {
             orderBy: { criadoEm: 'desc' },
         })
     }
+
 
     static async findUnique(maquinaId, date) {
         return await prisma.leitura.findFirst({
