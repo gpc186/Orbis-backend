@@ -2,16 +2,27 @@ const prisma = require('../prisma/prisma')
 
 class SensorModel {
     static async create(data) {
-        return await prisma.sensor.create({
-            data: {
-                tipo: data.tipo,
-                status: data.status,
-                limiteTemperatura: parseFloat(data.limiteTemperatura),
-                limiteVibracao: parseFloat(data.limiteVibracao),
-                maquina: {
-                    connect: { id: parseInt(data.maquinaId) }
-                }
+        const sensorData = {
+            tipo: data.tipo,
+            limiteTemperatura: parseFloat(data.limiteTemperatura),
+            idealTemperatura: parseFloat(data.idealTemperatura),
+            limiteVibracao: parseFloat(data.limiteVibracao),
+            idealVibracao: parseFloat(data.idealVibracao),
+            maquina: {
+                connect: { id: parseInt(data.maquinaId) }
             }
+        };
+
+        if (data.status) sensorData.status = data.status;
+        if (data.desvioMaximoTemp !== undefined) {
+            sensorData.desvioMaximoTemp = parseFloat(data.desvioMaximoTemp);
+        }
+        if (data.desvioMaximoVibra !== undefined) {
+            sensorData.desvioMaximoVibra = parseFloat(data.desvioMaximoVibra);
+        }
+
+        return await prisma.sensor.create({
+            data: sensorData
         })
     }
     static async findAll() {
@@ -30,7 +41,11 @@ class SensorModel {
                 tipo: data.tipo,
                 status: data.status,
                 limiteTemperatura: parseFloat(data.limiteTemperatura),
+                idealTemperatura: data.idealTemperatura !== undefined ? parseFloat(data.idealTemperatura) : undefined,
                 limiteVibracao: parseFloat(data.limiteVibracao),
+                idealVibracao: data.idealVibracao !== undefined ? parseFloat(data.idealVibracao) : undefined,
+                desvioMaximoTemp: data.desvioMaximoTemp !== undefined ? parseFloat(data.desvioMaximoTemp) : undefined,
+                desvioMaximoVibra: data.desvioMaximoVibra !== undefined ? parseFloat(data.desvioMaximoVibra) : undefined,
                 maquina: {
                     connect: { id: parseInt(data.maquinaId) }
                 }
@@ -45,7 +60,11 @@ class SensorModel {
                 tipo: data.tipo,
                 status: "INATIVO",
                 limiteTemperatura: data.limiteTemperatura ? parseFloat(data.limiteTemperatura) : undefined,
+                idealTemperatura: data.idealTemperatura ? parseFloat(data.idealTemperatura) : undefined,
                 limiteVibracao: data.limiteVibracao ? parseFloat(data.limiteVibracao) : undefined,
+                idealVibracao: data.idealVibracao ? parseFloat(data.idealVibracao) : undefined,
+                desvioMaximoTemp: data.desvioMaximoTemp ? parseFloat(data.desvioMaximoTemp) : undefined,
+                desvioMaximoVibra: data.desvioMaximoVibra ? parseFloat(data.desvioMaximoVibra) : undefined,
                 maquina: {
                     disconnect: true
                 }
