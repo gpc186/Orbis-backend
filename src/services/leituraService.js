@@ -53,6 +53,7 @@ class leituraService {
 
             return novaLeitura;
         } catch (error) {
+            if (error instanceof AppError) throw error;
             throw new AppError("Erro ao processar nova leitura.", 500);
         }
     }

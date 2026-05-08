@@ -2,7 +2,6 @@ const mqtt = require('mqtt');
 const leituraService = require('./leituraService');
 
 const connectMQTT = (app) => {
-    // Configuração para o Broker Público do HiveMQ
     const cliente = mqtt.connect(process.env.MQTT_URL, {
         keepalive: 60,
         reconnectPeriod: 1000,
@@ -10,43 +9,58 @@ const connectMQTT = (app) => {
     });
 
     cliente.on('connect', () => {
-        console.log('✅ API conectada ao Broker Público do HiveMQ');
-        
-        // Assina o tópico que o seu ESP32 está usando
+        console.log('API conectada ao Broker MQTT');
+
         cliente.subscribe('orbis/leituras', (err) => {
-            if (!err) {
-                console.log('📡 Monitorando tópico: orbis/leituras');
+            if (err) {
+                console.error('Erro ao assinar topico orbis/leituras:', err.message);
+                return;
             }
+
+            console.log('Monitorando topico: orbis/leituras');
         });
     });
 
     cliente.on('message', async (topic, message) => {
-        try {
-            const data = JSON.parse(message.toString());
-            console.log("📥 Leitura recebida do ESP32:", data);
+        const payload = message.toString();
 
-            // Mapeia os dados do ESP32 para o formato do seu Banco de Dados
-            // O seu ESP32 envia 'vibracao_rms' e 'temperatura'
+        try {
+            const data = JSON.parse(payload);
+            console.log('Leitura recebida do ESP32:', data);
+
+            const sensorId = Number(data.sensorId ?? process.env.MQTT_SENSOR_ID ?? 1);
+            const temperatura = Number(data.temperatura);
+            const vibracao = Number(data.vibracao_rms ?? data.vibracao);
+
+            if (!Number.isInteger(sensorId)) {
+                throw new Error('sensorId invalido na leitura do ESP32.');
+            }
+
+            if (!Number.isFinite(temperatura) || !Number.isFinite(vibracao)) {
+                throw new Error('temperatura e vibracao devem ser numeros validos.');
+            }
+
             const novaLeitura = await leituraService.processarNovaLeitura({
-                sensorId: 1, // ID padrão para o sensor físico
-                temperatura: data.temperatura,
-                vibracao: data.vibracao_rms 
+                sensorId,
+                temperatura,
+                vibracao
             });
 
-            // Envia para o Dashboard em tempo real via Socket.io
             const io = app.get('io');
             if (io) {
                 io.emit('novaLeitura', novaLeitura);
-                console.log("🚀 Dados enviados para o Dashboard via WebSocket");
+                console.log('Dados enviados para o Dashboard via WebSocket');
             }
-
         } catch (error) {
-            console.error('❌ Erro ao processar leitura do ESP32:', error.message);
+            console.error('Erro ao processar leitura do ESP32:', error.message, {
+                topic,
+                payload
+            });
         }
     });
 
     cliente.on('error', (err) => {
-        console.error('⚠️ Erro de conexão MQTT na API:', err.message);
+        console.error('Erro de conexao MQTT na API:', err.message);
     });
 };
 
