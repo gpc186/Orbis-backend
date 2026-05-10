@@ -46,6 +46,18 @@ class PerfilController {
             next(error);
         };
     };
+
+    static async sendPushTeste(req, res, next){
+        try {
+            const { id } = req.usuario;
+            const { title, message, data } = req.body;
+
+            const response = await PerfilService.sendPushTeste({ id, title, message, data });
+            return res.status(200).json(response);
+        } catch (error) {
+            next(error);
+        }
+    }
 }
 
 module.exports = { PerfilController };

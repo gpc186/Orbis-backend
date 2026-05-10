@@ -1,5 +1,6 @@
 const UsuarioModel = require("../models/usuarioModel");
 const AppError = require("../utils/appErrorUtils");
+const OneSignalService = require("./oneSignalService");
 const StorageService = require("./storageService");
 
 class PerfilService {
@@ -75,7 +76,7 @@ class PerfilService {
         const bucket = "profile-images"
 
         try {
-            uploadResult = await StorageService.uploadFoto({bucket , caminho, buffer});
+            uploadResult = await StorageService.uploadFoto({ bucket, caminho, buffer });
 
             const usuarioAtualizado = await UsuarioModel.update({
                 id: usuarioId,
@@ -101,6 +102,25 @@ class PerfilService {
             }
             throw error;
         }
+    }
+
+    static async sendPushTeste({ id, title, message, data = {} }) {
+        const usuario = await UsuarioModel.findById(id);
+
+        if (!usuario) {
+            throw new AppError("Perfil não encontrado!", 404);
+        }
+
+        if (!usuario.oneSignalId) {
+            throw new AppError("Usuário não possui OneSignalId cadastrado!", 400);
+        }
+
+        return await OneSignalService.sendToOneSignalIds({
+            oneSignalIds: [usuario.oneSignalId],
+            title,
+            message,
+            data,
+        });
     }
 };
 
