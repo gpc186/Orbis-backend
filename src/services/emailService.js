@@ -1,57 +1,85 @@
-const { Resend } = require("resend");
+// src/services/emailService.js
+const nodemailer = require("nodemailer");
 const AppError = require("../utils/appErrorUtils");
 
 class EmailService {
-    static getClient() {
-        const apiKey = process.env.RESEND_API_KEY;
+  static validateConfig() {
+    const { SMTP_USER, SMTP_PASS, CONTACT_TO_EMAIL } = process.env;
 
-        if (!apiKey) {
-            throw new AppError("Resend não está configurado neste ambiente!", 500);
-        }
-
-        return new Resend(apiKey);
+    if (!SMTP_USER || !SMTP_PASS) {
+      throw new AppError("SMTP_USER/SMTP_PASS não configurados.", 500);
     }
 
-    static async sendContactEmail({ nome, email, assunto, mensagem }) {
-        if (!nome || nome.trim().length < 3) {
-            throw new AppError("Nome inválido!", 400);
-        }
-
-        if (!email || !/^[\\w\\-.]+@([\\w-]+\\.)+[\\w-]{2,}$/.test(email)) {
-            throw new AppError("Email inválido!", 400);
-        }
-
-        if (!assunto || assunto.trim().length < 3) {
-            throw new AppError("Assunto inválido!", 400);
-        }
-
-        if (!mensagem || mensagem.trim().length < 10) {
-            throw new AppError("Mensagem inválida!", 400);
-        }
-
-        const resend = this.getClient();
-
-        const { data, error } = await resend.emails.send({
-            from: process.env.RESEND_FROM_EMAIL,
-            to: [process.env.CONTACT_TO_EMAIL],
-            replyTo: email.trim(),
-            subject: `[Fale Conosco] ${assunto.trim()}`,
-            html: `
-                <h2>Novo contato pelo site</h2>
-                <p><strong>Nome:</strong> ${nome.trim()}</p>
-                <p><strong>Email:</strong> ${email.trim()}</p>
-                <p><strong>Assunto:</strong> ${assunto.trim()}</p>
-                <p><strong>Mensagem:</strong></p>
-                <p>${mensagem.trim()}</p>
-            `,
-        });
-
-        if (error) {
-            throw new AppError("Falha ao enviar email pelo Resend.", 502);
-        }
-
-        return data;
+    if (!CONTACT_TO_EMAIL) {
+      throw new AppError("CONTACT_TO_EMAIL não configurado.", 500);
     }
+
+    return { SMTP_USER, SMTP_PASS, CONTACT_TO_EMAIL };
+  }
+
+  static createTransporter() {
+    const { SMTP_USER, SMTP_PASS } = this.validateConfig();
+
+    return nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASS 
+      }
+    });
+
+  }
+
+  static sanitize(input) {
+    return String(input || "").trim();
+  }
+
+  static async sendContactEmail({ nome, email, assunto, mensagem }) {
+    const { SMTP_USER, CONTACT_TO_EMAIL } = this.validateConfig();
+
+    const nomeSafe = this.sanitize(nome);
+    const emailSafe = this.sanitize(email);
+    const assuntoSafe = this.sanitize(assunto);
+    const mensagemSafe = this.sanitize(mensagem);
+
+    if (!nomeSafe || !emailSafe || !assuntoSafe || !mensagemSafe) {
+      throw new AppError("Campos obrigatórios do contato não informados.", 400);
+    }
+
+    const transporter = this.createTransporter();
+
+    const mailOptions = {
+      from: `"Orbis - Fale Conosco" <${SMTP_USER}>`,
+      to: CONTACT_TO_EMAIL,
+      replyTo: emailSafe,
+      subject: `[Fale Conosco] ${assuntoSafe}`,
+      text: [
+        `Nome: ${nomeSafe}`,
+        `Email: ${emailSafe}`,
+        "",
+        "Mensagem:",
+        mensagemSafe
+      ].join("\n"),
+      html: `
+        <h3>Nova mensagem - Fale Conosco</h3>
+        <p><strong>Nome:</strong> ${nomeSafe}</p>
+        <p><strong>Email:</strong> ${emailSafe}</p>
+        <p><strong>Assunto:</strong> ${assuntoSafe}</p>
+        <p><strong>Mensagem:</strong><br/>${mensagemSafe.replace(/\n/g, "<br/>")}</p>
+      `
+    };
+
+    try {
+      const info = await transporter.sendMail(mailOptions);
+
+      return {
+        messageId: info.messageId,
+        accepted: info.accepted || []
+      };
+    } catch (error) {
+      throw new AppError("Falha ao enviar email de contato.", 502);
+    }
+  }
 }
 
 module.exports = EmailService;

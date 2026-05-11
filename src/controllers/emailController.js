@@ -1,25 +1,17 @@
+// src/controllers/contatoController.js
 const EmailService = require("../services/emailService");
 
 class ContatoController {
-    static async send(req, res, next) {
-        try {
-            const { nome, email, assunto, mensagem } = req.body;
+  static async enviar(req, res, next) {
+    try {
+      const { nome, email, assunto, mensagem } = req.body;
+      await EmailService.sendContactEmail({ nome, email, assunto, mensagem });
 
-            const response = await EmailService.sendContactEmail({
-                nome,
-                email,
-                assunto,
-                mensagem,
-            });
-
-            return res.status(200).json({
-                mensagem: "Email enviado com sucesso!",
-                data: response,
-            });
-        } catch (error) {
-            next(error);
-        }
+      return res.status(200).json({ message: "Mensagem enviada com sucesso!" });
+    } catch (err) {
+      return next(err);
     }
+  }
 }
 
 module.exports = ContatoController;
