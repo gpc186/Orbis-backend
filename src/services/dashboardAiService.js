@@ -19,9 +19,9 @@ class DashboardAiService {
 
     const resumo = await DashboardService.resume()
 
-    const topAlertas = await AlertaModel.listTopAtivos({limit});
-    const maquinasCriticas = await MaquinaModel.listPioresIntegridade({limit});   
-    const sensoresOffline = await SensorModel.listOfflineRecentes({limit});    
+    const topAlertas = await AlertaModel.listTopAtivos({ limit });
+    const maquinasCriticas = await MaquinaModel.listPioresIntegridade({ limit });
+    const sensoresOffline = await SensorModel.listOfflineRecentes({ limit });
 
     const destaques = [];
 
@@ -129,36 +129,64 @@ Instruções de resposta:
       throw new AppError("Pergunta inválida.", 400);
     }
 
-    if(pergunta.trim().length > 500){
+    if (pergunta.trim().length > 500) {
       throw new AppError("Pergunta grande demais!", 400);
     }
 
     const { original, normalized } = normalizeQuestion(pergunta, 500);
 
-    if(!normalized || normalized.trim().length === 0){
+    if (!normalized || normalized.trim().length === 0) {
       throw new AppError("Pergunta inválida!", 400);
     }
 
     console.log(`Pergunta veio como ${original}, e tratamos e enviamos para a ia como: ${normalized}`);
-    
+
     const contexto = await this.buildContext({ usuario });
-    
+
     const { systemPrompt, userPrompt } = this.buildPrompts({
       pergunta: normalized,
       contexto
     });
 
-    const resposta = await GroqService.generateText({
-      systemPrompt,
-      userPrompt,
-      temperature: 0.2
-    });
+    try {
+      const resposta = await GroqService.generateText({
+        systemPrompt,
+        userPrompt,
+        temperature: 0.2
+      });
 
-    return {
-      pergunta: pergunta.trim(),
-      resposta,
-      contextoGeradoEm: contexto?.metadata?.generatedAt
-    };
+      return {
+        pergunta: pergunta.trim(),
+        resposta,
+        fallback: false,
+        contextoGeradoEm: contexto?.metadata?.generatedAt
+      };
+    } catch (error) {
+      const respostaFallback = this.buildFallbackResponse({ usuario, contexto });
+
+      return {
+        pergunta,
+        resposta: respostaFallback,
+        fallback: true,
+        motivoFallback: "provider_unavailable",
+        contextoGeradoEm: contexto.metadata.generatedAt
+      };
+    }
+  }
+
+  static buildFallbackResponse({ usuario, contexto }) {
+    const nome = usuario?.nome || "usuário";
+    const r = contexto?.resumo || {};
+
+    return [
+      `Olá, ${nome}! O assistente de IA está indisponível no momento, mas aqui está um panorama rápido do Orbis:`,
+      `- Total de máquinas: ${r.totalMaquinas ?? 0}`,
+      `- Máquinas em alerta: ${r.maquinasEmAlerta ?? 0}`,
+      `- Alertas ativos: ${r.alertasAtivos ?? 0}`,
+      `- Alertas sem atendimento: ${r.alertaSemAtendimento ?? 0}`,
+      ``,
+      `Prioridade agora: atender os alertas ativos e, principalmente, os sem atendimento para reduzir risco operacional.`
+    ].join("\n");
   }
 }
 
