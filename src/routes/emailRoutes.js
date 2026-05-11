@@ -1,7 +1,10 @@
 const express = require("express");
-const router = express.Router();
 const ContatoController = require("../controllers/emailController");
+const validateContactMiddleware = require("../middlewares/validateContactMiddleware");
+const contactRateLimit = require("../middlewares/contactRateLimitMiddleware");
 
-router.post("/", ContatoController.send);
+const router = express.Router();
+
+router.post("/", contactRateLimit({ windowMs: 60_000, maxRequests: 3 }), validateContactMiddleware, ContatoController.enviar);
 
 module.exports = router;
