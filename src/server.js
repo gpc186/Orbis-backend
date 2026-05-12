@@ -17,6 +17,7 @@ const perfilRoutes = require('./routes/perfilRoutes');
 const manutencaoRoutes = require('./routes/manutencaoRoutes');
 const tecnicoRoutes = require('./routes/tecnicoRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const dashboardAiRoutes = require("./routes/dashboardAiRoutes");
 const validarEnv = require('./utils/validarEnv');
 validarEnv();
 const alertaRoutes = require('./routes/alertaRoutes');
@@ -50,6 +51,7 @@ app.use('/alertas', alertaRoutes)
 app.use('/auth', authRoutes)
 app.use('/usuarios', usuarioRoutes)
 app.use('/perfil', perfilRoutes)
+app.use("/dashboard/ia", dashboardAiRoutes);
 
 app.use(errorMiddleware)
 // Gerenciamento de Conexões Real-time
