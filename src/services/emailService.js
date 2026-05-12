@@ -2,6 +2,16 @@ const nodemailer = require("nodemailer");
 const AppError = require("../utils/appErrorUtils");
 
 class EmailService {
+
+  static #transporter = null;
+
+  static getTransporter() {
+    if (!this.#transporter) {
+      this.#transporter = this.createTransporter();
+    }
+    return this.#transporter;
+  }
+
   static validateConfig() {
     const { SMTP_USER, SMTP_PASS, CONTACT_TO_EMAIL } = process.env;
 
@@ -33,7 +43,7 @@ class EmailService {
 
   static async sendContactEmail({ nome, email, assunto, mensagem }) {
     const { SMTP_USER, CONTACT_TO_EMAIL } = this.validateConfig();
-    const transporter = this.createTransporter();
+    const transporter = this.getTransporter();
 
     const mailOptions = {
       from: `"Orbis - Fale Conosco" <${SMTP_USER}>`,
