@@ -31,6 +31,27 @@ class ContatoController {
       return next(error);
     }
   }
+
+  static async enviarRelatorioAgora(req, res, next) {
+    try {
+      const usuario = req.usuario;
+      const { emailDestino, assunto, htmlRelatorio } = req.body;
+
+      const resultado = await EmailService.enviarAgora({
+        usuario,
+        emailDestino,
+        assunto,
+        htmlRelatorio
+      });
+
+      return res.status(200).json({
+        message: "Relatório enviado com sucesso.",
+        ...resultado
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
 }
 
 module.exports = ContatoController;

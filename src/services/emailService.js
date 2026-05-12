@@ -1,5 +1,6 @@
 const { Resend } = require("resend");
 const AppError = require("../utils/appErrorUtils");
+const ReportEmailService = require("./reportEmailService");
 
 class EmailService {
   static #client = null;
@@ -54,6 +55,64 @@ class EmailService {
       console.error("[email][send_error]", { message: error?.message });
       throw new AppError("Não foi possível enviar o email no momento.", 502);
     }
+  }
+  static sanitizeText(input = "") {
+    return String(input).trim();
+  }
+
+  static validatePayload({ emailDestino, assunto, htmlRelatorio }) {
+    const email = this.sanitizeText(emailDestino).toLowerCase();
+    const subject = this.sanitizeText(assunto);
+    const html = String(htmlRelatorio || "").trim();
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(email) || email.length > 120) {
+      throw new AppError("Email de destino inválido.", 400);
+    }
+
+    if (subject.length < 3 || subject.length > 140) {
+      throw new AppError("Assunto inválido.", 400);
+    }
+
+    if (!html || html.length < 20) {
+      throw new AppError("HTML do relatório inválido.", 400);
+    }
+
+    if (html.length > 300_000) {
+      throw new AppError("Relatório HTML muito grande.", 400);
+    }
+
+    return { email, subject, html };
+  }
+
+  static assertAdmin(usuario) {
+    if (!usuario || usuario.role !== "ADMIN") {
+      throw new AppError("Apenas ADMIN pode enviar relatório.", 403);
+    }
+  }
+
+  static async enviarAgora({ usuario, emailDestino, assunto, htmlRelatorio }) {
+    this.assertAdmin(usuario);
+
+    const { email, subject, html } = this.validatePayload({
+      emailDestino,
+      assunto,
+      htmlRelatorio
+    });
+
+    const envio = await ReportEmailService.sendReportEmail({
+      to: email,
+      subject,
+      html
+    });
+
+    return {
+      enviadoPara: email,
+      messageId: envio.messageId || null,
+      provider: "resend",
+      enviadoEm: new Date().toISOString()
+    };
   }
 }
 
