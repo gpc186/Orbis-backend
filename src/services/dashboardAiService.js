@@ -100,13 +100,13 @@ Dados do usuário atual:
 - Perfil: ${contexto.metadata.usuario.role}
 
 Resumo operacional atual do dashboard:
-${contexto}
+${JSON.stringify(contexto.resumo, null, 2)}
 
-Informações complementares (itens priorizados):
-${contexto.colecoes}
+Informações complementares:
+${JSON.stringify(contexto.colecoes, null, 2)}
 
 Informações destaque:
-${contexto.destaques}
+${contexto.destaques.join('\n')}
 
 Pedido do usuário:
 "${pergunta}"

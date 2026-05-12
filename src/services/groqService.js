@@ -2,6 +2,17 @@ const Groq = require("groq-sdk");
 const AppError = require("../utils/appErrorUtils");
 
 class GroqService {
+
+  static #client = null;
+
+  static getClient() {
+    if (!this.#client) {
+      const { apiKey } = this.getConfig();
+      this.#client = new Groq({ apiKey });
+    }
+    return this.#client;
+  }
+
   static getConfig() {
     const { GROQ_API_KEY, GROQ_MODEL } = process.env;
 
@@ -13,11 +24,6 @@ class GroqService {
       apiKey: GROQ_API_KEY,
       model: GROQ_MODEL || "llama-3.3-70b-versatile"
     };
-  }
-
-  static getClient() {
-    const { apiKey } = this.getConfig();
-    return new Groq({ apiKey });
   }
 
   static async generateText({ systemPrompt, userPrompt, temperature = 0.2 }) {
