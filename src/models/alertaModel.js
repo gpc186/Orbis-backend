@@ -34,8 +34,8 @@ class AlertaModel {
         })
     }
 
-    static async findById(id){
-        return await prisma.alerta.findFirst({where: { id: parseInt(id) }});
+    static async findById(id) {
+        return await prisma.alerta.findFirst({ where: { id: parseInt(id) } });
     }
 
     static async findAtivo(sensorId, tipo) {
@@ -79,11 +79,37 @@ class AlertaModel {
     }
 
     static async countMaquinasWithAlerta() {
-        return await prisma.alerta.findMany({
+        const alerta = await prisma.alerta.findMany({
             where: { status: 'ATIVO' },
             select: { maquinaId: true },
             distinct: ['maquinaId']
-        }).length
+        })
+        return alerta.length
+    }
+
+    static async listTopAtivos({ limit = 5 } = {}) {
+        const safeLimit = Number(limit) > 0 ? Number(limit) : 5;
+
+        return prisma.alerta.findMany({
+            where: { status: "ATIVO" },
+            orderBy: { criadoEm: "desc" }, // ajuste para o nome real da sua coluna de data
+            take: safeLimit,
+            select: {
+                id: true,
+                tipo: true,
+                status: true,
+                maquinaId: true,
+                sensorId: true,
+                criadoEm: true,
+                maquina: {
+                    select: {
+                        id: true,
+                        nome: true,
+                        criticidade: true
+                    }
+                }
+            }
+        });
     }
 
     static async findAlertaStatusOfTecnicoById(id) {
@@ -95,20 +121,20 @@ class AlertaModel {
         })
     }
 
-    static async countActiveAlertas(){
-        return await prisma.alerta.count({where: {status: "ATIVO"}});
+    static async countActiveAlertas() {
+        return await prisma.alerta.count({ where: { status: "ATIVO" } });
     };
 
-    static async countAlertasToday(hoje){
-        return await prisma.alerta.count({ where: { criadoEm: { gte: hoje } }});
+    static async countAlertasToday(hoje) {
+        return await prisma.alerta.count({ where: { criadoEm: { gte: hoje } } });
     };
 
-    static async countAlertaSemAtendimento(){
-        return await prisma.alerta.count({where: { status: "ATIVO", tecnicoId: null }});
+    static async countAlertaSemAtendimento() {
+        return await prisma.alerta.count({ where: { status: "ATIVO", tecnicoId: null } });
     };
 
-    static async countAtendedToday(hoje){
-        return await prisma.alerta.count({ where: { status: "EM_ANDAMENTO", criadoEm: { gte: hoje }} });
+    static async countAtendedToday(hoje) {
+        return await prisma.alerta.count({ where: { status: "EM_ANDAMENTO", criadoEm: { gte: hoje } } });
     }
 
     static async countAlertasByTecnicoId(tecnicoId) {

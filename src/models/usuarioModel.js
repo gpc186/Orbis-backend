@@ -180,6 +180,22 @@ class UsuarioModel {
             where: { role: "ADMIN"}
         });
     };
+    static async findNotificationRecipients() {
+    return await prisma.usuario.findMany({
+        where: {
+            ativo: true,
+            role: { in: ["ADMIN", "TECNICO"] },
+            oneSignalId: { not: null }
+        },
+        select: {
+            id: true,
+            nome: true,
+            role: true,
+            ativo: true,
+            oneSignalId: true
+        }
+    });
+}
 };
 
 module.exports = UsuarioModel;

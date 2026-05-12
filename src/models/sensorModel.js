@@ -91,6 +91,22 @@ class SensorModel {
             data: { status: "OFFLINE" }
         })
     }
+
+    static async listOfflineRecentes({ limit = 5 } = {}) {
+        const safeLimit = Number(limit) > 0 ? Number(limit) : 5;
+
+        return prisma.sensor.findMany({
+            where: { status: "OFFLINE" }, 
+            orderBy: { ultimaLeituraEm: "desc" },
+            take: safeLimit,
+            select: {
+                id: true,
+                maquinaId: true,
+                status: true,
+                ultimaLeituraEm: true,
+            }
+        });
+    }
 }
 
 module.exports = SensorModel
