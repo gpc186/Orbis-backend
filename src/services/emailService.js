@@ -1,66 +1,57 @@
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 const AppError = require("../utils/appErrorUtils");
 
 class EmailService {
-
-  static #transporter = null;
-
-  static getTransporter() {
-    if (!this.#transporter) {
-      this.#transporter = this.createTransporter();
-    }
-    return this.#transporter;
-  }
+  static #client = null;
 
   static validateConfig() {
-    const { SMTP_USER, SMTP_PASS, CONTACT_TO_EMAIL } = process.env;
+    const { RESEND_API_KEY, CONTACT_TO_EMAIL } = process.env;
 
-    if (!SMTP_USER || !SMTP_PASS) {
-      throw new AppError("Configuração SMTP ausente.", 500);
+    if (!RESEND_API_KEY) {
+      throw new AppError("RESEND_API_KEY não configurada.", 500);
     }
 
     if (!CONTACT_TO_EMAIL) {
       throw new AppError("Destinatário de contato não configurado.", 500);
     }
 
-    return { SMTP_USER, SMTP_PASS, CONTACT_TO_EMAIL };
+    return { RESEND_API_KEY, CONTACT_TO_EMAIL };
   }
 
-  static createTransporter() {
-    const { SMTP_USER, SMTP_PASS } = this.validateConfig();
-
-    return nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: SMTP_USER,
-        pass: SMTP_PASS
-      },
-      connectionTimeout: 10_000,
-      greetingTimeout: 10_000,
-      socketTimeout: 15_000
-    });
+  static getClient() {
+    if (!this.#client) {
+      const { RESEND_API_KEY } = this.validateConfig();
+      this.#client = new Resend(RESEND_API_KEY);
+    }
+    return this.#client;
   }
 
   static async sendContactEmail({ nome, email, assunto, mensagem }) {
-    const { SMTP_USER, CONTACT_TO_EMAIL } = this.validateConfig();
-    const transporter = this.getTransporter();
-
-    const mailOptions = {
-      from: `"Orbis - Fale Conosco" <${SMTP_USER}>`,
-      to: CONTACT_TO_EMAIL,
-      replyTo: email,
-      subject: `[Fale Conosco] ${assunto}`,
-      text: `Nome: ${nome}\nEmail: ${email}\n\nMensagem:\n${mensagem}`
-    };
+    const { CONTACT_TO_EMAIL } = this.validateConfig();
+    const client = this.getClient();
 
     try {
-      const info = await transporter.sendMail(mailOptions);
-      return { messageId: info.messageId };
-    } catch (error) {
-      console.error("[email][send_error]", {
-        code: error?.code,
-        responseCode: error?.responseCode
+      const { error } = await client.emails.send({
+        from: "Orbis <onboarding@resend.dev>",
+        to: CONTACT_TO_EMAIL,
+        replyTo: email,
+        subject: `[Fale Conosco] ${assunto}`,
+        html: `
+          <p><strong>Nome:</strong> ${nome}</p>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Mensagem:</strong></p>
+          <p>${mensagem}</p>
+        `
       });
+
+      if (error) {
+        console.error("[email][send_error]", { message: error?.message });
+        throw new AppError("Não foi possível enviar o email no momento.", 502);
+      }
+
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      console.error("[email][send_error]", { message: error?.message });
       throw new AppError("Não foi possível enviar o email no momento.", 502);
     }
   }
