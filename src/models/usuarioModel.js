@@ -71,7 +71,7 @@ class UsuarioModel {
      * @example
      * const todosUsuarios = await UsuarioModel.findAll(skip, take);
      */
-    static async findAll({skip, take}) {
+    static async findAll({ skip, take }) {
         return await prisma.usuario.findMany({
             skip,
             take,
@@ -177,25 +177,32 @@ class UsuarioModel {
      */
     static async countAdmins() {
         return await prisma.usuario.count({
-            where: { role: "ADMIN"}
+            where: { role: "ADMIN" }
         });
     };
     static async findNotificationRecipients() {
-    return await prisma.usuario.findMany({
-        where: {
-            ativo: true,
-            role: { in: ["ADMIN", "TECNICO"] },
-            oneSignalId: { not: null }
-        },
-        select: {
-            id: true,
-            nome: true,
-            role: true,
-            ativo: true,
-            oneSignalId: true
-        }
-    });
-}
+        return await prisma.usuario.findMany({
+            where: {
+                ativo: true,
+                role: { in: ["ADMIN", "TECNICO"] },
+                oneSignalId: { not: null }
+            },
+            select: {
+                id: true,
+                nome: true,
+                role: true,
+                ativo: true,
+                oneSignalId: true
+            }
+        });
+    }
+
+    static async updateSenha(id, senhaHash){
+        await prisma.usuario.update({
+            where: { id: usuario.id },
+            data: { senha: senhaHash }
+        });
+    }
 };
 
 module.exports = UsuarioModel;

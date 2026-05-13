@@ -15,26 +15,25 @@ class OneSignalService {
     static async sendToOneSignalIds({ oneSignalIds, title, message, data = {} }) {
         const { appId, apiKey } = this.validateConfig();
 
-        if(!oneSignalIds || oneSignalIds.length == 0){
+        if (!oneSignalIds || oneSignalIds.length == 0) {
             throw new AppError("Não é possivel enviar push para nenhum usuario!", 400);
         }
 
-        if(typeof title != "string" || title.trim().length < 3){
+        if (typeof title != "string" || title.trim().length < 3) {
             throw new AppError("Titulo de push inválido!", 400);
         }
 
-        if(typeof message != "string" || message.trim().length < 3){
+        if (typeof message != "string" || message.trim().length < 3) {
             throw new AppError("Message de push inválido!", 400);
         }
 
-        if(typeof data != "object" || !data){
+        if (typeof data != "object" || !data) {
             throw new AppError("Data de push inválido!", 400);
         }
-        
+
         const payload = {
             app_id: appId,
             include_subscription_ids: oneSignalIds,
-            target_channel: "push",
             headings: { en: title, pt: title },
             contents: { en: message, pt: message },
             data
@@ -51,28 +50,29 @@ class OneSignalService {
                 },
                 timeout: 10000,
             })
-    
-            const recipients = Number(response.data?.recipients ?? 0);
-            
-            if(recipients === 0){
-                console.log("Push não enviado para nenhum recipiente!");
+
+            const notificationId = response.data?.id;
+
+            if (!notificationId) {
+                console.log("Push não gerou um ID de notificação válido!");
+                return { sent: 0, failed: oneSignalIds.length, providerResponse: response.data };
             }
-    
-            return { sent: recipients, failed: Math.max(oneSignalIds.length - recipients, 0), providerResponse: response.data };
+
+            return { sent: oneSignalIds.length, failed: 0, providerResponse: response.data };
         } catch (error) {
-            if(error.response){
+            if (error.response) {
                 const status = error.response.status;
                 const providerErrors = error.response.data?.errors;
 
-                if(status === 400){
+                if (status === 400) {
                     throw new AppError(`Erro de payload!: ${JSON.stringify(providerErrors || [])}`, 400);
                 }
 
-                if(status === 401 || status === 403){
+                if (status === 401 || status === 403) {
                     throw new AppError("Falha de autenticação do onesignal", 502);
                 }
 
-                if(status === 429){
+                if (status === 429) {
                     throw new AppError("Onesginal atigiu limite de taxas!", 503);
                 }
 
@@ -108,7 +108,7 @@ class OneSignalService {
      */
     static validateConfig() {
         const { ONESIGNAL_APP_ID, ONESIGNAL_API_KEY } = process.env;
-        if(!ONESIGNAL_API_KEY || !ONESIGNAL_APP_ID){
+        if (!ONESIGNAL_API_KEY || !ONESIGNAL_APP_ID) {
             throw new AppError("OneSignal não está configurado neste ambiente!", 500);
         };
 

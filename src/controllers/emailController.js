@@ -1,52 +1,20 @@
-const EmailService = require("../services/emailService");
+const ContatoService = require("../services/contatoService");
 
-function maskEmail(email = "") {
-  const [user, domain] = String(email).split("@");
-  if (!user || !domain) return "***";
-  return `${user.slice(0, 2)}***@${domain}`;
-}
-
-class ContatoController {
-  static async enviar(req, res, next) {
-    const startedAt = Date.now();
-
+class EmailController {
+  static async enviarContato(req, res, next) {
     try {
       const { nome, email, assunto, mensagem } = req.body;
-      await EmailService.sendContactEmail({ nome, email, assunto, mensagem });
 
-      console.info("[contato][ok]", {
-        ip: req.ip,
-        email: maskEmail(email),
-        durationMs: Date.now() - startedAt
-      });
-
-      return res.status(200).json({ message: "Mensagem enviada com sucesso!" });
-    } catch (error) {
-      console.warn("[contato][error]", {
-        ip: req.ip,
-        durationMs: Date.now() - startedAt,
-        status: error?.statusCode || 500
-      });
-
-      return next(error);
-    }
-  }
-
-  static async enviarRelatorioAgora(req, res, next) {
-    try {
-      const usuario = req.usuario;
-      const { emailDestino, assunto, htmlRelatorio } = req.body;
-
-      const resultado = await EmailService.enviarAgora({
-        usuario,
-        emailDestino,
+      const result = await ContatoService.enviarContato({
+        nome,
+        email,
         assunto,
-        htmlRelatorio
+        mensagem
       });
 
       return res.status(200).json({
-        message: "Relatório enviado com sucesso.",
-        ...resultado
+        message: "Mensagem enviada com sucesso.",
+        ...result
       });
     } catch (error) {
       return next(error);
@@ -54,4 +22,4 @@ class ContatoController {
   }
 }
 
-module.exports = ContatoController;
+module.exports = EmailController;
