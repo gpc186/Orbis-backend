@@ -5,6 +5,6 @@ const EmailController = require("../controllers/emailController");
 
 const router = express.Router();
 
-router.post("/contato", contactRateLimit({ windowMs: 60_000, maxRequests: 3 }), validateContactMiddleware, EmailController.enviarContato);
+router.post("/", contactRateLimit({ windowMs: 60_000, maxRequests: 3 }), validateContactMiddleware, EmailController.enviarContato);
 
 module.exports = router;
