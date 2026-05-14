@@ -63,6 +63,25 @@ class UsuarioModel {
             }
         })
     };
+    static async findByIdWithSenha(id) {
+        return await prisma.usuario.findUnique({
+            where: { id }, select: {
+                id: true,
+                nome: true,
+                email: true,
+                role: true,
+                ativo: true,
+                senha: true,
+                especialidade: true,
+                telefone: true,
+                oneSignalId: true,
+                atualizadoEm: true,
+                fotoPerfil: true,
+                caminhoFoto: true,
+                criadoEm: true
+            }
+        })
+    };
     /**
      * Pega todos os usuários que estão ativos com uma função de paginação, tendo o `skip`e `take` para fazer esta função
      * @param {number} skip 
@@ -199,7 +218,7 @@ class UsuarioModel {
 
     static async updateSenha(id, senhaHash){
         await prisma.usuario.update({
-            where: { id: usuario.id },
+            where: { id },
             data: { senha: senhaHash }
         });
     }
