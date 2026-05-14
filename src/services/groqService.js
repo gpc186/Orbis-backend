@@ -26,10 +26,29 @@ class GroqService {
     };
   }
 
-  static async generateText({ systemPrompt, userPrompt, temperature = 0.2 }) {
-    if (!userPrompt || typeof userPrompt !== "string" || userPrompt.trim().length < 3) {
+  static validateMessages(messages) {
+    if (!Array.isArray(messages) || messages.length === 0) {
       throw new AppError("Prompt inválido para IA.", 400);
     }
+
+    for (const message of messages) {
+      const validRole =
+        message &&
+        ["system", "user", "assistant"].includes(message.role);
+
+      const validContent =
+        message &&
+        typeof message.content === "string" &&
+        message.content.trim().length > 0;
+
+      if (!validRole || !validContent) {
+        throw new AppError("Mensagens inválidas para IA.", 400);
+      }
+    }
+  }
+
+  static async generateText({ messages, temperature = 0.2 }) {
+    this.validateMessages(messages);
 
     const client = this.getClient();
     const { model } = this.getConfig();
@@ -38,16 +57,7 @@ class GroqService {
       const completion = await client.chat.completions.create({
         model,
         temperature,
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt || "Você é um assistente técnico do sistema Orbis."
-          },
-          {
-            role: "user",
-            content: userPrompt.trim()
-          }
-        ]
+        messages
       });
 
       const text = completion?.choices?.[0]?.message?.content?.trim();

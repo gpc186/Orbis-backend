@@ -6,11 +6,11 @@ class EmailService {
     const { RESEND_API_KEY, RESEND_FROM_EMAIL } = process.env;
 
     if (!RESEND_API_KEY) {
-      throw new AppError("RESEND_API_KEY não configurada.", 500);
+      throw new AppError("RESEND_API_KEY nao configurada.", 500);
     }
 
     if (!RESEND_FROM_EMAIL) {
-      throw new AppError("RESEND_FROM_EMAIL não configurado.", 500);
+      throw new AppError("RESEND_FROM_EMAIL nao configurado.", 500);
     }
 
     return {
@@ -37,15 +37,15 @@ class EmailService {
     const resend = this.getClient();
 
     if (!to || (Array.isArray(to) && to.length === 0)) {
-      throw new AppError("Destinatário inválido.", 400);
+      throw new AppError("Destinatario invalido.", 400);
     }
 
     if (!subject || String(subject).trim().length < 3) {
-      throw new AppError("Assunto inválido.", 400);
+      throw new AppError("Assunto invalido.", 400);
     }
 
     if (!html && !text) {
-      throw new AppError("Conteúdo de email ausente.", 400);
+      throw new AppError("Conteudo de email ausente.", 400);
     }
 
     try {
@@ -55,18 +55,50 @@ class EmailService {
         subject,
         html,
         text,
-        reply_to: replyTo // no Resend é reply_to
+        reply_to: replyTo
       });
+
+      if (response?.error) {
+        console.error("[email][provider_error]", {
+          provider: "resend",
+          statusCode: response.error.statusCode,
+          name: response.error.name,
+          message: response.error.message
+        });
+
+        throw new AppError(
+          response.error.message || "Falha ao enviar email pelo provedor.",
+          response.error.statusCode || 502
+        );
+      }
+
+      const messageId = response?.data?.id ?? null;
+
+      if (!messageId) {
+        console.error("[email][missing_message_id]", {
+          provider: "resend",
+          from,
+          toCount: Array.isArray(to) ? to.length : 1
+        });
+
+        throw new AppError("O provedor de email nao confirmou o envio.", 502);
+      }
 
       return {
         provider: "resend",
-        messageId: response?.data?.id ?? null
+        messageId
       };
     } catch (error) {
       console.error("[email][send_error]", {
         name: error?.name,
-        message: error?.message
+        message: error?.message,
+        statusCode: error?.statusCode || error?.status
       });
+
+      if (error instanceof AppError) {
+        throw error;
+      }
+
       throw new AppError("Falha ao enviar email.", 502);
     }
   }
@@ -74,13 +106,13 @@ class EmailService {
   static async enviarCodigoRedefinicao({ para, nome, code }) {
     return this.send({
       to: para,
-      subject: "Código de redefinição de senha — Orbis",
+      subject: "Codigo de redefinicao de senha - Orbis",
       html: `
-        <h2>Olá, ${nome}!</h2>
-        <p>Seu código para redefinir a senha é:</p>
+        <h2>Ola, ${nome}!</h2>
+        <p>Seu codigo para redefinir a senha e:</p>
         <h1 style="letter-spacing: 8px; color: #3182ce;">${code}</h1>
-        <p>Este código expira em <strong>15 minutos</strong>.</p>
-        <p>Se você não solicitou isso, ignore este email.</p>
+        <p>Este codigo expira em <strong>15 minutos</strong>.</p>
+        <p>Se voce nao solicitou isso, ignore este email.</p>
       `
     });
   }

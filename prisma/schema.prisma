@@ -56,6 +56,35 @@ enum StatusManutencao {
   ENCERRADO_SEM_SOLUCAO
 }
 
+enum FrequenciaRelatorio {
+  DIARIO
+  SEMANAL
+  MENSAL
+}
+
+enum StatusAgendamentoRelatorio {
+  ATIVO
+  PAUSADO
+  ERRO
+}
+
+enum TipoPeriodoRelatorio {
+  RELATIVE_DAYS
+  CUSTOM_RANGE
+}
+
+enum TipoExecucaoRelatorio {
+  MANUAL
+  AGENDADO
+}
+
+enum StatusExecucaoRelatorio {
+  PROCESSANDO
+  ENVIADO
+  PARCIAL
+  FALHOU
+}
+
 // ─── MODELS ───────────────────────────────────────────────────────────────────
 
 model Usuario {
@@ -78,6 +107,7 @@ model Usuario {
   manutencoes   Manutencao[]
   refreshTokens RefreshToken[]
   passwordResetCode PasswordResetCode?
+  relatoriosAgendados RelatorioAgendamento[]
 }
 
 model Maquina {
@@ -207,4 +237,70 @@ model PasswordResetCode {
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@map("password_reset_codes")
+}
+
+model RelatorioAgendamento {
+  id              Int      @id @default(autoincrement())
+  nome            String
+  criadoPorId     Int
+  status          StatusAgendamentoRelatorio @default(ATIVO)
+  frequencia      FrequenciaRelatorio
+  timezone        String   @default("America/Sao_Paulo")
+  hora            Int
+  minuto          Int      @default(0)
+  diaSemana       Int?
+  diaMes          Int?
+  assunto         String?
+  tipoPeriodo     TipoPeriodoRelatorio
+  periodo         Json
+  filtros         Json
+  entidades       Json?
+  proximoEnvioEm  DateTime
+  ultimoEnvioEm   DateTime?
+  ultimoSucessoEm DateTime?
+  ultimoErroEm    String?  @db.Text
+  lockedAt        DateTime?
+  criadoEm        DateTime @default(now())
+  atualizadoEm    DateTime @updatedAt
+
+  criadoPor     Usuario                  @relation(fields: [criadoPorId], references: [id])
+  destinatarios RelatorioDestinatario[]
+  execucoes     RelatorioExecucao[]
+
+  @@index([status, proximoEnvioEm])
+}
+
+model RelatorioDestinatario {
+  id            Int      @id @default(autoincrement())
+  agendamentoId Int
+  email         String
+  nome          String?
+  criadoEm      DateTime @default(now())
+
+  agendamento RelatorioAgendamento @relation(fields: [agendamentoId], references: [id], onDelete: Cascade)
+
+  @@unique([agendamentoId, email])
+  @@index([email])
+}
+
+model RelatorioExecucao {
+  id              Int      @id @default(autoincrement())
+  agendamentoId   Int?
+  tipoExecucao    TipoExecucaoRelatorio
+  status          StatusExecucaoRelatorio @default(PROCESSANDO)
+  assunto         String
+  emailsDestino   Json
+  periodoSnapshot Json
+  filtrosSnapshot Json
+  entidades       Json?
+  provider        String?
+  messageId       String?
+  erro            String?  @db.Text
+  iniciadoEm      DateTime @default(now())
+  finalizadoEm    DateTime?
+
+  agendamento RelatorioAgendamento? @relation(fields: [agendamentoId], references: [id], onDelete: SetNull)
+
+  @@index([agendamentoId, iniciadoEm])
+  @@index([status, iniciadoEm])
 }
