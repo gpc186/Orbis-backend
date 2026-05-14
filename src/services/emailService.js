@@ -2,58 +2,87 @@ const { Resend } = require("resend");
 const AppError = require("../utils/appErrorUtils");
 
 class EmailService {
-  static #client = null;
-
-  static validateConfig() {
-    const { RESEND_API_KEY, CONTACT_TO_EMAIL } = process.env;
+  static getConfig() {
+    const { RESEND_API_KEY, RESEND_FROM_EMAIL } = process.env;
 
     if (!RESEND_API_KEY) {
       throw new AppError("RESEND_API_KEY não configurada.", 500);
     }
 
-    if (!CONTACT_TO_EMAIL) {
-      throw new AppError("Destinatário de contato não configurado.", 500);
+    if (!RESEND_FROM_EMAIL) {
+      throw new AppError("RESEND_FROM_EMAIL não configurado.", 500);
     }
 
-    return { RESEND_API_KEY, CONTACT_TO_EMAIL };
+    return {
+      apiKey: RESEND_API_KEY,
+      from: RESEND_FROM_EMAIL
+    };
   }
 
   static getClient() {
-    if (!this.#client) {
-      const { RESEND_API_KEY } = this.validateConfig();
-      this.#client = new Resend(RESEND_API_KEY);
-    }
-    return this.#client;
+    const { apiKey } = this.getConfig();
+    return new Resend(apiKey);
   }
 
-  static async sendContactEmail({ nome, email, assunto, mensagem }) {
-    const { CONTACT_TO_EMAIL } = this.validateConfig();
-    const client = this.getClient();
+  /**
+   * @param {Object} params
+   * @param {string|string[]} params.to
+   * @param {string} params.subject
+   * @param {string} [params.html]
+   * @param {string} [params.text]
+   * @param {string} [params.replyTo]
+   */
+  static async send({ to, subject, html, text, replyTo }) {
+    const { from } = this.getConfig();
+    const resend = this.getClient();
+
+    if (!to || (Array.isArray(to) && to.length === 0)) {
+      throw new AppError("Destinatário inválido.", 400);
+    }
+
+    if (!subject || String(subject).trim().length < 3) {
+      throw new AppError("Assunto inválido.", 400);
+    }
+
+    if (!html && !text) {
+      throw new AppError("Conteúdo de email ausente.", 400);
+    }
 
     try {
-      const { error } = await client.emails.send({
-        from: "Orbis <onboarding@resend.dev>",
-        to: CONTACT_TO_EMAIL,
-        replyTo: email,
-        subject: `[Fale Conosco] ${assunto}`,
-        html: `
-          <p><strong>Nome:</strong> ${nome}</p>
-          <p><strong>Email:</strong> ${email}</p>
-          <p><strong>Mensagem:</strong></p>
-          <p>${mensagem}</p>
-        `
+      const response = await resend.emails.send({
+        from,
+        to,
+        subject,
+        html,
+        text,
+        reply_to: replyTo // no Resend é reply_to
       });
 
-      if (error) {
-        console.error("[email][send_error]", { message: error?.message });
-        throw new AppError("Não foi possível enviar o email no momento.", 502);
-      }
-
+      return {
+        provider: "resend",
+        messageId: response?.data?.id ?? null
+      };
     } catch (error) {
-      if (error instanceof AppError) throw error;
-      console.error("[email][send_error]", { message: error?.message });
-      throw new AppError("Não foi possível enviar o email no momento.", 502);
+      console.error("[email][send_error]", {
+        name: error?.name,
+        message: error?.message
+      });
+      throw new AppError("Falha ao enviar email.", 502);
     }
+  }
+
+  static async enviarCodigoRedefinicao({ para, nome, code }) {
+    return this.send({
+      to: para,
+      subject: "Código de redefinição de senha — Orbis",
+      html: `
+        <h2>Olá, ${nome}!</h2>
+        <p>Seu código para redefinir a senha é:</p>
+        <h1 style="letter-spacing: 8px; color: #3182ce;">${code}</h1>
+        <p>Este código expira em <strong>15 minutos</strong>.</p>
+        <p>Se você não solicitou isso, ignore este email.</p>
+      `
+    });
   }
 }
 

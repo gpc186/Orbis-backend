@@ -77,6 +77,7 @@ model Usuario {
   alertaEventos AlertaEvento[]
   manutencoes   Manutencao[]
   refreshTokens RefreshToken[]
+  passwordResetCode PasswordResetCode?
 }
 
 model Maquina {
@@ -193,4 +194,17 @@ model RefreshToken {
   criadoEm  DateTime @default(now())
 
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetCode {
+  id           String   @id @default(uuid())
+  code         String
+  emailDestino String
+  usuarioId    Int      @unique
+  expiresAt    DateTime
+  criadoEm     DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_codes")
 }
