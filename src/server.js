@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('./config/env')();
 require('./jobs/tendenciaJob');
 const express = require('express');
 const http = require('http');
@@ -23,6 +23,7 @@ const resetSenhaRoutes = require("./routes/resetSenhaRoutes");
 const dashboardAiRoutes = require("./routes/dashboardAiRoutes");
 const validarEnv = require('./utils/validarEnv');
 validarEnv();
+require('./jobs/simuladorJob');
 const alertaRoutes = require('./routes/alertaRoutes');
 const connectMQTT = require('./services/mqttService')
 

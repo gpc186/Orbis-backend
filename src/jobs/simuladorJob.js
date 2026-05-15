@@ -1,15 +1,13 @@
-const axios = require('axios');
-require('./config/env')();
+const cron = require('node-cron');
+const prisma = require('../prisma/prisma');
+const leituraService = require('../services/leituraService');
 
-const prisma = require('./prisma/prisma');
-
-const PORT = process.env.PORT || 3000;
-const API_URL = normalizarUrlLeituras(process.env.SIMULADOR_API_URL || `http://localhost:${PORT}`);
-const API_KEY = process.env.ESP32_API_KEY?.trim();
 const intervaloConfigurado = Number(process.env.SIMULADOR_INTERVALO_MS);
 const INTERVALO_MS = Number.isFinite(intervaloConfigurado) && intervaloConfigurado > 0
     ? intervaloConfigurado
     : 5000;
+const INTERVALO_SEGUNDOS = Math.max(1, Math.round(INTERVALO_MS / 1000));
+const EXPRESSAO_CRON = criarExpressaoCron(INTERVALO_SEGUNDOS);
 const degradacaoHorasConfigurada = Number(process.env.SIMULADOR_DEGRADACAO_HORAS);
 const DEGRADACAO_HORAS = Number.isFinite(degradacaoHorasConfigurada) && degradacaoHorasConfigurada > 0
     ? degradacaoHorasConfigurada
@@ -23,25 +21,18 @@ const CICLOS_ESTAVEIS_INICIAIS = 5;
 const sensoresEmSimulacao = new Map();
 let cicloEmAndamento = false;
 
-function normalizarUrlLeituras(url) {
-    const urlSemBarraFinal = String(url || '').replace(/\/+$/, '');
-
-    if (urlSemBarraFinal.endsWith('/leituras')) {
-        return urlSemBarraFinal;
+function criarExpressaoCron(intervaloSegundos) {
+    if (intervaloSegundos < 60) {
+        return `*/${intervaloSegundos} * * * * *`;
     }
 
-    return `${urlSemBarraFinal}/leituras`;
+    const intervaloMinutos = Math.max(1, Math.round(intervaloSegundos / 60));
+
+    return `0 */${intervaloMinutos} * * * *`;
 }
 
-function validarConfiguracao() {
-    const faltando = [];
-
-    if (!process.env.DATABASE_URL) faltando.push('DATABASE_URL');
-    if (!API_KEY) faltando.push('ESP32_API_KEY');
-
-    if (faltando.length > 0) {
-        throw new Error(`Variaveis ausentes no .env: ${faltando.join(', ')}`);
-    }
+function simuladorEstaAtivo() {
+    return process.env.SIMULADOR_JOB_ATIVO !== 'false';
 }
 
 function numeroAleatorioEntre(min, max) {
@@ -98,7 +89,6 @@ function gerarValorEstavelComDegradacao(sensor, estado, configuracao) {
         : 0;
     const ruido = numeroAleatorioEntre(-ruidoMaximo, ruidoMaximo);
     const valor = ideal + degradacao + ruido;
-
     const minimoSeguro = Math.max(0, ideal - ruidoMaximo);
 
     return arredondar(limitar(valor, minimoSeguro, maximoSeguro));
@@ -147,7 +137,7 @@ async function atualizarSensoresEmSimulacao() {
                 sensor,
                 ciclos: 0
             });
-            console.log(`Sensor ${sensor.id} (${sensor.maquina.nome}) entrou na simulacao.`);
+            console.log(`[SIMULADOR] Sensor ${sensor.id} (${sensor.maquina.nome}) entrou na simulacao.`);
         } else {
             sensoresEmSimulacao.get(sensor.id).sensor = sensor;
         }
@@ -156,81 +146,62 @@ async function atualizarSensoresEmSimulacao() {
     return sensoresOffline.length;
 }
 
-async function enviarLeitura(estado) {
+async function processarLeituraSimulada(estado) {
     const sensor = estado.sensor;
     const dadosLeitura = gerarLeitura(estado);
 
-    await axios.post(API_URL, dadosLeitura, {
-        headers: {
-            'x-api-key': API_KEY
-        }
-    });
+    await leituraService.processarNovaLeitura(dadosLeitura);
+    estado.ciclos += 1;
 
     console.log(
-        `Leitura enviada | Sensor ${sensor.id} - ${sensor.maquina.nome} | ` +
+        `[SIMULADOR] Leitura gerada | Sensor ${sensor.id} - ${sensor.maquina.nome} | ` +
         `Temp: ${dadosLeitura.temperatura}C | Vib: ${dadosLeitura.vibracao}mm/s`
     );
-
-    estado.ciclos += 1;
 }
 
 async function simularCiclo() {
+    if (!simuladorEstaAtivo()) return;
+
     if (cicloEmAndamento) {
-        console.log('Ciclo anterior ainda em andamento. Pulando este intervalo.');
+        console.log('[SIMULADOR] Ciclo anterior ainda em andamento. Pulando este intervalo.');
         return;
     }
 
     cicloEmAndamento = true;
 
     try {
-        const totalOfflineEncontrado = await atualizarSensoresEmSimulacao();
+        await atualizarSensoresEmSimulacao();
 
         if (sensoresEmSimulacao.size === 0) {
-            console.log(`Nenhum sensor OFFLINE encontrado. Nova busca em ${INTERVALO_MS / 1000}s.`);
+            console.log('[SIMULADOR] Nenhum sensor OFFLINE encontrado.');
             return;
         }
 
-        console.log(
-            `Simulando ${sensoresEmSimulacao.size} sensor(es). ` +
-            `${totalOfflineEncontrado} sensor(es) OFFLINE encontrados neste ciclo.`
-        );
-
         for (const estado of sensoresEmSimulacao.values()) {
             try {
-                await enviarLeitura(estado);
+                await processarLeituraSimulada(estado);
             } catch (err) {
-                const detalhe = err.response?.data?.mensagem || err.response?.data?.message || err.message;
-                console.error(`Erro ao enviar leitura do sensor ${estado.sensor.id}: ${detalhe}`);
+                console.error(`[SIMULADOR] Erro ao gerar leitura do sensor ${estado.sensor.id}: ${err.message}`);
             }
         }
+    } catch (err) {
+        console.error('[SIMULADOR] Erro no ciclo de simulacao:', err.message);
     } finally {
         cicloEmAndamento = false;
     }
 }
 
-async function iniciarSimulador() {
-    validarConfiguracao();
+if (simuladorEstaAtivo()) {
+    console.log(
+        `[SIMULADOR] Job ativo a cada ${INTERVALO_SEGUNDOS}s. ` +
+        `Degradacao gradual em aproximadamente ${DEGRADACAO_HORAS}h.`
+    );
 
-    console.log('Iniciando simulador de sensores OFFLINE...');
-    console.log(`API: ${API_URL}`);
-    console.log(`Intervalo: ${INTERVALO_MS}ms`);
-    console.log(`Degradacao gradual em aproximadamente ${DEGRADACAO_HORAS}h.`);
-
-    if (!process.env.SIMULADOR_API_URL) {
-        console.log('SIMULADOR_API_URL nao definida. Usando a API local pelo PORT do .env.');
-    }
-
-    await simularCiclo();
-    setInterval(simularCiclo, INTERVALO_MS);
+    cron.schedule(EXPRESSAO_CRON, simularCiclo);
+} else {
+    console.log('[SIMULADOR] Job desativado por SIMULADOR_JOB_ATIVO=false.');
 }
 
-process.on('SIGINT', async () => {
-    await prisma.$disconnect();
-    process.exit(0);
-});
-
-iniciarSimulador().catch(async (err) => {
-    console.error('Erro ao iniciar simulador:', err.message);
-    await prisma.$disconnect();
-    process.exit(1);
-});
+module.exports = {
+    simularCiclo
+};

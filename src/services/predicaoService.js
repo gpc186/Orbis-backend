@@ -1,4 +1,3 @@
-const { get } = require('node:http');
 const AppError = require('../utils/appErrorUtils');
 
 class PredicaoService {
@@ -61,7 +60,7 @@ class PredicaoService {
 
             const dadosOntem = { ...leituraOntem.sensor, ...leituraOntem };
             const scoreOntem = this.calcularHealthScore(dadosOntem);
-            const scoreHoje = maquina.integridade;
+            const scoreHoje = await this.atualizarSaudeMaquina(maquinaId);
 
             const quedaPeriodo = scoreOntem - scoreHoje;
 

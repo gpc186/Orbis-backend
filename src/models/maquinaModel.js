@@ -12,9 +12,10 @@ class MaquinaModel {
         });
     }
 
-    static async findById(id) {
+    static async findById(id, options = {}) {
         return await prisma.maquina.findUnique({
             where: { id: parseInt(id) },
+            ...options
         });
     }
 
