@@ -1,6 +1,10 @@
 const prisma = require("../prisma/prisma");
 
 class RelatorioReadModel {
+  static getReportTimeZone() {
+    return process.env.REPORT_JOB_TIMEZONE || "America/Sao_Paulo";
+  }
+
   static buildMachineWhere(filtros = {}, { includeInactive = false } = {}) {
     const where = {};
 
@@ -54,10 +58,19 @@ class RelatorioReadModel {
     return where;
   }
 
-  static formatDateKey(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
+  static formatDateKey(value) {
+    const date = new Date(value);
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: this.getReportTimeZone(),
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(date);
+
+    const year = parts.find((part) => part.type === "year")?.value;
+    const month = parts.find((part) => part.type === "month")?.value;
+    const day = parts.find((part) => part.type === "day")?.value;
+
     return `${year}-${month}-${day}`;
   }
 
@@ -238,7 +251,7 @@ class RelatorioReadModel {
     const counters = new Map();
 
     for (const alerta of alertas) {
-      const key = this.formatDateKey(new Date(alerta.criadoEm));
+      const key = this.formatDateKey(alerta.criadoEm);
       counters.set(key, (counters.get(key) || 0) + 1);
     }
 

@@ -4,19 +4,25 @@ const RelatorioPayloadMapper = require("../mappers/relatorioPayloadMapper");
 class RelatorioDataService {
   static resolveDateRange(periodo) {
     if (periodo.tipo === "RELATIVE_DAYS") {
+      const valor = Number(periodo.valor || 30);
       const end = new Date();
+      end.setHours(23, 59, 59, 999);
+
       const start = new Date();
-      start.setDate(start.getDate() - Number(periodo.valor || 30));
+      start.setHours(0, 0, 0, 0);
+      start.setDate(start.getDate() - (valor - 1));
 
       return {
         start,
         end,
-        label: `${periodo.valor} dias`
+        label: `${valor} dias`
       };
     }
 
     const start = new Date(periodo.inicio);
     const end = new Date(periodo.fim);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
 
     return {
       start,

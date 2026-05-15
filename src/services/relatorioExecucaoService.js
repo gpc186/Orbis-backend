@@ -5,21 +5,42 @@ const RelatorioRendererService = require("./relatorioRendererService");
 const RelatorioDispatchService = require("./relatorioDispatchService");
 const { computeNextRun } = require("../utils/reportScheduleUtils");
 const { validatePreviewPayload } = require("../utils/reportValidation");
+const { normalizeEmails, isValidEmail } = require("../utils/emailValidation");
 
 class RelatorioExecucaoService {
-  static async executarManual({ usuario, payload }) {
+  static assertAdmin(usuario) {
     if (!usuario || usuario.role !== "ADMIN") {
       throw new AppError("Apenas ADMIN pode executar relatorios.", 403);
     }
+  }
 
-    const normalized = validatePreviewPayload(payload);
-    const emailsDestino = Array.isArray(payload.emailsDestino) ? payload.emailsDestino : [];
+  static validateDestinatarios(emailsDestino) {
+    const destinatarios = normalizeEmails(emailsDestino);
 
-    if (!emailsDestino.length) {
+    if (!destinatarios.length) {
       throw new AppError("Informe os emails de destino para envio manual.", 400);
     }
 
+    if (destinatarios.length > 10) {
+      throw new AppError("Maximo de 10 destinatarios por envio.", 400);
+    }
+
+    const emailInvalido = destinatarios.find((email) => !isValidEmail(email));
+    if (emailInvalido) {
+      throw new AppError(`Email invalido: ${emailInvalido}`, 400);
+    }
+
+    return destinatarios;
+  }
+
+  static async executarManual({ usuario, payload }) {
+    this.assertAdmin(usuario);
+
+    const normalized = validatePreviewPayload(payload);
+    const emailsDestino = this.validateDestinatarios(payload.emailsDestino);
+
     const rendered = await RelatorioRendererService.render(normalized);
+    const sentAt = new Date();
 
     const execution = await RelatorioExecucaoModel.create({
       agendamentoId: null,
@@ -43,7 +64,7 @@ class RelatorioExecucaoService {
       await RelatorioExecucaoModel.markSuccess(execution.id, {
         provider: dispatch.provider,
         messageId: dispatch.messageId,
-        finalizadoEm: new Date()
+        finalizadoEm: sentAt
       });
 
       return {
@@ -51,7 +72,10 @@ class RelatorioExecucaoService {
         provider: dispatch.provider,
         messageId: dispatch.messageId,
         subject: rendered.subject,
-        enviadoPara: emailsDestino
+        enviadoPara: emailsDestino,
+        quantidadeDestinatarios: emailsDestino.length,
+        enviadoEm: sentAt.toISOString(),
+        origemTemplate: "backend"
       };
     } catch (error) {
       await RelatorioExecucaoModel.markFailure(execution.id, {
