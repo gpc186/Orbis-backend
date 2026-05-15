@@ -3,7 +3,8 @@ function validarEnv() {
         "DATABASE_URL",
         "JWT_SECRET",
         "SUPABASE_URL",
-        "SUPABASE_SERVICE_ROLE"
+        "SUPABASE_SERVICE_ROLE",
+        "ESP32_API_KEY"
     ];
 
     const faltando = obrigatorias.filter((chave) => !process.env[chave]);
