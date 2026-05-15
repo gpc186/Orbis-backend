@@ -23,7 +23,7 @@ const resetSenhaRoutes = require("./routes/resetSenhaRoutes");
 const dashboardAiRoutes = require("./routes/dashboardAiRoutes");
 const validarEnv = require('./utils/validarEnv');
 validarEnv();
-require('./jobs/simuladorJob');
+const { iniciarSimuladorJob } = require('./jobs/simuladorJob');
 const alertaRoutes = require('./routes/alertaRoutes');
 const connectMQTT = require('./services/mqttService')
 
@@ -37,6 +37,7 @@ app.use(express.json());
 
 // Compartilha o 'io' globalmente se precisar usar nos controllers
 app.set('io', io);
+iniciarSimuladorJob(io);
 
 // Inicializa o MQTT
 connectMQTT(app)

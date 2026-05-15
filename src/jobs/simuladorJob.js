@@ -20,6 +20,8 @@ const CICLOS_ESTAVEIS_INICIAIS = 5;
 
 const sensoresEmSimulacao = new Map();
 let cicloEmAndamento = false;
+let ioServer = null;
+let jobAgendado = null;
 
 function criarExpressaoCron(intervaloSegundos) {
     if (intervaloSegundos < 60) {
@@ -150,8 +152,13 @@ async function processarLeituraSimulada(estado) {
     const sensor = estado.sensor;
     const dadosLeitura = gerarLeitura(estado);
 
-    await leituraService.processarNovaLeitura(dadosLeitura);
+    const novaLeitura = await leituraService.processarNovaLeitura(dadosLeitura);
     estado.ciclos += 1;
+
+    if (ioServer) {
+        ioServer.emit('nova-leitura', novaLeitura);
+        ioServer.emit('novaLeitura', novaLeitura);
+    }
 
     console.log(
         `[SIMULADOR] Leitura gerada | Sensor ${sensor.id} - ${sensor.maquina.nome} | ` +
@@ -191,17 +198,28 @@ async function simularCiclo() {
     }
 }
 
-if (simuladorEstaAtivo()) {
+function iniciarSimuladorJob(io) {
+    ioServer = io;
+
+    if (!simuladorEstaAtivo()) {
+        console.log('[SIMULADOR] Job desativado por SIMULADOR_JOB_ATIVO=false.');
+        return null;
+    }
+
+    if (jobAgendado) {
+        return jobAgendado;
+    }
+
     console.log(
         `[SIMULADOR] Job ativo a cada ${INTERVALO_SEGUNDOS}s. ` +
         `Degradacao gradual em aproximadamente ${DEGRADACAO_HORAS}h.`
     );
 
-    cron.schedule(EXPRESSAO_CRON, simularCiclo);
-} else {
-    console.log('[SIMULADOR] Job desativado por SIMULADOR_JOB_ATIVO=false.');
+    jobAgendado = cron.schedule(EXPRESSAO_CRON, simularCiclo);
+    return jobAgendado;
 }
 
 module.exports = {
+    iniciarSimuladorJob,
     simularCiclo
 };
