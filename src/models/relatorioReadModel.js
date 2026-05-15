@@ -1,8 +1,12 @@
 const prisma = require("../prisma/prisma");
 
 class RelatorioReadModel {
-  static buildMachineWhere(filtros = {}) {
-    const where = { ativo: true };
+  static buildMachineWhere(filtros = {}, { includeInactive = false } = {}) {
+    const where = {};
+
+    if (!includeInactive) {
+      where.ativo = true;
+    }
 
     if (filtros.maquinasIds?.length) {
       where.id = { in: filtros.maquinasIds };
@@ -25,13 +29,15 @@ class RelatorioReadModel {
     return where;
   }
 
-  static buildAlertWhere({ filtros = {}, range }) {
-    const where = {
-      criadoEm: {
+  static buildAlertWhere({ filtros = {}, range } = {}) {
+    const where = {};
+
+    if (range) {
+      where.criadoEm = {
         gte: range.start,
         lte: range.end
-      }
-    };
+      };
+    }
 
     if (filtros.maquinasIds?.length) {
       where.maquinaId = { in: filtros.maquinasIds };
@@ -41,100 +47,219 @@ class RelatorioReadModel {
       where.sensorId = { in: filtros.sensoresIds };
     }
 
+    if (filtros.usuariosIds?.length) {
+      where.tecnicoId = { in: filtros.usuariosIds };
+    }
+
     return where;
   }
 
-  static async findMaquinas({ filtros = {} }) {
-    return prisma.maquina.findMany({
-      where: this.buildMachineWhere(filtros),
-      include: { sensores: true },
-      orderBy: { nome: "asc" }
+  static formatDateKey(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  static async countMaquinasAtivas({ filtros = {} }) {
+    return prisma.maquina.count({
+      where: this.buildMachineWhere(filtros)
     });
   }
 
-  static async findAlertas({ filtros = {}, range }) {
-    return prisma.alerta.findMany({
+  static async countMaquinasAltaImportancia({ filtros = {} }) {
+    return prisma.maquina.count({
+      where: {
+        ...this.buildMachineWhere(filtros),
+        criticidade: "ALTA"
+      }
+    });
+  }
+
+  static async calculateIntegridadeMedia({ filtros = {} }) {
+    return prisma.maquina.aggregate({
+      where: this.buildMachineWhere(filtros),
+      _avg: { integridade: true }
+    });
+  }
+
+  static async countChamadosAbertos({ filtros = {} }) {
+    return prisma.alerta.count({
+      where: {
+        ...this.buildAlertWhere({ filtros }),
+        status: "ATIVO"
+      }
+    });
+  }
+
+  static async findStatusDasMaquinas({ filtros = {} }) {
+    const maquinas = await prisma.maquina.findMany({
+      where: this.buildMachineWhere(filtros, { includeInactive: true }),
+      select: {
+        id: true,
+        ativo: true
+      }
+    });
+
+    const maquinasAtivasIds = maquinas
+      .filter((maquina) => maquina.ativo)
+      .map((maquina) => maquina.id);
+
+    let maquinasComAlertaAtivo = [];
+
+    if (maquinasAtivasIds.length > 0) {
+      maquinasComAlertaAtivo = await prisma.alerta.findMany({
+        where: {
+          ...this.buildAlertWhere({ filtros }),
+          maquinaId: { in: maquinasAtivasIds },
+          status: "ATIVO"
+        },
+        select: { maquinaId: true },
+        distinct: ["maquinaId"]
+      });
+    }
+
+    const maquinasEmAlertaIds = new Set(maquinasComAlertaAtivo.map((item) => item.maquinaId));
+
+    let operando = 0;
+    let emAlerta = 0;
+    let inativa = 0;
+
+    for (const maquina of maquinas) {
+      if (!maquina.ativo) {
+        inativa += 1;
+      } else if (maquinasEmAlertaIds.has(maquina.id)) {
+        emAlerta += 1;
+      } else {
+        operando += 1;
+      }
+    }
+
+    return { operando, emAlerta, inativa };
+  }
+
+  static async countMaquinasPorCriticidade({ filtros = {} }) {
+    const grouped = await prisma.maquina.groupBy({
+      by: ["criticidade"],
+      where: this.buildMachineWhere(filtros, { includeInactive: true }),
+      _count: { criticidade: true }
+    });
+
+    const result = {
+      alta: 0,
+      media: 0,
+      baixa: 0
+    };
+
+    for (const item of grouped) {
+      const key = String(item.criticidade || "").toLowerCase();
+      result[key] = item._count.criticidade;
+    }
+
+    return result;
+  }
+
+  static async findIntegridadePorSetor({ filtros = {} }) {
+    const grouped = await prisma.maquina.groupBy({
+      by: ["setor"],
+      where: this.buildMachineWhere(filtros),
+      _avg: { integridade: true },
+      orderBy: { setor: "asc" }
+    });
+
+    return grouped.map((item) => ({
+      setor: item.setor,
+      integridadeMedia: Number((item._avg.integridade || 0).toFixed(1))
+    }));
+  }
+
+  static async countSensoresPorStatus({ filtros = {} }) {
+    const grouped = await prisma.sensor.groupBy({
+      by: ["status"],
+      where: this.buildSensorWhere(filtros),
+      _count: { status: true }
+    });
+
+    const result = {
+      online: 0,
+      offline: 0,
+      inativo: 0
+    };
+
+    for (const item of grouped) {
+      const key = String(item.status || "").toLowerCase();
+      result[key] = item._count.status;
+    }
+
+    return result;
+  }
+
+  static async findChamados({ filtros = {}, range }) {
+    const alertas = await prisma.alerta.findMany({
       where: this.buildAlertWhere({ filtros, range }),
       include: {
-        maquina: true,
-        sensor: true,
+        maquina: {
+          select: { id: true, nome: true }
+        },
+        sensor: {
+          select: { id: true, tipo: true }
+        },
         tecnico: {
           select: { id: true, nome: true, email: true }
         }
       },
       orderBy: { criadoEm: "desc" }
     });
+
+    return alertas.map((alerta) => ({
+      id: alerta.id,
+      maquina: alerta.maquina?.nome || null,
+      sensor: alerta.sensor?.tipo || null,
+      tipo: alerta.tipo,
+      status: alerta.status,
+      tecnico: alerta.tecnico
+        ? {
+            id: alerta.tecnico.id,
+            nome: alerta.tecnico.nome,
+            email: alerta.tecnico.email
+          }
+        : null,
+      criadoEm: alerta.criadoEm
+    }));
   }
 
-  static async countMaquinas({ filtros = {} }) {
-    return prisma.maquina.count({
-      where: this.buildMachineWhere(filtros)
-    });
-  }
-
-  static async countSensoresOnline({ filtros = {} }) {
-    return prisma.sensor.count({
-      where: {
-        ...this.buildSensorWhere(filtros),
-        status: "ONLINE"
-      }
-    });
-  }
-
-  static async countAlertasAtivosNoPeriodo({ filtros = {}, range }) {
-    return prisma.alerta.count({
-      where: {
-        ...this.buildAlertWhere({ filtros, range }),
-        status: "ATIVO"
-      }
-    });
-  }
-
-  static async countMaquinasComAlertaAtivo({ filtros = {}, range }) {
-    const items = await prisma.alerta.findMany({
-      where: {
-        ...this.buildAlertWhere({ filtros, range }),
-        status: "ATIVO"
-      },
-      select: { maquinaId: true },
-      distinct: ["maquinaId"]
+  static async findHistoricoTendencia({ filtros = {}, range }) {
+    const alertas = await prisma.alerta.findMany({
+      where: this.buildAlertWhere({ filtros, range }),
+      select: { criadoEm: true },
+      orderBy: { criadoEm: "asc" }
     });
 
-    return items.length;
-  }
+    const counters = new Map();
 
-  static async countAlertasHoje({ filtros = {}, range, referenceDate = new Date() }) {
-    const startOfDay = new Date(
-      referenceDate.getFullYear(),
-      referenceDate.getMonth(),
-      referenceDate.getDate()
-    );
-
-    const start = range.start > startOfDay ? range.start : startOfDay;
-
-    if (start > range.end) {
-      return 0;
+    for (const alerta of alertas) {
+      const key = this.formatDateKey(new Date(alerta.criadoEm));
+      counters.set(key, (counters.get(key) || 0) + 1);
     }
 
-    return prisma.alerta.count({
-      where: this.buildAlertWhere({
-        filtros,
-        range: {
-          start,
-          end: range.end
-        }
-      })
-    });
-  }
+    const historico = [];
+    const cursor = new Date(range.start);
+    cursor.setHours(0, 0, 0, 0);
 
-  static async countAlertasAtivosSemAtendimento({ filtros = {}, range }) {
-    return prisma.alerta.count({
-      where: {
-        ...this.buildAlertWhere({ filtros, range }),
-        status: "ATIVO",
-        tecnicoId: null
-      }
-    });
+    const end = new Date(range.end);
+    end.setHours(0, 0, 0, 0);
+
+    while (cursor <= end) {
+      const key = this.formatDateKey(cursor);
+      historico.push({
+        data: key,
+        quantidade: counters.get(key) || 0
+      });
+
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return historico;
   }
 }
 

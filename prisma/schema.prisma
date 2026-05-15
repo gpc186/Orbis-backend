@@ -254,7 +254,7 @@ model RelatorioAgendamento {
   tipoPeriodo     TipoPeriodoRelatorio
   periodo         Json
   filtros         Json
-  entidades       Json?
+  secoes          Json?
   proximoEnvioEm  DateTime
   ultimoEnvioEm   DateTime?
   ultimoSucessoEm DateTime?
@@ -292,7 +292,7 @@ model RelatorioExecucao {
   emailsDestino   Json
   periodoSnapshot Json
   filtrosSnapshot Json
-  entidades       Json?
+  secoes          Json?
   provider        String?
   messageId       String?
   erro            String?  @db.Text

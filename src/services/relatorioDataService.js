@@ -1,5 +1,5 @@
-const DashboardService = require("./dashboardService");
 const RelatorioReadModel = require("../models/relatorioReadModel");
+const RelatorioPayloadMapper = require("../mappers/relatorioPayloadMapper");
 
 class RelatorioDataService {
   static resolveDateRange(periodo) {
@@ -27,50 +27,51 @@ class RelatorioDataService {
 
   static async collect({ periodo, filtros }) {
     const range = this.resolveDateRange(periodo);
-    const includeEntities = new Set(filtros.entidades || []);
-    const includeResumo = includeEntities.has("resumo");
+    const secoes = filtros.secoes || [];
+    const includeResumo = secoes.includes("resumo");
+    const includeDesempenho = secoes.includes("desempenho");
+    const includeSensores = secoes.includes("sensores");
+    const includeChamados = secoes.includes("chamados");
+    const includeHistoricoTendencia = secoes.includes("historicoTendencia");
 
     const [
-      maquinas,
-      alertas,
-      sensoresOnline,
-      alertasAtivosNoPeriodo,
-      totalMaquinasFiltradas,
-      maquinasEmAlertaNoPeriodo,
-      alertasHojeNoPeriodo,
-      alertaSemAtendimentoNoPeriodo,
-      resumoGlobal
+      maquinasAtivas,
+      maquinasAltaImportancia,
+      integridadeMediaAgg,
+      chamadosAbertos,
+      statusDasMaquinas,
+      maquinasPorImportancia,
+      integridadePorSetor,
+      sensores,
+      chamados,
+      historicoTendencia
     ] = await Promise.all([
-      includeEntities.has("maquinas") ? RelatorioReadModel.findMaquinas({ filtros }) : [],
-      includeEntities.has("alertas") ? RelatorioReadModel.findAlertas({ filtros, range }) : [],
-      includeResumo ? RelatorioReadModel.countSensoresOnline({ filtros }) : 0,
-      includeResumo ? RelatorioReadModel.countAlertasAtivosNoPeriodo({ filtros, range }) : 0,
-      includeResumo ? RelatorioReadModel.countMaquinas({ filtros }) : 0,
-      includeResumo ? RelatorioReadModel.countMaquinasComAlertaAtivo({ filtros, range }) : 0,
-      includeResumo ? RelatorioReadModel.countAlertasHoje({ filtros, range }) : 0,
-      includeResumo ? RelatorioReadModel.countAlertasAtivosSemAtendimento({ filtros, range }) : 0,
-      includeResumo ? DashboardService.resume() : []
+      includeResumo ? RelatorioReadModel.countMaquinasAtivas({ filtros }) : 0,
+      includeResumo ? RelatorioReadModel.countMaquinasAltaImportancia({ filtros }) : 0,
+      includeResumo ? RelatorioReadModel.calculateIntegridadeMedia({ filtros }) : null,
+      includeResumo ? RelatorioReadModel.countChamadosAbertos({ filtros }) : 0,
+      includeDesempenho ? RelatorioReadModel.findStatusDasMaquinas({ filtros }) : null,
+      includeDesempenho ? RelatorioReadModel.countMaquinasPorCriticidade({ filtros }) : null,
+      includeDesempenho ? RelatorioReadModel.findIntegridadePorSetor({ filtros }) : [],
+      includeSensores ? RelatorioReadModel.countSensoresPorStatus({ filtros }) : null,
+      includeChamados ? RelatorioReadModel.findChamados({ filtros, range }) : [],
+      includeHistoricoTendencia ? RelatorioReadModel.findHistoricoTendencia({ filtros, range }) : []
     ]);
 
-    const resumo = includeResumo
-      ? {
-          ...resumoGlobal,
-          totalMaquinas: totalMaquinasFiltradas,
-          maquinasEmAlerta: maquinasEmAlertaNoPeriodo,
-          alertasAtivos: alertasAtivosNoPeriodo,
-          alertasHoje: alertasHojeNoPeriodo,
-          sensoresOnline,
-          alertaSemAtendimento: alertaSemAtendimentoNoPeriodo
-        }
-      : null;
-
-    return {
-      range,
+    return RelatorioPayloadMapper.build({
       periodoLabel: range.label,
-      resumo,
-      maquinas,
-      alertas
-    };
+      secoes,
+      maquinasAtivas,
+      maquinasAltaImportancia,
+      integridadeMedia: integridadeMediaAgg?._avg?.integridade || 0,
+      chamadosAbertos,
+      statusDasMaquinas,
+      maquinasPorImportancia,
+      integridadePorSetor,
+      sensores,
+      chamados,
+      historicoTendencia
+    });
   }
 }
 

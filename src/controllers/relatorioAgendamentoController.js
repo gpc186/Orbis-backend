@@ -4,8 +4,16 @@ const RelatorioExecucaoService = require("../services/relatorioExecucaoService")
 class RelatorioAgendamentoController {
   static async preview(req, res, next) {
     try {
-      const usuario = req.usuario;
-      const result = await RelatorioAgendamentoService.preview({ usuario, payload: req.body });
+      const {
+        body: { nome, assunto, periodo, filtros },
+        usuario
+      } = req;
+
+      const result = await RelatorioAgendamentoService.preview({
+        usuario,
+        payload: { nome, assunto, periodo, filtros }
+      });
+
       return res.status(200).json(result);
     } catch (error) {
       return next(error);
@@ -14,10 +22,14 @@ class RelatorioAgendamentoController {
 
   static async create(req, res, next) {
     try {
-      const usuario = req.usuario;
+      const {
+        body: { nome, emailsDestino, assunto, periodo, filtros, agendamento },
+        usuario
+      } = req;
+
       const result = await RelatorioAgendamentoService.create({
         usuario,
-        payload: req.body
+        payload: { nome, emailsDestino, assunto, periodo, filtros, agendamento }
       });
 
       return res.status(201).json({ message: "Agendamento de relatorio criado com sucesso.", ...result });
@@ -28,7 +40,7 @@ class RelatorioAgendamentoController {
 
   static async list(req, res, next) {
     try {
-      const usuario = req.usuario;
+      const { usuario } = req;
       const result = await RelatorioAgendamentoService.list({ usuario });
       return res.status(200).json(result);
     } catch (error) {
@@ -38,8 +50,11 @@ class RelatorioAgendamentoController {
 
   static async findById(req, res, next) {
     try {
-      const { id } = req.params;
-      const usuario = req.usuario;
+      const {
+        params: { id },
+        usuario
+      } = req;
+
       const result = await RelatorioAgendamentoService.findById({ usuario, id });
 
       return res.status(200).json(result);
@@ -50,9 +65,18 @@ class RelatorioAgendamentoController {
 
   static async update(req, res, next) {
     try {
-      const { id } = req.params;
-      const usuario = req.usuario;
-      const result = await RelatorioAgendamentoService.update({ usuario, id, payload: req.body });
+      const {
+        params: { id },
+        body: { nome, emailsDestino, assunto, periodo, filtros, agendamento },
+        usuario
+      } = req;
+
+      const result = await RelatorioAgendamentoService.update({
+        usuario,
+        id,
+        payload: { nome, emailsDestino, assunto, periodo, filtros, agendamento }
+      });
+
       return res.status(200).json({ message: "Agendamento de relatorio atualizado com sucesso.", ...result });
     } catch (error) {
       return next(error);
@@ -61,9 +85,13 @@ class RelatorioAgendamentoController {
 
   static async updateStatus(req, res, next) {
     try {
-      const { id } = req.params;
-      const usuario = req.usuario;
-      const result = await RelatorioAgendamentoService.updateStatus({ usuario, id, payload: req.body });
+      const {
+        params: { id },
+        body: { status },
+        usuario
+      } = req;
+
+      const result = await RelatorioAgendamentoService.updateStatus({ usuario, id, payload: { status } });
       return res.status(200).json({ message: "Status do agendamento atualizado com sucesso.", ...result });
     } catch (error) {
       return next(error);
@@ -72,8 +100,11 @@ class RelatorioAgendamentoController {
 
   static async executeNow(req, res, next) {
     try {
-      const { id } = req.params
-      const usuario = req.usuario;
+      const {
+        params: { id },
+        usuario
+      } = req;
+
       const result = await RelatorioAgendamentoService.executeNow({ usuario, id });
       return res.status(200).json({ message: "Execucao manual do agendamento concluida.", ...result });
     } catch (error) {
@@ -83,8 +114,11 @@ class RelatorioAgendamentoController {
 
   static async listExecutions(req, res, next) {
     try {
-      const { id } = req.params
-      const usuario = req.usuario;
+      const {
+        params: { id },
+        usuario
+      } = req;
+
       const result = await RelatorioExecucaoService.listExecutions({ id, usuario });
       return res.status(200).json(result);
     } catch (error) {

@@ -45,12 +45,7 @@ class RelatorioService {
 
     const to = this.validateDestinatarios(emailsDestino);
 
-    const validated = validatePreviewPayload({
-      nome,
-      assunto,
-      periodo,
-      filtros
-    });
+    const validated = validatePreviewPayload({ nome, assunto, periodo, filtros });
 
     const rendered = await RelatorioRendererService.render(validated);
     const subject = rendered.subject;

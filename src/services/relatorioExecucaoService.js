@@ -29,7 +29,7 @@ class RelatorioExecucaoService {
       emailsDestino,
       periodoSnapshot: normalized.periodo,
       filtrosSnapshot: normalized.filtros,
-      entidades: normalized.filtros.entidades
+      secoes: normalized.filtros.secoes
     });
 
     try {
@@ -80,7 +80,7 @@ class RelatorioExecucaoService {
       emailsDestino,
       periodoSnapshot: agendamento.periodo,
       filtrosSnapshot: agendamento.filtros,
-      entidades: agendamento.entidades || null
+      secoes: agendamento.secoes || agendamento.filtros?.secoes || null
     });
 
     try {
@@ -90,9 +90,9 @@ class RelatorioExecucaoService {
         periodo: agendamento.periodo,
         filtros: {
           ...agendamento.filtros,
-          entidades: Array.isArray(agendamento.entidades)
-            ? agendamento.entidades
-            : agendamento.filtros?.entidades
+          secoes: Array.isArray(agendamento.secoes)
+            ? agendamento.secoes
+            : agendamento.filtros?.secoes
         }
       });
 

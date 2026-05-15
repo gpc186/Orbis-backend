@@ -3,6 +3,7 @@ const AppError = require("./appErrorUtils");
 const FREQUENCIAS = ["DIARIO", "SEMANAL", "MENSAL"];
 const STATUS_AGENDAMENTO = ["ATIVO", "PAUSADO"];
 const PERIOD_TYPES = ["RELATIVE_DAYS", "CUSTOM_RANGE"];
+const SECOES_RELATORIO = ["resumo", "desempenho", "sensores", "chamados", "historicoTendencia"];
 
 function normalizeEmails(emailsDestino) {
   if (!emailsDestino) return [];
@@ -36,6 +37,25 @@ function normalizeIdList(values) {
   return values
     .map((value) => Number(value))
     .filter((value) => Number.isInteger(value) && value > 0);
+}
+
+function normalizeSecoes(values) {
+  if (!Array.isArray(values) || values.length === 0) {
+    return [...SECOES_RELATORIO];
+  }
+
+  const secoes = [...new Set(
+    values
+      .map((value) => String(value).trim())
+      .filter(Boolean)
+  )];
+
+  const invalid = secoes.find((secao) => !SECOES_RELATORIO.includes(secao));
+  if (invalid) {
+    throw new AppError(`Secao de relatorio invalida: ${invalid}`, 400);
+  }
+
+  return secoes;
 }
 
 function validatePeriodo(periodo = {}) {
@@ -73,13 +93,13 @@ function validatePeriodo(periodo = {}) {
 }
 
 function validateFiltros(filtros = {}) {
+  const secoes = normalizeSecoes(filtros.secoes);
+
   return {
     maquinasIds: normalizeIdList(filtros.maquinasIds),
     sensoresIds: normalizeIdList(filtros.sensoresIds),
     usuariosIds: normalizeIdList(filtros.usuariosIds),
-    entidades: Array.isArray(filtros.entidades)
-      ? [...new Set(filtros.entidades.map((value) => String(value).trim().toLowerCase()).filter(Boolean))]
-      : ["resumo", "maquinas", "alertas"]
+    secoes
   };
 }
 

@@ -18,25 +18,14 @@ class RelatorioRendererService {
 
   static async render({ nome, assunto, periodo, filtros }) {
     const data = await RelatorioDataService.collect({ periodo, filtros });
-
-    const html = gerarRelatorioHTML({
-      resumo: data.resumo,
-      maquinas: data.maquinas,
-      alertas: data.alertas,
-      config: {
-        nome,
-        periodoLabel: data.periodoLabel
-      }
-    });
+    const periodoLabel = data.periodoLabel;
+    const html = gerarRelatorioHTML({ data, config: { nome, periodoLabel } });
 
     return {
-      subject: this.buildSubject({
-        nome,
-        periodoLabel: data.periodoLabel,
-        assunto
-      }),
-      text: this.buildTextFallback({ periodoLabel: data.periodoLabel }),
+      subject: this.buildSubject({ nome, periodoLabel, assunto }),
+      text: this.buildTextFallback({ periodoLabel }),
       html,
+      periodoLabel,
       data
     };
   }

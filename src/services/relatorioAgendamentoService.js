@@ -41,8 +41,8 @@ class RelatorioAgendamentoService {
     return {
       subject: rendered.subject,
       html: rendered.html,
-      periodoLabel: rendered.data.periodoLabel,
-      resumo: rendered.data.resumo
+      periodoLabel: rendered.periodoLabel,
+      data: rendered.data
     };
   }
 
@@ -67,7 +67,7 @@ class RelatorioAgendamentoService {
         tipoPeriodo: normalized.periodo.tipo,
         periodo: normalized.periodo,
         filtros: normalized.filtros,
-        entidades: normalized.filtros.entidades,
+        secoes: normalized.filtros.secoes,
         proximoEnvioEm: nextRunAt
       },
       emailsDestino: normalized.emailsDestino
@@ -118,7 +118,7 @@ class RelatorioAgendamentoService {
         tipoPeriodo: normalized.periodo.tipo,
         periodo: normalized.periodo,
         filtros: normalized.filtros,
-        entidades: normalized.filtros.entidades,
+        secoes: normalized.filtros.secoes,
         proximoEnvioEm: nextRunAt,
         status: current.status === "PAUSADO" ? "PAUSADO" : "ATIVO"
       },
