@@ -1,5 +1,5 @@
-const prisma = require("../prisma/prisma");
 const DashboardService = require("./dashboardService");
+const RelatorioReadModel = require("../models/relatorioReadModel");
 
 class RelatorioDataService {
   static resolveDateRange(periodo) {
@@ -25,105 +25,42 @@ class RelatorioDataService {
     };
   }
 
-  static buildMachineWhere(filtros = {}) {
-    const where = { ativo: true };
-
-    if (filtros.maquinasIds?.length) {
-      where.id = { in: filtros.maquinasIds };
-    }
-
-    return where;
-  }
-
-  static buildSensorWhere(filtros = {}) {
-    const where = {};
-
-    if (filtros.sensoresIds?.length) {
-      where.id = { in: filtros.sensoresIds };
-    }
-
-    if (filtros.maquinasIds?.length) {
-      where.maquinaId = { in: filtros.maquinasIds };
-    }
-
-    return where;
-  }
-
-  static buildAlertWhere({ filtros = {}, range }) {
-    const where = {
-      criadoEm: {
-        gte: range.start,
-        lte: range.end
-      }
-    };
-
-    if (filtros.maquinasIds?.length) {
-      where.maquinaId = { in: filtros.maquinasIds };
-    }
-
-    if (filtros.sensoresIds?.length) {
-      where.sensorId = { in: filtros.sensoresIds };
-    }
-
-    return where;
-  }
-
   static async collect({ periodo, filtros }) {
     const range = this.resolveDateRange(periodo);
-    const machineWhere = this.buildMachineWhere(filtros);
-    const sensorWhere = this.buildSensorWhere(filtros);
-    const alertWhere = this.buildAlertWhere({ filtros, range });
     const includeEntities = new Set(filtros.entidades || []);
+    const includeResumo = includeEntities.has("resumo");
 
-    const [maquinas, alertas, sensoresOnline, alertasAtivosNoPeriodo, resumoGlobal] = await Promise.all([
-      includeEntities.has("maquinas")
-        ? prisma.maquina.findMany({
-            where: machineWhere,
-            include: { sensores: true },
-            orderBy: { nome: "asc" }
-          })
-        : [],
-      includeEntities.has("alertas")
-        ? prisma.alerta.findMany({
-            where: alertWhere,
-            include: {
-              maquina: true,
-              sensor: true,
-              tecnico: {
-                select: { id: true, nome: true, email: true }
-              }
-            },
-            orderBy: { criadoEm: "desc" }
-          })
-        : [],
-      prisma.sensor.count({
-        where: {
-          ...sensorWhere,
-          status: "ONLINE"
-        }
-      }),
-      prisma.alerta.count({
-        where: {
-          ...alertWhere,
-          status: "ATIVO"
-        }
-      }),
-      DashboardService.resume()
+    const [
+      maquinas,
+      alertas,
+      sensoresOnline,
+      alertasAtivosNoPeriodo,
+      totalMaquinasFiltradas,
+      maquinasEmAlertaNoPeriodo,
+      alertasHojeNoPeriodo,
+      alertaSemAtendimentoNoPeriodo,
+      resumoGlobal
+    ] = await Promise.all([
+      includeEntities.has("maquinas") ? RelatorioReadModel.findMaquinas({ filtros }) : [],
+      includeEntities.has("alertas") ? RelatorioReadModel.findAlertas({ filtros, range }) : [],
+      includeResumo ? RelatorioReadModel.countSensoresOnline({ filtros }) : 0,
+      includeResumo ? RelatorioReadModel.countAlertasAtivosNoPeriodo({ filtros, range }) : 0,
+      includeResumo ? RelatorioReadModel.countMaquinas({ filtros }) : 0,
+      includeResumo ? RelatorioReadModel.countMaquinasComAlertaAtivo({ filtros, range }) : 0,
+      includeResumo ? RelatorioReadModel.countAlertasHoje({ filtros, range }) : 0,
+      includeResumo ? RelatorioReadModel.countAlertasAtivosSemAtendimento({ filtros, range }) : 0,
+      includeResumo ? DashboardService.resume() : []
     ]);
 
-    const resumo = includeEntities.has("resumo")
+    const resumo = includeResumo
       ? {
           ...resumoGlobal,
-          totalMaquinas: maquinas.length || resumoGlobal.totalMaquinas,
-          maquinasEmAlerta: [...new Set(alertas.filter((item) => item.status === "ATIVO").map((item) => item.maquinaId))].length,
+          totalMaquinas: totalMaquinasFiltradas,
+          maquinasEmAlerta: maquinasEmAlertaNoPeriodo,
           alertasAtivos: alertasAtivosNoPeriodo,
-          alertasHoje: alertas.filter((item) => {
-            const now = new Date();
-            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            return new Date(item.criadoEm) >= startOfDay;
-          }).length,
+          alertasHoje: alertasHojeNoPeriodo,
           sensoresOnline,
-          alertaSemAtendimento: alertas.filter((item) => item.status === "ATIVO" && !item.tecnicoId).length
+          alertaSemAtendimento: alertaSemAtendimentoNoPeriodo
         }
       : null;
 

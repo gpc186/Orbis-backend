@@ -4,11 +4,8 @@ const RelatorioExecucaoService = require("../services/relatorioExecucaoService")
 class RelatorioAgendamentoController {
   static async preview(req, res, next) {
     try {
-      const result = await RelatorioAgendamentoService.preview({
-        usuario: req.usuario,
-        payload: req.body
-      });
-
+      const usuario = req.usuario;
+      const result = await RelatorioAgendamentoService.preview({ usuario, payload: req.body });
       return res.status(200).json(result);
     } catch (error) {
       return next(error);
@@ -17,15 +14,13 @@ class RelatorioAgendamentoController {
 
   static async create(req, res, next) {
     try {
+      const usuario = req.usuario;
       const result = await RelatorioAgendamentoService.create({
-        usuario: req.usuario,
+        usuario,
         payload: req.body
       });
 
-      return res.status(201).json({
-        message: "Agendamento de relatorio criado com sucesso.",
-        ...result
-      });
+      return res.status(201).json({ message: "Agendamento de relatorio criado com sucesso.", ...result });
     } catch (error) {
       return next(error);
     }
@@ -33,10 +28,8 @@ class RelatorioAgendamentoController {
 
   static async list(req, res, next) {
     try {
-      const result = await RelatorioAgendamentoService.list({
-        usuario: req.usuario
-      });
-
+      const usuario = req.usuario;
+      const result = await RelatorioAgendamentoService.list({ usuario });
       return res.status(200).json(result);
     } catch (error) {
       return next(error);
@@ -45,10 +38,9 @@ class RelatorioAgendamentoController {
 
   static async findById(req, res, next) {
     try {
-      const result = await RelatorioAgendamentoService.findById({
-        usuario: req.usuario,
-        id: req.params.id
-      });
+      const { id } = req.params;
+      const usuario = req.usuario;
+      const result = await RelatorioAgendamentoService.findById({ usuario, id });
 
       return res.status(200).json(result);
     } catch (error) {
@@ -58,16 +50,10 @@ class RelatorioAgendamentoController {
 
   static async update(req, res, next) {
     try {
-      const result = await RelatorioAgendamentoService.update({
-        usuario: req.usuario,
-        id: req.params.id,
-        payload: req.body
-      });
-
-      return res.status(200).json({
-        message: "Agendamento de relatorio atualizado com sucesso.",
-        ...result
-      });
+      const { id } = req.params;
+      const usuario = req.usuario;
+      const result = await RelatorioAgendamentoService.update({ usuario, id, payload: req.body });
+      return res.status(200).json({ message: "Agendamento de relatorio atualizado com sucesso.", ...result });
     } catch (error) {
       return next(error);
     }
@@ -75,16 +61,10 @@ class RelatorioAgendamentoController {
 
   static async updateStatus(req, res, next) {
     try {
-      const result = await RelatorioAgendamentoService.updateStatus({
-        usuario: req.usuario,
-        id: req.params.id,
-        payload: req.body
-      });
-
-      return res.status(200).json({
-        message: "Status do agendamento atualizado com sucesso.",
-        ...result
-      });
+      const { id } = req.params;
+      const usuario = req.usuario;
+      const result = await RelatorioAgendamentoService.updateStatus({ usuario, id, payload: req.body });
+      return res.status(200).json({ message: "Status do agendamento atualizado com sucesso.", ...result });
     } catch (error) {
       return next(error);
     }
@@ -92,15 +72,10 @@ class RelatorioAgendamentoController {
 
   static async executeNow(req, res, next) {
     try {
-      const result = await RelatorioAgendamentoService.executeNow({
-        usuario: req.usuario,
-        id: req.params.id
-      });
-
-      return res.status(200).json({
-        message: "Execucao manual do agendamento concluida.",
-        ...result
-      });
+      const { id } = req.params
+      const usuario = req.usuario;
+      const result = await RelatorioAgendamentoService.executeNow({ usuario, id });
+      return res.status(200).json({ message: "Execucao manual do agendamento concluida.", ...result });
     } catch (error) {
       return next(error);
     }
@@ -108,7 +83,9 @@ class RelatorioAgendamentoController {
 
   static async listExecutions(req, res, next) {
     try {
-      const result = await RelatorioExecucaoService.listExecutions(req.params.id);
+      const { id } = req.params
+      const usuario = req.usuario;
+      const result = await RelatorioExecucaoService.listExecutions({ id, usuario });
       return res.status(200).json(result);
     } catch (error) {
       return next(error);

@@ -152,8 +152,11 @@ class RelatorioExecucaoService {
     }
   }
 
-  static async listExecutions(agendamentoId) {
-    return RelatorioExecucaoModel.findByAgendamentoId(agendamentoId);
+  static async listExecutions({ id, usuario }) {
+    if (!usuario || usuario.role !== "ADMIN") {
+      throw new AppError("Apenas ADMIN pode executar relatorios.", 403);
+    }
+    return RelatorioExecucaoModel.findByAgendamentoId(id);
   }
 }
 
