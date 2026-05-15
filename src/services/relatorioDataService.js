@@ -1,0 +1,84 @@
+const RelatorioReadModel = require("../models/relatorioReadModel");
+const RelatorioPayloadMapper = require("../mappers/relatorioPayloadMapper");
+
+class RelatorioDataService {
+  static resolveDateRange(periodo) {
+    if (periodo.tipo === "RELATIVE_DAYS") {
+      const valor = Number(periodo.valor || 30);
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      start.setDate(start.getDate() - (valor - 1));
+
+      return {
+        start,
+        end,
+        label: `${valor} dias`
+      };
+    }
+
+    const start = new Date(periodo.inicio);
+    const end = new Date(periodo.fim);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+
+    return {
+      start,
+      end,
+      label: `${start.toLocaleDateString("pt-BR")} ate ${end.toLocaleDateString("pt-BR")}`
+    };
+  }
+
+  static async collect({ periodo, filtros }) {
+    const range = this.resolveDateRange(periodo);
+    const secoes = filtros.secoes || [];
+    const includeResumo = secoes.includes("resumo");
+    const includeDesempenho = secoes.includes("desempenho");
+    const includeSensores = secoes.includes("sensores");
+    const includeChamados = secoes.includes("chamados");
+    const includeHistoricoTendencia = secoes.includes("historicoTendencia");
+
+    const [
+      maquinasAtivas,
+      maquinasAltaImportancia,
+      integridadeMediaAgg,
+      chamadosAbertos,
+      statusDasMaquinas,
+      maquinasPorImportancia,
+      integridadePorSetor,
+      sensores,
+      chamados,
+      historicoTendencia
+    ] = await Promise.all([
+      includeResumo ? RelatorioReadModel.countMaquinasAtivas({ filtros }) : 0,
+      includeResumo ? RelatorioReadModel.countMaquinasAltaImportancia({ filtros }) : 0,
+      includeResumo ? RelatorioReadModel.calculateIntegridadeMedia({ filtros }) : null,
+      includeResumo ? RelatorioReadModel.countChamadosAbertos({ filtros }) : 0,
+      includeDesempenho ? RelatorioReadModel.findStatusDasMaquinas({ filtros }) : null,
+      includeDesempenho ? RelatorioReadModel.countMaquinasPorCriticidade({ filtros }) : null,
+      includeDesempenho ? RelatorioReadModel.findIntegridadePorSetor({ filtros }) : [],
+      includeSensores ? RelatorioReadModel.countSensoresPorStatus({ filtros }) : null,
+      includeChamados ? RelatorioReadModel.findChamados({ filtros, range }) : [],
+      includeHistoricoTendencia ? RelatorioReadModel.findHistoricoTendencia({ filtros, range }) : []
+    ]);
+
+    return RelatorioPayloadMapper.build({
+      periodoLabel: range.label,
+      secoes,
+      maquinasAtivas,
+      maquinasAltaImportancia,
+      integridadeMedia: integridadeMediaAgg?._avg?.integridade || 0,
+      chamadosAbertos,
+      statusDasMaquinas,
+      maquinasPorImportancia,
+      integridadePorSetor,
+      sensores,
+      chamados,
+      historicoTendencia
+    });
+  }
+}
+
+module.exports = RelatorioDataService;

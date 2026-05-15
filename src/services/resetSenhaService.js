@@ -9,7 +9,7 @@ class ResetSenhaService {
             throw new AppError("Dados inválidos.", 400);
         }
 
-        if (!/^[\w\-\.]+@([\w-]+\.)+[\w-]{2,}$/gm.test(email)) {
+        if (!/^[\w\-\.]+@([\w-]+\.)+[\w-]{2,}$/gm.test(email) || !/^[\w\-\.]+@([\w-]+\.)+[\w-]{2,}$/gm.test(emailDestino)) {
             throw new AppError("Email inválido!", 400);
         };
 

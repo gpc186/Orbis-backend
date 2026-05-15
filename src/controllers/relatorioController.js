@@ -1,22 +1,19 @@
-const RelatorioService = require("../services/relatorioService");
+const RelatorioExecucaoService = require("../services/relatorioExecucaoService");
 
 class RelatorioController {
   static async enviarAgora(req, res, next) {
     try {
-      const usuario = req.usuario;
-      const { emailsDestino, assunto, htmlRelatorio } = req.body;
+      const {
+        body: { emailsDestino, assunto, nome, periodo, filtros },
+        usuario
+      } = req;
 
-      const result = await RelatorioService.enviarAgora({
+      const result = await RelatorioExecucaoService.executarManual({
         usuario,
-        emailsDestino,
-        assunto,
-        htmlRelatorio
+        payload: { emailsDestino, assunto, nome, periodo, filtros }
       });
 
-      return res.status(200).json({
-        message: "Relatório enviado com sucesso.",
-        ...result
-      });
+      return res.status(200).json({ message: "Relatorio enviado com sucesso.", ...result });
     } catch (error) {
       return next(error);
     }

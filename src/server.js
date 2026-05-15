@@ -1,5 +1,6 @@
 require('./config/env')();
 require('./jobs/tendenciaJob');
+require('./jobs/relatorioJob');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -19,6 +20,7 @@ const tecnicoRoutes = require('./routes/tecnicoRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const emailRoutes = require("./routes/emailRoutes");
 const relatorioRoutes = require("./routes/relatorioRoutes");
+const relatorioAgendamentoRoutes = require("./routes/relatorioAgendamentoRoutes");
 const resetSenhaRoutes = require("./routes/resetSenhaRoutes");
 const dashboardAiRoutes = require("./routes/dashboardAiRoutes");
 const validarEnv = require('./utils/validarEnv');
@@ -58,6 +60,7 @@ app.use('/usuarios', usuarioRoutes)
 app.use('/perfil', perfilRoutes)
 app.use('/email', emailRoutes);
 app.use('/relatorios', relatorioRoutes);
+app.use('/relatorios', relatorioAgendamentoRoutes);
 app.use('/senha', resetSenhaRoutes)
 app.use('/dashboard/ia', dashboardAiRoutes);
 
