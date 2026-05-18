@@ -49,6 +49,10 @@ function limitar(valor, minimo, maximo) {
   return Math.min(Math.max(valor, minimo), maximo);
 }
 
+function escolherItemAleatorio(itens) {
+  return itens[Math.floor(Math.random() * itens.length)];
+}
+
 function calcularFaixaSegura(sensor, campoIdeal, campoLimite, campoDesvio) {
   const ideal = Number(sensor[campoIdeal]);
   const limite = Number(sensor[campoLimite]);
@@ -122,18 +126,51 @@ function gerarLeitura(estado) {
   };
 }
 
-async function buscarSensoresOffline() {
+function gerarValorAcimaDoLimite(sensor, campoIdeal, campoLimite, campoDesvio, incrementoMinimo) {
+  const ideal = Number(sensor[campoIdeal]);
+  const limite = Number(sensor[campoLimite]);
+  const desvioMaximo = Number(sensor[campoDesvio]);
+  const idealSeguro = Number.isFinite(ideal) ? ideal : 0;
+  const base = Number.isFinite(limite) && limite > idealSeguro
+    ? limite
+    : idealSeguro + (Number.isFinite(desvioMaximo) && desvioMaximo > 0 ? desvioMaximo : incrementoMinimo);
+  const incremento = Math.max(Math.abs(base) * 0.08, incrementoMinimo);
+
+  return arredondar(base + incremento + numeroAleatorioEntre(0, incremento));
+}
+
+function gerarLeituraComAlerta(sensor) {
+  return {
+    sensorId: sensor.id,
+    temperatura: gerarValorAcimaDoLimite(
+      sensor,
+      "idealTemperatura",
+      "limiteTemperatura",
+      "desvioMaximoTemp",
+      1
+    ),
+    vibracao: gerarValorAcimaDoLimite(
+      sensor,
+      "idealVibracao",
+      "limiteVibracao",
+      "desvioMaximoVibra",
+      0.1
+    )
+  };
+}
+
+async function buscarSensoresDisponiveis() {
   return prisma.sensor.findMany({
-    where: { status: "OFFLINE" },
+    where: { status: { not: "INATIVO" } },
     include: { maquina: true },
     orderBy: { id: "asc" }
   });
 }
 
 async function atualizarSensoresEmSimulacao() {
-  const sensoresOffline = await buscarSensoresOffline();
+  const sensoresDisponiveis = await buscarSensoresDisponiveis();
 
-  for (const sensor of sensoresOffline) {
+  for (const sensor of sensoresDisponiveis) {
     if (!sensoresEmSimulacao.has(sensor.id)) {
       sensoresEmSimulacao.set(sensor.id, {
         sensor,
@@ -150,12 +187,18 @@ async function atualizarSensoresEmSimulacao() {
     }
   }
 
-  return sensoresOffline.length;
+  for (const sensorId of sensoresEmSimulacao.keys()) {
+    if (!sensoresDisponiveis.some((sensor) => sensor.id === sensorId)) {
+      sensoresEmSimulacao.delete(sensorId);
+    }
+  }
+
+  return sensoresDisponiveis.length;
 }
 
-async function processarLeituraSimulada(estado) {
+async function processarLeituraSimulada(estado, forcarAlerta = false) {
   const sensor = estado.sensor;
-  const dadosLeitura = gerarLeitura(estado);
+  const dadosLeitura = forcarAlerta ? gerarLeituraComAlerta(sensor) : gerarLeitura(estado);
   const novaLeitura = await leituraService.processarNovaLeitura(dadosLeitura);
 
   estado.ciclos += 1;
@@ -195,11 +238,11 @@ async function simularCiclo() {
       cronExpression: EXPRESSAO_CRON
     });
 
-    const sensoresOffline = await atualizarSensoresEmSimulacao();
+    const sensoresDisponiveis = await atualizarSensoresEmSimulacao();
 
     if (sensoresEmSimulacao.size === 0) {
       logger.info("simulador_cycle_finished", {
-        sensoresOffline,
+        sensoresDisponiveis,
         leiturasGeradas: 0,
         durationMs: Date.now() - startedAt
       });
@@ -207,24 +250,24 @@ async function simularCiclo() {
     }
 
     let leiturasGeradas = 0;
+    const estadoAleatorio = escolherItemAleatorio([...sensoresEmSimulacao.values()]);
 
-    for (const estado of sensoresEmSimulacao.values()) {
-      try {
-        await processarLeituraSimulada(estado);
-        leiturasGeradas += 1;
-      } catch (error) {
-        logger.error("simulador_sensor_processing_error", {
-          sensorId: estado.sensor.id,
-          maquinaId: estado.sensor.maquinaId,
-          maquinaNome: estado.sensor.maquina?.nome ?? null,
-          error
-        });
-      }
+    try {
+      await processarLeituraSimulada(estadoAleatorio, true);
+      leiturasGeradas += 1;
+    } catch (error) {
+      logger.error("simulador_sensor_processing_error", {
+        sensorId: estadoAleatorio.sensor.id,
+        maquinaId: estadoAleatorio.sensor.maquinaId,
+        maquinaNome: estadoAleatorio.sensor.maquina?.nome ?? null,
+        error
+      });
     }
 
     logger.info("simulador_cycle_finished", {
-      sensoresOffline,
+      sensoresDisponiveis,
       leiturasGeradas,
+      sensorAleatorioId: estadoAleatorio.sensor.id,
       durationMs: Date.now() - startedAt
     });
   } catch (error) {
