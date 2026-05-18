@@ -78,6 +78,34 @@ class AlertaModel {
         });
     }
 
+    static async findAllEventos() {
+        return await prisma.alertaEvento.findMany({
+            include: {
+                alerta: {
+                    include: {
+                        sensor: true,
+                        maquina: true,
+                        tecnico: { select: { id: true, nome: true, email: true, role: true } }
+                    }
+                },
+                usuario: { select: { id: true, nome: true, email: true, role: true } },
+                manutencao: true
+            },
+            orderBy: { criadoEm: 'desc' }
+        });
+    }
+
+    static async findEventosByAlertaId(alertaId) {
+        return await prisma.alertaEvento.findMany({
+            where: { alertaId: parseInt(alertaId) },
+            include: {
+                usuario: { select: { id: true, nome: true, email: true, role: true } },
+                manutencao: true
+            },
+            orderBy: { criadoEm: 'desc' }
+        });
+    }
+
     static async countMaquinasWithAlerta() {
         const alerta = await prisma.alerta.findMany({
             where: { status: 'ATIVO' },

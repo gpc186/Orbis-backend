@@ -151,6 +151,35 @@ class AlertaService {
       return alerta;
     } catch (error) {
       throw new AppError("Erro ao buscar alerta.", 500);
+
+    static async findAllEventos() {
+        try {
+            return await AlertaModel.findAllEventos();
+        } catch (error) {
+            throw new AppError("Erro ao buscar eventos de alerta.", 500);
+        }
+    }
+
+    static async findEventosByAlertaId(id) {
+        try {
+            const alerta = await AlertaModel.findById(id);
+            if (!alerta) throw new AppError("Alerta nÃ£o encontrada.", 404);
+
+            return await AlertaModel.findEventosByAlertaId(id);
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            throw new AppError("Erro ao buscar eventos do alerta.", 500);
+        }
+    }
+
+    static async findById(id) {
+        try {
+            const alerta = await AlertaModel.findById(id);
+            if (!alerta) throw new AppError("Alerta não encontrada.", 404);
+            return alerta;
+        } catch (error) {
+            throw new AppError("Erro ao buscar alerta.", 500);
+        }
     }
   }
 }
