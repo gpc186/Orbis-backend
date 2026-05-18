@@ -1,4 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient } = require("@prisma/client");
+const logger = require("../utils/logger");
+
 const prismaRaw = new PrismaClient();
 
 const MAX_RETRIES = 4;
@@ -6,34 +8,45 @@ const INITIAL_DELAY = 1000;
 
 /** @type {PrismaClient} */
 const prisma = prismaRaw.$extends({
-    query: {
-        $allModels: {
-            async $allOperations({ model, operation, args, query }){
-                let lastError;
-                for(let attempt = 1; attempt <= MAX_RETRIES; attempt++){
-                    try {
-                        return await query(args);
-                    } catch (error) {
-                        lastError = error;
-                        const isConnectionError = error.code === 'P1001' || error.code === 'P1017' || error.message.includes('timeout');
+  query: {
+    $allModels: {
+      async $allOperations({ model, operation, args, query }) {
+        let lastError;
 
-                        if(isConnectionError && attempt < MAX_RETRIES){
-                            await prismaRaw.$disconnect();
-                            const delay = INITIAL_DELAY * Math.pow(2, attempt - 1) + Math.random() * 1000;
-                            
-                            console.warn(`[Prisma] Tentativa ${attempt} falhou em ${model}.${operation}. Tentando em ${delay}ms...`);
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            return await query(args);
+          } catch (error) {
+            lastError = error;
+            const isConnectionError =
+              error.code === "P1001" ||
+              error.code === "P1017" ||
+              error.message.includes("timeout");
 
-                            await new Promise((resolve) => setTimeout(resolve, delay));
-                            continue
-                        };
+            if (isConnectionError && attempt < MAX_RETRIES) {
+              await prismaRaw.$disconnect();
+              const delay = INITIAL_DELAY * Math.pow(2, attempt - 1) + Math.random() * 1000;
 
-                        throw error;
-                    }
-                }
-                throw lastError
+              logger.warn("prisma_retry_scheduled", {
+                model,
+                operation,
+                attempt,
+                delayMs: Math.round(delay),
+                error
+              });
+
+              await new Promise((resolve) => setTimeout(resolve, delay));
+              continue;
             }
+
+            throw error;
+          }
         }
+
+        throw lastError;
+      }
     }
-})
+  }
+});
 
 module.exports = prisma;

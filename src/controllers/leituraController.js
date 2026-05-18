@@ -1,37 +1,41 @@
-const leituraService = require('../services/leituraService')
+const leituraService = require("../services/leituraService");
+const logger = require("../utils/logger");
 
 class LeituraController {
-    static async store(req, res, next) {
-        try {
-            console.log("Conteúdo recebido:", req.body);
-            const { sensorId, temperatura, vibracao } = req.body;
-            // Validação corrigida: verifica se os campos existem (mesmo que sejam 0)
-            if (sensorId === undefined || temperatura === undefined || vibracao === undefined) {
-                return res.status(400).json({ error: "Dados incompletos" });
-            }
+  static async store(req, res, next) {
+    try {
+      const { sensorId, temperatura, vibracao } = req.body;
 
-            const novaLeitura = await leituraService.processarNovaLeitura(req.body)
+      logger.info("leitura_received", {
+        requestId: req.requestId || null,
+        sensorId: sensorId ?? null
+      });
 
-            const io = req.app.get('io')
-            if (io) io.emit('nova-leitura', novaLeitura)
+      if (sensorId === undefined || temperatura === undefined || vibracao === undefined) {
+        return res.status(400).json({ error: "Dados incompletos" });
+      }
 
-            return res.status(201).json(novaLeitura);
-        } catch (error) {
-            next(error)
-        }
+      const novaLeitura = await leituraService.processarNovaLeitura({ sensorId, temperatura, vibracao });
+      const io = req.app.get("io");
+
+      if (io) {
+        io.emit("nova-leitura", novaLeitura);
+      }
+
+      return res.status(201).json(novaLeitura);
+    } catch (error) {
+      next(error);
     }
-    static async index(req, res, next) {
-        try {
-            const leituras = await leituraService.index()
-            return res.json(leituras.reverse())
-        } catch (error) {
-            next(error)
-        }
+  }
+
+  static async index(req, res, next) {
+    try {
+      const leituras = await leituraService.index();
+      return res.json(leituras.reverse());
+    } catch (error) {
+      next(error);
     }
-
-
+  }
 }
-
-
 
 module.exports = LeituraController;
