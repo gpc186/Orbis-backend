@@ -60,11 +60,20 @@ class AlertaService {
   static async notificarNovoAlerta(alertaId) {
     const alerta = await AlertaModel.findById(alertaId);
     if (!alerta) {
+      logger.warn("alerta_notification_skipped", {
+        alertaId,
+        reason: "alerta_not_found"
+      });
       return;
     }
 
     const maquina = await MaquinaModel.findById(alerta.maquinaId);
     if (!maquina) {
+      logger.warn("alerta_notification_skipped", {
+        alertaId,
+        maquinaId: alerta.maquinaId,
+        reason: "maquina_not_found"
+      });
       return;
     }
 
@@ -72,6 +81,11 @@ class AlertaService {
     const oneSignalIds = [...new Set(destinatarios.map((usuario) => usuario.oneSignalId).filter(Boolean))];
 
     if (oneSignalIds.length === 0) {
+      logger.info("alerta_notification_skipped", {
+        alertaId,
+        maquinaId: alerta.maquinaId,
+        reason: "no_recipients"
+      });
       return;
     }
 
@@ -97,6 +111,7 @@ class AlertaService {
     try {
       return await AlertaModel.countMaquinasWithAlerta();
     } catch (error) {
+      logger.error("alerta_count_maquinas_error", { error });
       throw new AppError("Erro ao contar maquinas com alerta.", 500);
     }
   }
@@ -105,6 +120,7 @@ class AlertaService {
     try {
       return await AlertaModel.countActiveAlertas();
     } catch (error) {
+      logger.error("alerta_count_active_error", { error });
       throw new AppError("Erro ao contar alertas ativos.", 500);
     }
   }
@@ -115,6 +131,7 @@ class AlertaService {
       hoje.setHours(0, 0, 0, 0);
       return await AlertaModel.countAlertasToday(hoje);
     } catch (error) {
+      logger.error("alerta_count_today_error", { error });
       throw new AppError("Erro ao contar alertas de hoje.", 500);
     }
   }
@@ -123,6 +140,7 @@ class AlertaService {
     try {
       return await AlertaModel.countAlertaSemAtendimento();
     } catch (error) {
+      logger.error("alerta_count_sem_atendimento_error", { error });
       throw new AppError("Erro ao contar alertas sem atendimento.", 500);
     }
   }
@@ -133,12 +151,43 @@ class AlertaService {
       hoje.setHours(0, 0, 0, 0);
       return await AlertaModel.countAtendedToday(hoje);
     } catch (error) {
+      logger.error("alerta_count_atendidos_hoje_error", { error });
       throw new AppError("Erro ao contar alertas atendidos hoje.", 500);
     }
   }
 
   static async findAll() {
     return await AlertaModel.findAll();
+  }
+
+  static async findAllEventos() {
+    try {
+      return await AlertaModel.findAllEventos();
+    } catch (error) {
+      logger.error("alerta_find_all_eventos_error", { error });
+      throw new AppError("Erro ao buscar eventos de alerta.", 500);
+    }
+  }
+
+  static async findEventosByAlertaId(id) {
+    try {
+      const alerta = await AlertaModel.findById(id);
+      if (!alerta) {
+        throw new AppError("Alerta nao encontrada.", 404);
+      }
+
+      return await AlertaModel.findEventosByAlertaId(id);
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      logger.error("alerta_find_eventos_by_id_error", {
+        alertaId: id,
+        error
+      });
+      throw new AppError("Erro ao buscar eventos do alerta.", 500);
+    }
   }
 
   static async findById(id) {
@@ -150,36 +199,15 @@ class AlertaService {
 
       return alerta;
     } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      logger.error("alerta_find_by_id_error", {
+        alertaId: id,
+        error
+      });
       throw new AppError("Erro ao buscar alerta.", 500);
-
-    static async findAllEventos() {
-        try {
-            return await AlertaModel.findAllEventos();
-        } catch (error) {
-            throw new AppError("Erro ao buscar eventos de alerta.", 500);
-        }
-    }
-
-    static async findEventosByAlertaId(id) {
-        try {
-            const alerta = await AlertaModel.findById(id);
-            if (!alerta) throw new AppError("Alerta nÃ£o encontrada.", 404);
-
-            return await AlertaModel.findEventosByAlertaId(id);
-        } catch (error) {
-            if (error instanceof AppError) throw error;
-            throw new AppError("Erro ao buscar eventos do alerta.", 500);
-        }
-    }
-
-    static async findById(id) {
-        try {
-            const alerta = await AlertaModel.findById(id);
-            if (!alerta) throw new AppError("Alerta não encontrada.", 404);
-            return alerta;
-        } catch (error) {
-            throw new AppError("Erro ao buscar alerta.", 500);
-        }
     }
   }
 }
