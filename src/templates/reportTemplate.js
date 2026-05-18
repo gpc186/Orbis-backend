@@ -1,3 +1,5 @@
+const LOGO_URL = "https://iyoztaljmpklixtftsub.supabase.co/storage/v1/object/public/email-images/LogoBrancaGrande.svg";
+
 function esc(value) {
   if (value == null) return "";
 
@@ -22,6 +24,20 @@ function formatarData(value) {
   });
 }
 
+function formatarDataCurta(value) {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value).slice(5).replace("-", "/") || "-";
+  }
+
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit"
+  });
+}
+
 function formatarDataHora(value) {
   const date = new Date(value);
 
@@ -36,7 +52,7 @@ function formatarDataHora(value) {
   });
 }
 
-function renderSectionTitle(label) {
+function renderSectionTitle(label, subtitle = "") {
   return `
     <table width="100%" cellpadding="0" cellspacing="0" border="0"
            style="border-bottom:1px solid #d6d3d1;padding-bottom:4px;">
@@ -46,6 +62,9 @@ function renderSectionTitle(label) {
                     letter-spacing:0.18em;color:#44403c;">
             ${esc(label)}
           </p>
+          ${subtitle
+            ? `<p style="margin:6px 0 0;font-size:11px;color:#78716c;">${esc(subtitle)}</p>`
+            : ""}
         </td>
       </tr>
     </table>`;
@@ -81,21 +100,6 @@ function renderTh(label, right = false) {
                      border-bottom:1px solid #e7e5e4;">
             ${esc(label)}
           </th>`;
-}
-
-function renderCriticidadeBadge(value) {
-  const labels = { ALTA: "Alta", MEDIA: "Media", BAIXA: "Baixa" };
-  const styles = {
-    ALTA: "background:#fafaf9;color:#1c1917;",
-    MEDIA: "background:#ffffff;color:#44403c;",
-    BAIXA: "background:#ffffff;color:#57534e;"
-  };
-
-  return `<span style="display:inline-block;padding:2px 8px;font-size:10px;
-                       font-weight:500;border:1px solid #d6d3d1;
-                       ${styles[value] || styles.MEDIA}">
-            ${esc(labels[value] || value)}
-          </span>`;
 }
 
 function renderPlainStatusBadge(value) {
@@ -222,37 +226,135 @@ function renderChamadosTable(chamados, faltantes) {
     </tbody>`;
 }
 
-function renderHistoricoTendenciaTable(points, faltantes) {
-  if (!points.length) {
-    return renderEstado("Nenhum ponto de tendencia encontrado.", 2);
+function renderLogo() {
+  return `
+    <table cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td style="font-size:0;line-height:0;">
+          <img
+            src="${esc(LOGO_URL)}"
+            alt="Orbis"
+            width="128"
+            style="display:block;width:128px;max-width:128px;height:auto;border:0;outline:none;text-decoration:none;"
+          />
+        </td>
+      </tr>
+      <tr>
+        <td style="padding-top:6px;">
+          <p style="margin:0;font-size:11px;line-height:1.4;color:#d6d3d1;">
+            Caso a imagem nao carregue, considere a marca Orbis.
+          </p>
+        </td>
+      </tr>
+    </table>`;
+}
+
+function getTimelineCircleColor(quantidade, maiorQuantidade) {
+  if (quantidade <= 0) {
+    return {
+      background: "#bbf7d0",
+      border: "#22c55e",
+      text: "#166534"
+    };
   }
 
+  const intensity = maiorQuantidade <= 1
+    ? 1
+    : quantidade / maiorQuantidade;
+
+  if (intensity >= 0.85) {
+    return {
+      background: "#6d28d9",
+      border: "#5b21b6",
+      text: "#ffffff"
+    };
+  }
+
+  if (intensity >= 0.5) {
+    return {
+      background: "#8b5cf6",
+      border: "#7c3aed",
+      text: "#ffffff"
+    };
+  }
+
+  return {
+    background: "#c4b5fd",
+    border: "#8b5cf6",
+    text: "#4c1d95"
+  };
+}
+
+function renderTimelineCircle(quantidade, maiorQuantidade) {
+  const colors = getTimelineCircleColor(quantidade, maiorQuantidade);
+
   return `
-    <thead>
-      <tr style="background:#fafaf9;">
-        ${renderTh("Data")}
-        ${renderTh("Quantidade", true)}
+    <table align="center" cellpadding="0" cellspacing="0" border="0"
+           style="border-collapse:separate;">
+      <tr>
+        <td width="28" height="28" align="center" valign="middle"
+            style="width:28px;height:28px;border-radius:28px;background:${colors.background};border:2px solid ${colors.border};font-size:11px;line-height:1;font-weight:700;color:${colors.text};">
+          ${esc(quantidade)}
+        </td>
       </tr>
-    </thead>
-    <tbody>
-      ${points.map((item) => `
-        <tr>
-          <td style="padding:9px 12px;font-size:11px;border-bottom:1px solid #f5f5f4;color:#1c1917;">
-            ${esc(item.data)}
-          </td>
-          <td style="padding:9px 12px;font-size:11px;border-bottom:1px solid #f5f5f4;color:#1c1917;text-align:right;font-weight:600;">
-            ${esc(item.quantidade)}
-          </td>
-        </tr>
-      `).join("")}
-      ${faltantes > 0
-        ? `<tr>
-             <td colspan="2" style="padding:9px 12px;font-size:11px;border-bottom:1px solid #f5f5f4;text-align:center;background:#fafaf9;color:#78716c;">
-               + ${faltantes} pontos nao exibidos.
-             </td>
-           </tr>`
-        : ""}
-    </tbody>`;
+    </table>`;
+}
+
+function renderHistoricoTendenciaTimeline(points) {
+  if (!points.length) {
+    return `
+      <table width="100%" cellpadding="0" cellspacing="0" border="0"
+             style="margin-top:12px;border:1px solid #e7e5e4;border-collapse:collapse;">
+        ${renderEstado("Nenhum ponto de tendencia encontrado.", 7)}
+      </table>`;
+  }
+
+  const timelinePoints = points.slice(-7);
+  const maiorQuantidade = Math.max(...timelinePoints.map((item) => Number(item.quantidade || 0)), 0);
+
+  return `
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="margin-top:12px;border:1px solid #e7e5e4;background:#ffffff;">
+      <tr>
+        <td style="padding:18px 20px 8px;">
+          <p style="margin:0;font-size:11px;color:#78716c;">
+            Ultimos 7 dias
+          </p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:0 18px 18px;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;">
+            <tr>
+              ${timelinePoints.map((item) => `
+                <td align="center" valign="bottom" style="padding:0 4px 8px;">
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#1c1917;">
+                    ${esc(formatarDataCurta(item.data))}
+                  </p>
+                  <p style="margin:0;font-size:10px;color:#78716c;">
+                    ${esc(`${item.quantidade} alerta${Number(item.quantidade) === 1 ? "" : "s"}`)}
+                  </p>
+                </td>
+              `).join("")}
+            </tr>
+            <tr>
+              ${timelinePoints.map((item) => {
+                const quantidade = Number(item.quantidade || 0);
+                const colors = getTimelineCircleColor(quantidade, maiorQuantidade);
+
+                return `
+                  <td align="center" valign="middle" style="padding:2px 4px;">
+                    ${renderTimelineCircle(quantidade, maiorQuantidade)}
+                    <p style="margin:8px 0 0;font-size:10px;font-weight:600;color:${colors.border};">
+                      ${esc(quantidade > 0 ? "Com alerta" : "Sem alerta")}
+                    </p>
+                  </td>`;
+              }).join("")}
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>`;
 }
 
 function buildStatusLabel(integridadeMedia) {
@@ -284,8 +386,7 @@ function gerarRelatorioHTML({ data = {}, config = {} }) {
   const statusLabel = buildStatusLabel(integridadeMedia);
   const chamadosVisiveis = chamados ? chamados.slice(0, 10) : [];
   const chamadosFaltantes = chamados ? chamados.length - chamadosVisiveis.length : 0;
-  const historicoVisivel = historicoTendencia ? historicoTendencia.slice(0, 30) : [];
-  const historicoFaltante = historicoTendencia ? historicoTendencia.length - historicoVisivel.length : 0;
+  const historicoTimeline = historicoTendencia ? historicoTendencia.slice(-7) : [];
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -307,13 +408,30 @@ function gerarRelatorioHTML({ data = {}, config = {} }) {
              style="width:100%;max-width:680px;background:#ffffff;border:1px solid #e7e5e4;">
 
         <tr>
-          <td style="padding:28px 32px 20px;border-bottom:1px solid #d6d3d1;">
+          <td style="padding:18px 32px;background:#1c1917;border-bottom:1px solid #312e2b;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td valign="middle">
+                  ${renderLogo()}
+                </td>
+                <td valign="middle" align="right" style="padding-left:16px;">
+                  <p style="margin:0;font-size:10px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:#d6d3d1;">
+                    Relatorio operacional
+                  </p>
+                  <p style="margin:6px 0 0;font-size:11px;color:#a8a29e;">
+                    ${esc(periodoLabel)}
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:24px 32px 20px;border-bottom:1px solid #d6d3d1;">
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr>
                 <td valign="top">
-                  <p style="margin:0 0 14px;font-size:20px;font-weight:800;letter-spacing:-0.5px;color:#1c1917;">
-                    <span style="color:#8000ff;">&#9675;</span>rbis
-                  </p>
                   <p style="margin:0 0 4px;font-size:11px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:#1c1917;">
                     ${esc(titulo)}
                   </p>
@@ -373,7 +491,7 @@ function gerarRelatorioHTML({ data = {}, config = {} }) {
                   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
                     <tr>
                       ${pctIntegridade > 0
-                        ? `<td width="${pctIntegridade}%" height="8" style="background:#8000ff;font-size:0;line-height:0;">&nbsp;</td>`
+                        ? `<td width="${pctIntegridade}%" height="8" style="background:#7c3aed;font-size:0;line-height:0;">&nbsp;</td>`
                         : ""}
                       ${pctIntegridade < 100
                         ? `<td width="${100 - pctIntegridade}%" height="8" style="background:#e7e5e4;font-size:0;line-height:0;">&nbsp;</td>`
@@ -441,11 +559,8 @@ function gerarRelatorioHTML({ data = {}, config = {} }) {
         ${historicoTendencia ? `
         <tr>
           <td style="padding:24px 32px 0;">
-            ${renderSectionTitle("Historico de Tendencia")}
-            <table width="100%" cellpadding="0" cellspacing="0" border="0"
-                   style="margin-top:12px;border:1px solid #e7e5e4;border-collapse:collapse;">
-              ${renderHistoricoTendenciaTable(historicoVisivel, historicoFaltante)}
-            </table>
+            ${renderSectionTitle("Historico de Tendencia", "Ultimos 7 dias")}
+            ${renderHistoricoTendenciaTimeline(historicoTimeline)}
           </td>
         </tr>` : ""}
 
@@ -459,8 +574,8 @@ function gerarRelatorioHTML({ data = {}, config = {} }) {
                   </p>
                 </td>
                 <td align="right" valign="middle">
-                  <span style="font-size:16px;font-weight:800;color:#8000ff;letter-spacing:-0.3px;">
-                    &#9675;rbis
+                  <span style="font-size:12px;font-weight:700;color:#57534e;letter-spacing:0.08em;text-transform:uppercase;">
+                    Orbis
                   </span>
                 </td>
               </tr>

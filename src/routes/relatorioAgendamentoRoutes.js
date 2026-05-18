@@ -9,6 +9,7 @@ router.post('/agendamentos', authMiddleware, RelatorioAgendamentoController.crea
 router.get('/agendamentos', authMiddleware, RelatorioAgendamentoController.list);
 router.get('/agendamentos/:id', authMiddleware, RelatorioAgendamentoController.findById);
 router.patch('/agendamentos/:id', authMiddleware, RelatorioAgendamentoController.update);
+router.delete('/agendamentos/:id', authMiddleware, RelatorioAgendamentoController.delete);
 router.patch('/agendamentos/:id/status', authMiddleware, RelatorioAgendamentoController.updateStatus);
 router.post('/agendamentos/:id/executar-agora', authMiddleware, RelatorioAgendamentoController.executeNow);
 router.get('/agendamentos/:id/execucoes', authMiddleware, RelatorioAgendamentoController.listExecutions);
