@@ -4,10 +4,8 @@ const RelatorioExecucaoService = require("../services/relatorioExecucaoService")
 class RelatorioAgendamentoController {
   static async preview(req, res, next) {
     try {
-      const {
-        body: { nome, assunto, periodo, filtros },
-        usuario
-      } = req;
+      const { nome, assunto, periodo, filtros } = req.body;
+      const { usuario } = req;
 
       const result = await RelatorioAgendamentoService.preview({
         usuario,
@@ -22,10 +20,8 @@ class RelatorioAgendamentoController {
 
   static async create(req, res, next) {
     try {
-      const {
-        body: { nome, emailsDestino, assunto, periodo, filtros, agendamento },
-        usuario
-      } = req;
+      const { nome, emailsDestino, assunto, periodo, filtros, agendamento } = req.body;
+      const { usuario } = req;
 
       const result = await RelatorioAgendamentoService.create({
         usuario,
@@ -50,10 +46,8 @@ class RelatorioAgendamentoController {
 
   static async findById(req, res, next) {
     try {
-      const {
-        params: { id },
-        usuario
-      } = req;
+      const { id } = req.params;
+      const { usuario } = req;
 
       const result = await RelatorioAgendamentoService.findById({ usuario, id });
 
@@ -65,11 +59,9 @@ class RelatorioAgendamentoController {
 
   static async update(req, res, next) {
     try {
-      const {
-        params: { id },
-        body: { nome, emailsDestino, assunto, periodo, filtros, agendamento },
-        usuario
-      } = req;
+      const { id } = req.params;
+      const { nome, emailsDestino, assunto, periodo, filtros, agendamento } = req.body;
+      const { usuario } = req;
 
       const result = await RelatorioAgendamentoService.update({
         usuario,
@@ -85,11 +77,9 @@ class RelatorioAgendamentoController {
 
   static async updateStatus(req, res, next) {
     try {
-      const {
-        params: { id },
-        body: { status },
-        usuario
-      } = req;
+      const { id } = req.params;
+      const { status } = req.body;
+      const { usuario } = req;
 
       const result = await RelatorioAgendamentoService.updateStatus({ usuario, id, payload: { status } });
       return res.status(200).json({ message: "Status do agendamento atualizado com sucesso.", ...result });
@@ -100,10 +90,8 @@ class RelatorioAgendamentoController {
 
   static async executeNow(req, res, next) {
     try {
-      const {
-        params: { id },
-        usuario
-      } = req;
+      const { id } = req.params;
+      const { usuario } = req;
 
       const result = await RelatorioAgendamentoService.executeNow({ usuario, id });
       return res.status(200).json({ message: "Execucao manual do agendamento concluida.", ...result });
@@ -114,10 +102,8 @@ class RelatorioAgendamentoController {
 
   static async listExecutions(req, res, next) {
     try {
-      const {
-        params: { id },
-        usuario
-      } = req;
+      const { id } = req.params;
+      const { usuario } = req;
 
       const result = await RelatorioExecucaoService.listExecutions({ id, usuario });
       return res.status(200).json(result);

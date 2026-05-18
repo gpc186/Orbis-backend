@@ -3,10 +3,8 @@ const RelatorioExecucaoService = require("../services/relatorioExecucaoService")
 class RelatorioController {
   static async enviarAgora(req, res, next) {
     try {
-      const {
-        body: { emailsDestino, assunto, nome, periodo, filtros },
-        usuario
-      } = req;
+      const { emailsDestino, assunto, nome, periodo, filtros } = req.body;
+      const { usuario } = req;
 
       const result = await RelatorioExecucaoService.executarManual({
         usuario,

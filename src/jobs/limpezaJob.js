@@ -1,10 +1,30 @@
 const cron = require("node-cron");
 const LeituraModel = require("../models/leituraModel");
+const logger = require("../utils/logger");
 
-cron.schedule('0 0 * * *', async () => {
-    const trintaDiasAtras = new Date()
+const cronExpression = "0 0 * * *";
+
+cron.schedule(cronExpression, async () => {
+  const startedAt = Date.now();
+
+  try {
+    logger.info("limpeza_job_started", {
+      cronExpression
+    });
+
+    const trintaDiasAtras = new Date();
     trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
 
     const quantidadeDeletada = await LeituraModel.limpeza(trintaDiasAtras);
-    console.log(`Foram deletadas ${quantidadeDeletada.count} leituras do banco de dados por terem ultrapassado o periodo de 30 dias`);  
+
+    logger.info("limpeza_job_finished", {
+      leiturasDeletadas: quantidadeDeletada.count,
+      durationMs: Date.now() - startedAt
+    });
+  } catch (error) {
+    logger.error("limpeza_job_error", {
+      durationMs: Date.now() - startedAt,
+      error
+    });
+  }
 });

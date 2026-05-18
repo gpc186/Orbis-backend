@@ -1,5 +1,6 @@
 const { Resend } = require("resend");
 const AppError = require("../utils/appErrorUtils");
+const logger = require("../utils/logger");
 
 class EmailService {
   static getConfig() {
@@ -59,7 +60,7 @@ class EmailService {
       });
 
       if (response?.error) {
-        console.error("[email][provider_error]", {
+        logger.error("email_provider_error", {
           provider: "resend",
           statusCode: response.error.statusCode,
           name: response.error.name,
@@ -75,7 +76,7 @@ class EmailService {
       const messageId = response?.data?.id ?? null;
 
       if (!messageId) {
-        console.error("[email][missing_message_id]", {
+        logger.error("email_missing_message_id", {
           provider: "resend",
           from,
           toCount: Array.isArray(to) ? to.length : 1
@@ -89,10 +90,10 @@ class EmailService {
         messageId
       };
     } catch (error) {
-      console.error("[email][send_error]", {
-        name: error?.name,
-        message: error?.message,
-        statusCode: error?.statusCode || error?.status
+      logger.error("email_send_error", {
+        provider: "resend",
+        statusCode: error?.statusCode || error?.status || 502,
+        error
       });
 
       if (error instanceof AppError) {
