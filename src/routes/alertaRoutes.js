@@ -6,6 +6,7 @@ const router = express.Router();
 router.get('/resumo', authMiddleware, AlertaController.summary);
 router.get('/eventos', authMiddleware, AlertaController.listEventos);
 router.get('/', authMiddleware, AlertaController.list);
+router.get('/:id/eventos', authMiddleware, AlertaController.listEventosByAlertaId);
 router.get('/:id', authMiddleware, AlertaController.findById);
 
 module.exports = router;

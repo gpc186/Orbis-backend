@@ -95,6 +95,17 @@ class AlertaModel {
         });
     }
 
+    static async findEventosByAlertaId(alertaId) {
+        return await prisma.alertaEvento.findMany({
+            where: { alertaId: parseInt(alertaId) },
+            include: {
+                usuario: { select: { id: true, nome: true, email: true, role: true } },
+                manutencao: true
+            },
+            orderBy: { criadoEm: 'desc' }
+        });
+    }
+
     static async countMaquinasWithAlerta() {
         const alerta = await prisma.alerta.findMany({
             where: { status: 'ATIVO' },
