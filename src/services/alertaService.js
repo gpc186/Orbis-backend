@@ -129,6 +129,18 @@ class AlertaService {
         }
     }
 
+    static async findEventosByAlertaId(id) {
+        try {
+            const alerta = await AlertaModel.findById(id);
+            if (!alerta) throw new AppError("Alerta nÃ£o encontrada.", 404);
+
+            return await AlertaModel.findEventosByAlertaId(id);
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            throw new AppError("Erro ao buscar eventos do alerta.", 500);
+        }
+    }
+
     static async findById(id) {
         try {
             const alerta = await AlertaModel.findById(id);
