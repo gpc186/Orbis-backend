@@ -75,6 +75,22 @@ class RelatorioAgendamentoController {
     }
   }
 
+  static async delete(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { usuario } = req;
+
+      const result = await RelatorioAgendamentoService.delete({ usuario, id });
+
+      return res.status(200).json({
+        message: "Agendamento de relatorio deletado com sucesso.",
+        ...result
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   static async updateStatus(req, res, next) {
     try {
       const { id } = req.params;

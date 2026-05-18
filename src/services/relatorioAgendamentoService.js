@@ -135,6 +135,22 @@ class RelatorioAgendamentoService {
     return this.mapResponse(agendamento);
   }
 
+  static async delete({ usuario, id }) {
+    this.assertAdmin(usuario);
+
+    const current = await RelatorioAgendamentoModel.findById(id);
+    if (!current) {
+      throw new AppError("Agendamento de relatorio nao encontrado.", 404);
+    }
+
+    await RelatorioAgendamentoModel.delete(id);
+
+    return {
+      id: Number(id),
+      nome: current.nome
+    };
+  }
+
   static async executeNow({ usuario, id }) {
     this.assertAdmin(usuario);
     return RelatorioExecucaoService.executarAgendamento(id);

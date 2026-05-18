@@ -78,6 +78,12 @@ class RelatorioAgendamentoModel {
     });
   }
 
+  static async delete(id) {
+    return prisma.relatorioAgendamento.delete({
+      where: { id: Number(id) }
+    });
+  }
+
   static async listDue(referenceDate, limit = 20) {
     return prisma.relatorioAgendamento.findMany({
       where: {
