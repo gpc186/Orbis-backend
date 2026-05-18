@@ -4,6 +4,7 @@ const AlertaController = require('../controllers/alertaController');
 const router = express.Router();
 
 router.get('/resumo', authMiddleware, AlertaController.summary);
+router.get('/eventos', authMiddleware, AlertaController.listEventos);
 router.get('/', authMiddleware, AlertaController.list);
 router.get('/:id', authMiddleware, AlertaController.findById);
 

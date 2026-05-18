@@ -121,6 +121,14 @@ class AlertaService {
         return await AlertaModel.findAll();
     }
 
+    static async findAllEventos() {
+        try {
+            return await AlertaModel.findAllEventos();
+        } catch (error) {
+            throw new AppError("Erro ao buscar eventos de alerta.", 500);
+        }
+    }
+
     static async findById(id) {
         try {
             const alerta = await AlertaModel.findById(id);

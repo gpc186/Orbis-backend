@@ -27,6 +27,15 @@ class AlertaController {
         }
     }
 
+    static async listEventos(req, res, next) {
+        try {
+            const eventos = await AlertaService.findAllEventos();
+            return res.status(200).json(eventos);
+        } catch (error) {
+            next(error);
+        }
+    }
+
     static async findById(req, res, next) {
         try {
             const { id } = req.params;
