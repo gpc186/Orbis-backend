@@ -196,7 +196,7 @@ async function atualizarSensoresEmSimulacao() {
   return sensoresDisponiveis.length;
 }
 
-async function processarLeituraSimulada(estado, forcarAlerta = false) {
+async function processarLeituraSimulada(estado, forcarAlerta = true) {
   const sensor = estado.sensor;
   const dadosLeitura = forcarAlerta ? gerarLeituraComAlerta(sensor) : gerarLeitura(estado);
   const novaLeitura = await leituraService.processarNovaLeitura(dadosLeitura);
