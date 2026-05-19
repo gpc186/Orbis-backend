@@ -253,7 +253,7 @@ async function simularCiclo() {
     const estadoAleatorio = escolherItemAleatorio([...sensoresEmSimulacao.values()]);
 
     try {
-      await processarLeituraSimulada(estadoAleatorio, true);
+      await processarLeituraSimulada(estadoAleatorio);
       leiturasGeradas += 1;
     } catch (error) {
       logger.error("simulador_sensor_processing_error", {
