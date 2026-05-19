@@ -196,7 +196,7 @@ async function atualizarSensoresEmSimulacao() {
   return sensoresDisponiveis.length;
 }
 
-async function processarLeituraSimulada(estado, forcarAlerta = false) {
+async function processarLeituraSimulada(estado, forcarAlerta = true) {
   const sensor = estado.sensor;
   const dadosLeitura = forcarAlerta ? gerarLeituraComAlerta(sensor) : gerarLeitura(estado);
   const novaLeitura = await leituraService.processarNovaLeitura(dadosLeitura);
@@ -253,7 +253,7 @@ async function simularCiclo() {
     const estadoAleatorio = escolherItemAleatorio([...sensoresEmSimulacao.values()]);
 
     try {
-      await processarLeituraSimulada(estadoAleatorio, false);
+      await processarLeituraSimulada(estadoAleatorio, true);
       leiturasGeradas += 1;
     } catch (error) {
       logger.error("simulador_sensor_processing_error", {
