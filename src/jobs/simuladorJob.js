@@ -37,6 +37,10 @@ function simuladorEstaAtivo() {
   return process.env.SIMULADOR_JOB_ATIVO !== "false";
 }
 
+function deveForcarAlertas() {
+  return process.env.SIMULADOR_FORCAR_ALERTAS === "true";
+}
+
 function numeroAleatorioEntre(min, max) {
   return Math.random() * (max - min) + min;
 }
@@ -196,7 +200,7 @@ async function atualizarSensoresEmSimulacao() {
   return sensoresDisponiveis.length;
 }
 
-async function processarLeituraSimulada(estado, forcarAlerta = true) {
+async function processarLeituraSimulada(estado, forcarAlerta = false) {
   const sensor = estado.sensor;
   const dadosLeitura = forcarAlerta ? gerarLeituraComAlerta(sensor) : gerarLeitura(estado);
   const novaLeitura = await leituraService.processarNovaLeitura(dadosLeitura);
@@ -253,7 +257,7 @@ async function simularCiclo() {
     const estadoAleatorio = escolherItemAleatorio([...sensoresEmSimulacao.values()]);
 
     try {
-      await processarLeituraSimulada(estadoAleatorio);
+      await processarLeituraSimulada(estadoAleatorio, deveForcarAlertas());
       leiturasGeradas += 1;
     } catch (error) {
       logger.error("simulador_sensor_processing_error", {
@@ -268,6 +272,7 @@ async function simularCiclo() {
       sensoresDisponiveis,
       leiturasGeradas,
       sensorAleatorioId: estadoAleatorio.sensor.id,
+      forcarAlertas: deveForcarAlertas(),
       durationMs: Date.now() - startedAt
     });
   } catch (error) {
@@ -297,7 +302,8 @@ function iniciarSimuladorJob(io) {
   logger.info("simulador_job_started", {
     cronExpression: EXPRESSAO_CRON,
     intervalMs: INTERVALO_MS,
-    degradacaoHoras: DEGRADACAO_HORAS
+    degradacaoHoras: DEGRADACAO_HORAS,
+    forcarAlertas: deveForcarAlertas()
   });
 
   jobAgendado = cron.schedule(EXPRESSAO_CRON, simularCiclo);
