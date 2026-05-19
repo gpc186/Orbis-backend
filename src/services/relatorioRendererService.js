@@ -1,13 +1,59 @@
 const { gerarRelatorioHTML } = require("../templates/reportTemplate");
 const RelatorioDataService = require("./relatorioDataService");
 
+const SECTION_LABELS = {
+  resumo: "Resumo",
+  desempenho: "Desempenho",
+  sensores: "Sensores",
+  chamados: "Chamados",
+  historicoTendencia: "Historico de tendencia"
+};
+
 class RelatorioRendererService {
   static buildEscopo(filtros = {}) {
     const maquinasIds = Array.isArray(filtros.maquinasIds) ? filtros.maquinasIds : [];
+    const sensoresIds = Array.isArray(filtros.sensoresIds) ? filtros.sensoresIds : [];
+    const usuariosIds = Array.isArray(filtros.usuariosIds) ? filtros.usuariosIds : [];
+    const secoes = Array.isArray(filtros.secoes) ? filtros.secoes : [];
 
-    if (maquinasIds.length === 0) return "Completo";
-    if (maquinasIds.length === 1) return "Maquina especifica";
-    return "Multiplas maquinas";
+    const abrangencia = [];
+    const secoesLabel = secoes
+      .map((secao) => SECTION_LABELS[secao] || secao)
+      .join(", ");
+
+    if (maquinasIds.length > 0) {
+      abrangencia.push(
+        maquinasIds.length === 1
+          ? "1 maquina filtrada"
+          : `${maquinasIds.length} maquinas filtradas`
+      );
+    }
+
+    if (sensoresIds.length > 0) {
+      abrangencia.push(
+        sensoresIds.length === 1
+          ? "1 sensor filtrado"
+          : `${sensoresIds.length} sensores filtrados`
+      );
+    }
+
+    if (usuariosIds.length > 0) {
+      abrangencia.push(
+        usuariosIds.length === 1
+          ? "1 tecnico filtrado"
+          : `${usuariosIds.length} tecnicos filtrados`
+      );
+    }
+
+    if (abrangencia.length === 0) {
+      abrangencia.push("Abrangencia completa");
+    }
+
+    if (!secoesLabel) {
+      return abrangencia.join(" · ");
+    }
+
+    return `${abrangencia.join(" · ")} · Secoes: ${secoesLabel}`;
   }
 
   static buildSubject({ nome, periodoLabel, assunto }) {

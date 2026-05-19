@@ -67,9 +67,13 @@ SUPABASE_SERVICE_ROLE="sua_service_role"
 JWT_EXPIRES_IN="30m"
 REFRESH_TOKEN_EXPIRES_IN_DAYS="7"
 ESP32_API_KEY="chave_do_esp32"
+REPORT_JOB_ENABLED=false
+REPORT_JOB_CRON="* * * * *"
 PORT=3333
 NODE_ENV="DEVELOPMENT"
 ```
+
+O fluxo de relatorios usa timezone fixo `America/Sao_Paulo`.
 
 ## Scripts
 
@@ -318,6 +322,7 @@ src/
 Ao iniciar o servidor, a aplicação também carrega:
 
 - `tendenciaJob`
+- `relatorioJob` com timezone fixo `America/Sao_Paulo`
 - `limpezaJob`
 - `sensorOfflineJob`
 

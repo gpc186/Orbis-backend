@@ -1,0 +1,279 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-05-19T00:00:00.000Z",
+  "__export_source": "codex:orbis-relatorios",
+  "resources": [
+    {
+      "_id": "wrk_orbis_relatorios",
+      "_type": "workspace",
+      "name": "Orbis Relatorios",
+      "description": "Colecao para validar preview, envio manual, agendamento, pausa/reativacao e execucoes de relatorios.",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_orbis_relatorios_base",
+      "_type": "environment",
+      "parentId": "wrk_orbis_relatorios",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:3333",
+        "token": "",
+        "agendamento_id": "",
+        "destino_email": "admin@orbis.local",
+        "report_hour": 14,
+        "report_minute": 35,
+        "report_name": "Teste diario",
+        "report_subject": "Teste relatorio",
+        "report_period_days": 7
+      }
+    },
+    {
+      "_id": "fld_relatorios_health",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_relatorios",
+      "name": "Health"
+    },
+    {
+      "_id": "req_health_ready",
+      "_type": "request",
+      "parentId": "fld_relatorios_health",
+      "name": "Ready",
+      "method": "GET",
+      "url": "{{ _.base_url }}/ready",
+      "headers": [],
+      "body": {},
+      "description": "Confere se o servico de relatorios esta habilitado e exibe o timezone fixo America/Sao_Paulo."
+    },
+    {
+      "_id": "fld_relatorios_execucao",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_relatorios",
+      "name": "Relatorios"
+    },
+    {
+      "_id": "req_relatorio_preview",
+      "_type": "request",
+      "parentId": "fld_relatorios_execucao",
+      "name": "Preview Relatorio",
+      "method": "POST",
+      "url": "{{ _.base_url }}/relatorios/preview",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"{{ _.report_name }}\",\n  \"assunto\": \"{{ _.report_subject }}\",\n  \"periodo\": {\n    \"tipo\": \"RELATIVE_DAYS\",\n    \"valor\": {{ _.report_period_days }}\n  },\n  \"filtros\": {\n    \"secoes\": [\"resumo\", \"sensores\"]\n  }\n}"
+      },
+      "description": "Valida renderizacao do relatorio sem enviar email."
+    },
+    {
+      "_id": "req_relatorio_enviar_agora",
+      "_type": "request",
+      "parentId": "fld_relatorios_execucao",
+      "name": "Enviar Agora",
+      "method": "POST",
+      "url": "{{ _.base_url }}/relatorios/enviar-agora",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"{{ _.report_name }}\",\n  \"assunto\": \"{{ _.report_subject }}\",\n  \"emailsDestino\": [\"{{ _.destino_email }}\"],\n  \"periodo\": {\n    \"tipo\": \"RELATIVE_DAYS\",\n    \"valor\": {{ _.report_period_days }}\n  },\n  \"filtros\": {\n    \"secoes\": [\"resumo\", \"desempenho\", \"sensores\", \"chamados\", \"historicoTendencia\"]\n  }\n}"
+      },
+      "description": "Executa envio manual avulso, sem criar agendamento."
+    },
+    {
+      "_id": "fld_relatorios_agendamentos",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_relatorios",
+      "name": "Agendamentos"
+    },
+    {
+      "_id": "req_agendamento_create",
+      "_type": "request",
+      "parentId": "fld_relatorios_agendamentos",
+      "name": "Criar Agendamento Diario",
+      "method": "POST",
+      "url": "{{ _.base_url }}/relatorios/agendamentos",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"{{ _.report_name }}\",\n  \"emailsDestino\": [\"{{ _.destino_email }}\"],\n  \"assunto\": \"{{ _.report_subject }}\",\n  \"periodo\": {\n    \"tipo\": \"RELATIVE_DAYS\",\n    \"valor\": {{ _.report_period_days }}\n  },\n  \"filtros\": {\n    \"secoes\": [\"resumo\", \"desempenho\", \"sensores\", \"chamados\", \"historicoTendencia\"]\n  },\n  \"agendamento\": {\n    \"frequencia\": \"DIARIO\",\n    \"hora\": {{ _.report_hour }},\n    \"minuto\": {{ _.report_minute }}\n  }\n}"
+      },
+      "description": "Cria um agendamento diario. A resposta trara o id para preencher em agendamento_id."
+    },
+    {
+      "_id": "req_agendamento_list",
+      "_type": "request",
+      "parentId": "fld_relatorios_agendamentos",
+      "name": "Listar Agendamentos",
+      "method": "GET",
+      "url": "{{ _.base_url }}/relatorios/agendamentos",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Lista todos os agendamentos."
+    },
+    {
+      "_id": "req_agendamento_find",
+      "_type": "request",
+      "parentId": "fld_relatorios_agendamentos",
+      "name": "Buscar Agendamento",
+      "method": "GET",
+      "url": "{{ _.base_url }}/relatorios/agendamentos/{{ _.agendamento_id }}",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Usado para comparar proximoEnvioEm antes e depois dos testes."
+    },
+    {
+      "_id": "req_agendamento_update",
+      "_type": "request",
+      "parentId": "fld_relatorios_agendamentos",
+      "name": "Atualizar Agendamento",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/relatorios/agendamentos/{{ _.agendamento_id }}",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"{{ _.report_name }} atualizado\",\n  \"emailsDestino\": [\"{{ _.destino_email }}\"],\n  \"assunto\": \"{{ _.report_subject }} atualizado\",\n  \"periodo\": {\n    \"tipo\": \"RELATIVE_DAYS\",\n    \"valor\": {{ _.report_period_days }}\n  },\n  \"filtros\": {\n    \"secoes\": [\"resumo\", \"sensores\"]\n  },\n  \"agendamento\": {\n    \"frequencia\": \"DIARIO\",\n    \"hora\": {{ _.report_hour }},\n    \"minuto\": {{ _.report_minute }}\n  }\n}"
+      },
+      "description": "Atualiza o agendamento sem campo timezone."
+    },
+    {
+      "_id": "req_agendamento_pause",
+      "_type": "request",
+      "parentId": "fld_relatorios_agendamentos",
+      "name": "Pausar Agendamento",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/relatorios/agendamentos/{{ _.agendamento_id }}/status",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"PAUSADO\"\n}"
+      },
+      "description": "Pausa o agendamento."
+    },
+    {
+      "_id": "req_agendamento_resume",
+      "_type": "request",
+      "parentId": "fld_relatorios_agendamentos",
+      "name": "Reativar Agendamento",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/relatorios/agendamentos/{{ _.agendamento_id }}/status",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"ATIVO\"\n}"
+      },
+      "description": "Reativa e deve recalcular a proxima janela futura, sem catch-up."
+    },
+    {
+      "_id": "req_agendamento_execute_now",
+      "_type": "request",
+      "parentId": "fld_relatorios_agendamentos",
+      "name": "Executar Agora",
+      "method": "POST",
+      "url": "{{ _.base_url }}/relatorios/agendamentos/{{ _.agendamento_id }}/executar-agora",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Dispara uma execucao manual do agendamento sem alterar proximoEnvioEm."
+    },
+    {
+      "_id": "req_agendamento_executions",
+      "_type": "request",
+      "parentId": "fld_relatorios_agendamentos",
+      "name": "Listar Execucoes",
+      "method": "GET",
+      "url": "{{ _.base_url }}/relatorios/agendamentos/{{ _.agendamento_id }}/execucoes",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Lista o historico de execucoes MANUAL e AGENDADO."
+    },
+    {
+      "_id": "req_agendamento_delete",
+      "_type": "request",
+      "parentId": "fld_relatorios_agendamentos",
+      "name": "Deletar Agendamento",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/relatorios/agendamentos/{{ _.agendamento_id }}",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Limpa o agendamento criado no teste."
+    }
+  ]
+}

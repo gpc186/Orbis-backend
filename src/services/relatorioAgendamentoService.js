@@ -9,7 +9,8 @@ const {
 } = require("../utils/reportValidation");
 const {
   buildScheduleDescription,
-  computeNextRun
+  computeNextRun,
+  formatReportDateTime
 } = require("../utils/reportScheduleUtils");
 
 class RelatorioAgendamentoService {
@@ -22,6 +23,11 @@ class RelatorioAgendamentoService {
   static mapResponse(agendamento) {
     return {
       ...agendamento,
+      proximoEnvioEm: formatReportDateTime(agendamento.proximoEnvioEm),
+      ultimoEnvioEm: formatReportDateTime(agendamento.ultimoEnvioEm),
+      ultimoSucessoEm: formatReportDateTime(agendamento.ultimoSucessoEm),
+      criadoEm: formatReportDateTime(agendamento.criadoEm),
+      atualizadoEm: formatReportDateTime(agendamento.atualizadoEm),
       descricaoAgendamento: buildScheduleDescription({
         frequencia: agendamento.frequencia,
         hora: agendamento.hora,
@@ -58,7 +64,6 @@ class RelatorioAgendamentoService {
         criadoPorId: usuario.id,
         status: "ATIVO",
         frequencia: normalized.agendamento.frequencia,
-        timezone: normalized.agendamento.timezone,
         hora: normalized.agendamento.hora,
         minuto: normalized.agendamento.minuto,
         diaSemana: normalized.agendamento.diaSemana,
@@ -110,7 +115,6 @@ class RelatorioAgendamentoService {
         nome: normalized.nome,
         assunto: normalized.assunto,
         frequencia: normalized.agendamento.frequencia,
-        timezone: normalized.agendamento.timezone,
         hora: normalized.agendamento.hora,
         minuto: normalized.agendamento.minuto,
         diaSemana: normalized.agendamento.diaSemana,
@@ -131,7 +135,23 @@ class RelatorioAgendamentoService {
   static async updateStatus({ usuario, id, payload }) {
     this.assertAdmin(usuario);
     const normalized = validateStatusPayload(payload);
-    const agendamento = await RelatorioAgendamentoModel.updateStatus(id, normalized.status);
+    const current = await RelatorioAgendamentoModel.findById(id);
+
+    if (!current) {
+      throw new AppError("Agendamento de relatorio nao encontrado.", 404);
+    }
+
+    const data = {
+      status: normalized.status,
+      lockedAt: null
+    };
+
+    if (normalized.status === "ATIVO") {
+      data.proximoEnvioEm = computeNextRun(current, new Date());
+      data.ultimoErroEm = null;
+    }
+
+    const agendamento = await RelatorioAgendamentoModel.updateStatus(id, data);
     return this.mapResponse(agendamento);
   }
 
@@ -153,7 +173,10 @@ class RelatorioAgendamentoService {
 
   static async executeNow({ usuario, id }) {
     this.assertAdmin(usuario);
-    return RelatorioExecucaoService.executarAgendamento(id);
+    return RelatorioExecucaoService.executarAgendamento(id, {
+      updateSchedule: false,
+      tipoExecucao: "MANUAL"
+    });
   }
 
   static async processDueSchedules() {

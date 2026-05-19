@@ -1,8 +1,9 @@
 const prisma = require("../prisma/prisma");
+const { REPORT_TIMEZONE } = require("../utils/reportScheduleUtils");
 
 class RelatorioReadModel {
   static getReportTimeZone() {
-    return process.env.REPORT_JOB_TIMEZONE || "America/Sao_Paulo";
+    return REPORT_TIMEZONE;
   }
 
   static buildMachineWhere(filtros = {}, { includeInactive = false } = {}) {

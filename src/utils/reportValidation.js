@@ -105,7 +105,6 @@ function validateFiltros(filtros = {}) {
 
 function validateAgendamento(agendamento = {}) {
   const frequencia = String(agendamento.frequencia || "").toUpperCase();
-  const timezone = String(agendamento.timezone || "America/Sao_Paulo").trim();
   const hora = Number(agendamento.hora);
   const minuto = Number(agendamento.minuto ?? 0);
   const diaSemana = agendamento.diaSemana == null ? null : Number(agendamento.diaSemana);
@@ -133,7 +132,6 @@ function validateAgendamento(agendamento = {}) {
 
   return {
     frequencia,
-    timezone,
     hora,
     minuto,
     diaSemana,

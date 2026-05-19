@@ -1,10 +1,11 @@
 const cron = require("node-cron");
 const RelatorioAgendamentoService = require("../services/relatorioAgendamentoService");
+const { REPORT_TIMEZONE } = require("../utils/reportScheduleUtils");
 const logger = require("../utils/logger");
 
 const enabled = String(process.env.REPORT_JOB_ENABLED || "false").toLowerCase() === "true";
 const cronExpression = process.env.REPORT_JOB_CRON || "* * * * *";
-const timezone = process.env.REPORT_JOB_TIMEZONE || "America/Sao_Paulo";
+const timezone = REPORT_TIMEZONE;
 
 if (enabled) {
   logger.info("relatorio_job_started", {

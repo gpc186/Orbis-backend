@@ -70,10 +70,10 @@ class RelatorioAgendamentoModel {
     });
   }
 
-  static async updateStatus(id, status) {
+  static async updateStatus(id, data) {
     return prisma.relatorioAgendamento.update({
       where: { id: Number(id) },
-      data: { status },
+      data,
       include: this.baseInclude()
     });
   }
@@ -122,7 +122,7 @@ class RelatorioAgendamentoModel {
     });
   }
 
-  static async markSuccess({ id, sentAt, nextRunAt }) {
+  static async markScheduledSuccess({ id, sentAt, nextRunAt }) {
     return prisma.relatorioAgendamento.update({
       where: { id: Number(id) },
       data: {
@@ -135,12 +135,34 @@ class RelatorioAgendamentoModel {
     });
   }
 
-  static async markError({ id, errorMessage }) {
+  static async markScheduledError({ id, errorMessage, attemptedAt }) {
     return prisma.relatorioAgendamento.update({
       where: { id: Number(id) },
       data: {
         lockedAt: null,
         status: "ERRO",
+        ...(attemptedAt ? { ultimoEnvioEm: attemptedAt } : {}),
+        ultimoErroEm: errorMessage
+      }
+    });
+  }
+
+  static async markExecutionSuccess({ id, sentAt }) {
+    return prisma.relatorioAgendamento.update({
+      where: { id: Number(id) },
+      data: {
+        ultimoEnvioEm: sentAt,
+        ultimoSucessoEm: sentAt,
+        ultimoErroEm: null
+      }
+    });
+  }
+
+  static async markExecutionFailure({ id, errorMessage, attemptedAt }) {
+    return prisma.relatorioAgendamento.update({
+      where: { id: Number(id) },
+      data: {
+        ...(attemptedAt ? { ultimoEnvioEm: attemptedAt } : {}),
         ultimoErroEm: errorMessage
       }
     });

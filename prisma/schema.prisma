@@ -245,7 +245,6 @@ model RelatorioAgendamento {
   criadoPorId     Int
   status          StatusAgendamentoRelatorio @default(ATIVO)
   frequencia      FrequenciaRelatorio
-  timezone        String   @default("America/Sao_Paulo")
   hora            Int
   minuto          Int      @default(0)
   diaSemana       Int?

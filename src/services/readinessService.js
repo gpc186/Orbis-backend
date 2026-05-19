@@ -1,4 +1,5 @@
 const prisma = require("../prisma/prisma");
+const { REPORT_TIMEZONE } = require("../utils/reportScheduleUtils");
 const logger = require("../utils/logger");
 
 class ReadinessService {
@@ -65,7 +66,7 @@ class ReadinessService {
       relatorio: {
         status: reportEnabled ? "enabled" : "disabled",
         cron: process.env.REPORT_JOB_CRON || "* * * * *",
-        timezone: process.env.REPORT_JOB_TIMEZONE || "America/Sao_Paulo"
+        timezone: REPORT_TIMEZONE
       },
       simulador: {
         status: simuladorEnabled ? "enabled" : "disabled",

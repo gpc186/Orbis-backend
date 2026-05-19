@@ -3,11 +3,19 @@ const RelatorioAgendamentoModel = require("../models/relatorioAgendamentoModel")
 const RelatorioExecucaoModel = require("../models/relatorioExecucaoModel");
 const RelatorioRendererService = require("./relatorioRendererService");
 const RelatorioDispatchService = require("./relatorioDispatchService");
-const { computeNextRun } = require("../utils/reportScheduleUtils");
+const { computeNextRun, formatReportDateTime } = require("../utils/reportScheduleUtils");
 const { validatePreviewPayload } = require("../utils/reportValidation");
 const { normalizeEmails, isValidEmail } = require("../utils/emailValidation");
 
 class RelatorioExecucaoService {
+  static mapExecutionResponse(execucao) {
+    return {
+      ...execucao,
+      iniciadoEm: formatReportDateTime(execucao.iniciadoEm),
+      finalizadoEm: formatReportDateTime(execucao.finalizadoEm)
+    };
+  }
+
   static assertAdmin(usuario) {
     if (!usuario || usuario.role !== "ADMIN") {
       throw new AppError("Apenas ADMIN pode executar relatorios.", 403);
@@ -74,7 +82,7 @@ class RelatorioExecucaoService {
         subject: rendered.subject,
         enviadoPara: emailsDestino,
         quantidadeDestinatarios: emailsDestino.length,
-        enviadoEm: sentAt.toISOString(),
+        enviadoEm: formatReportDateTime(sentAt),
         origemTemplate: "backend"
       };
     } catch (error) {
@@ -87,7 +95,8 @@ class RelatorioExecucaoService {
     }
   }
 
-  static async executarAgendamento(agendamentoId) {
+  static async executarAgendamento(agendamentoId, options = {}) {
+    const { updateSchedule = true, tipoExecucao = "AGENDADO" } = options;
     const agendamento = await RelatorioAgendamentoModel.findById(agendamentoId);
 
     if (!agendamento) {
@@ -98,7 +107,7 @@ class RelatorioExecucaoService {
 
     const execution = await RelatorioExecucaoModel.create({
       agendamentoId: agendamento.id,
-      tipoExecucao: "AGENDADO",
+      tipoExecucao,
       status: "PROCESSANDO",
       assunto: agendamento.assunto || agendamento.nome,
       emailsDestino,
@@ -106,6 +115,8 @@ class RelatorioExecucaoService {
       filtrosSnapshot: agendamento.filtros,
       secoes: agendamento.secoes || agendamento.filtros?.secoes || null
     });
+
+    let attemptedAt = null;
 
     try {
       const rendered = await RelatorioRendererService.render({
@@ -120,6 +131,7 @@ class RelatorioExecucaoService {
         }
       });
 
+      attemptedAt = new Date();
       const dispatch = await RelatorioDispatchService.send({
         emailsDestino,
         subject: rendered.subject,
@@ -127,50 +139,81 @@ class RelatorioExecucaoService {
         text: rendered.text
       });
 
-      const sentAt = new Date();
-      const nextRunAt = computeNextRun(
-        {
-          frequencia: agendamento.frequencia,
-          timezone: agendamento.timezone,
-          hora: agendamento.hora,
-          minuto: agendamento.minuto,
-          diaSemana: agendamento.diaSemana,
-          diaMes: agendamento.diaMes
-        },
-        sentAt
-      );
-
-      await Promise.all([
+      let nextRunAt = agendamento.proximoEnvioEm;
+      const updates = [
         RelatorioExecucaoModel.markSuccess(execution.id, {
           provider: dispatch.provider,
           messageId: dispatch.messageId,
-          finalizadoEm: sentAt
-        }),
-        RelatorioAgendamentoModel.markSuccess({
-          id: agendamento.id,
-          sentAt,
-          nextRunAt
+          finalizadoEm: attemptedAt
         })
-      ]);
+      ];
+
+      if (updateSchedule) {
+        nextRunAt = computeNextRun(
+          {
+            frequencia: agendamento.frequencia,
+            hora: agendamento.hora,
+            minuto: agendamento.minuto,
+            diaSemana: agendamento.diaSemana,
+            diaMes: agendamento.diaMes
+          },
+          attemptedAt
+        );
+
+        updates.push(
+          RelatorioAgendamentoModel.markScheduledSuccess({
+            id: agendamento.id,
+            sentAt: attemptedAt,
+            nextRunAt
+          })
+        );
+      } else {
+        updates.push(
+          RelatorioAgendamentoModel.markExecutionSuccess({
+            id: agendamento.id,
+            sentAt: attemptedAt
+          })
+        );
+      }
+
+      await Promise.all(updates);
 
       return {
         execucaoId: execution.id,
         provider: dispatch.provider,
         messageId: dispatch.messageId,
-        sentAt,
-        nextRunAt
+        sentAt: formatReportDateTime(attemptedAt),
+        nextRunAt: formatReportDateTime(nextRunAt),
+        tipoExecucao
       };
     } catch (error) {
-      await Promise.all([
+      const finalizedAt = new Date();
+      const updates = [
         RelatorioExecucaoModel.markFailure(execution.id, {
           errorMessage: error.message,
-          finalizadoEm: new Date()
-        }),
-        RelatorioAgendamentoModel.markError({
-          id: agendamento.id,
-          errorMessage: error.message
+          finalizadoEm: finalizedAt
         })
-      ]);
+      ];
+
+      if (updateSchedule) {
+        updates.push(
+          RelatorioAgendamentoModel.markScheduledError({
+            id: agendamento.id,
+            errorMessage: error.message,
+            attemptedAt
+          })
+        );
+      } else {
+        updates.push(
+          RelatorioAgendamentoModel.markExecutionFailure({
+            id: agendamento.id,
+            errorMessage: error.message,
+            attemptedAt
+          })
+        );
+      }
+
+      await Promise.all(updates);
 
       throw error;
     }
@@ -180,7 +223,8 @@ class RelatorioExecucaoService {
     if (!usuario || usuario.role !== "ADMIN") {
       throw new AppError("Apenas ADMIN pode executar relatorios.", 403);
     }
-    return RelatorioExecucaoModel.findByAgendamentoId(id);
+    const execucoes = await RelatorioExecucaoModel.findByAgendamentoId(id);
+    return execucoes.map((execucao) => this.mapExecutionResponse(execucao));
   }
 }
 
