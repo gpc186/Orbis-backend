@@ -21,7 +21,7 @@ class StorageService {
         const { data, error } = await supabase.storage.from(bucket).upload(caminho, buffer, {
             contentType: "image/webp",
             cacheControl: "3600",
-            upsert: false
+            upsert: true
         });
 
         if (error) {
