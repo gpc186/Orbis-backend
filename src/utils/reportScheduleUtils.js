@@ -205,7 +205,7 @@ function formatReportDateTime(value) {
   if (Number.isNaN(date.getTime())) return null;
 
   const parts = toNumberMap(buildApiDateTimeFormatter().formatToParts(date));
-  const offsetMinutes = Math.round((toUtcDate(parts).getTime() - date.getTime()) / 60000);
+  const offsetMinutes = Math.round((date.getTime() - toUtcDate(parts).getTime()) / 60000);
   const sign = offsetMinutes >= 0 ? "+" : "-";
   const absoluteOffsetMinutes = Math.abs(offsetMinutes);
   const offsetHours = String(Math.floor(absoluteOffsetMinutes / 60)).padStart(2, "0");
@@ -216,12 +216,14 @@ function formatReportDateTime(value) {
 }
 
 function buildScheduleDescription(scheduleConfig) {
+  const DIAS_SEMANA = ["Domingo", "Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado"];
   if (scheduleConfig.frequencia === "DIARIO") {
     return `Diario as ${String(scheduleConfig.hora).padStart(2, "0")}:${String(scheduleConfig.minuto).padStart(2, "0")}`;
   }
 
   if (scheduleConfig.frequencia === "SEMANAL") {
-    return `Semanal no dia ${scheduleConfig.diaSemana} as ${String(scheduleConfig.hora).padStart(2, "0")}:${String(scheduleConfig.minuto).padStart(2, "0")}`;
+    const nomeDia = DIAS_SEMANA[scheduleConfig.diaSemana] ?? scheduleConfig.diaSemana;
+    return `Semanal toda ${nomeDia} as ${String(scheduleConfig.hora).padStart(2, "0")}:${String(scheduleConfig.minuto).padStart(2, "0")}`;
   }
 
   if (scheduleConfig.frequencia === "MENSAL") {
