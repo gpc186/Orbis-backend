@@ -1,4 +1,5 @@
 const LOGO_URL = "https://iyoztaljmpklixtftsub.supabase.co/storage/v1/object/public/email-images/LogoBrancaGrande.svg";
+const { REPORT_TIMEZONE } = require("../utils/reportScheduleUtils");
 
 function esc(value) {
   if (value == null) return "";
@@ -11,17 +12,24 @@ function esc(value) {
     .replace(/'/g, "&#039;");
 }
 
+function buildPtBrDateOptions(extraOptions = {}) {
+  return {
+    timeZone: REPORT_TIMEZONE,
+    ...extraOptions
+  };
+}
+
 function formatarData(value) {
   if (!value) return "-";
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
 
-  return date.toLocaleDateString("pt-BR", {
+  return date.toLocaleDateString("pt-BR", buildPtBrDateOptions({
     day: "2-digit",
     month: "2-digit",
     year: "2-digit"
-  });
+  }));
 }
 
 function formatarDataCurta(value) {
@@ -32,10 +40,10 @@ function formatarDataCurta(value) {
     return String(value).slice(5).replace("-", "/") || "-";
   }
 
-  return date.toLocaleDateString("pt-BR", {
+  return date.toLocaleDateString("pt-BR", buildPtBrDateOptions({
     day: "2-digit",
     month: "2-digit"
-  });
+  }));
 }
 
 function formatarDataHora(value) {
@@ -43,13 +51,13 @@ function formatarDataHora(value) {
 
   if (Number.isNaN(date.getTime())) return "-";
 
-  return date.toLocaleDateString("pt-BR", {
+  return date.toLocaleDateString("pt-BR", buildPtBrDateOptions({
     day: "2-digit",
     month: "long",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit"
-  });
+  }));
 }
 
 function renderSectionTitle(label, subtitle = "") {
