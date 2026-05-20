@@ -22,6 +22,31 @@ class MaquinaService {
             throw new AppError("Erro ao buscar máquina.", 500);
         }
     }
+    static async findByNome({ nome, limit = 10, somenteAtivas }) {
+        const nomeNormalizado = String(nome || "").trim();
+
+        if (nomeNormalizado.length < 2) {
+            throw new AppError("Nome invalido para busca de maquina.", 400);
+        }
+
+        const take = Math.min(Math.max(Number(limit || 10), 1), 20);
+
+        try {
+            const maquinas = await MaquinaModel.findByNome({
+                nome: nomeNormalizado,
+                take,
+                ativo: typeof somenteAtivas === "boolean" ? somenteAtivas : undefined
+            });
+
+            return {
+                total: maquinas.length,
+                dados: maquinas
+            };
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            throw new AppError("Erro ao buscar maquina por nome.", 500);
+        }
+    }
     static async update(id, dados) {
         try {
             // Verifica se a máquina existe antes de tentar atualizar
@@ -99,6 +124,16 @@ class MaquinaService {
     }
     static async calculateAverageIntegrity() {
         return await MaquinaModel.calculateAverageIntegrity()
+    }
+    static async listCriticas({ limit = 10 } = {}) {
+        const take = Math.min(Math.max(Number(limit || 10), 1), 20);
+
+        return await MaquinaModel.listPioresIntegridade({ limit: take });
+    }
+    static async findComAlertaAtivo({ limit = 10 } = {}) {
+        const take = Math.min(Math.max(Number(limit || 10), 1), 20);
+
+        return await MaquinaModel.findComAlertaAtivo({ limit: take });
     }
     static async delete(id) {
         const maquina = await MaquinaModel.findById(id);

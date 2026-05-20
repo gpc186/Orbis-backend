@@ -140,6 +140,84 @@ class AlertaModel {
         });
     }
 
+    static async findAtivos({ limit = 10 } = {}) {
+        const safeLimit = Number(limit) > 0 ? Number(limit) : 10;
+
+        return prisma.alerta.findMany({
+            where: { status: "ATIVO" },
+            orderBy: { criadoEm: "desc" },
+            take: safeLimit,
+            include: {
+                sensor: {
+                    select: {
+                        id: true,
+                        tipo: true,
+                        status: true
+                    }
+                },
+                maquina: {
+                    select: {
+                        id: true,
+                        nome: true,
+                        setor: true,
+                        criticidade: true,
+                        ativo: true,
+                        integridade: true
+                    }
+                },
+                tecnico: {
+                    select: {
+                        id: true,
+                        nome: true,
+                        email: true,
+                        role: true,
+                        ativo: true
+                    }
+                }
+            }
+        });
+    }
+
+    static async findByMaquinaId(maquinaId, { skip, take, status } = {}) {
+        return prisma.alerta.findMany({
+            where: {
+                maquinaId: parseInt(maquinaId),
+                ...(status ? { status } : {})
+            },
+            skip,
+            take,
+            orderBy: { criadoEm: "desc" },
+            include: {
+                sensor: {
+                    select: {
+                        id: true,
+                        tipo: true,
+                        status: true
+                    }
+                },
+                maquina: {
+                    select: {
+                        id: true,
+                        nome: true,
+                        setor: true,
+                        criticidade: true,
+                        ativo: true,
+                        integridade: true
+                    }
+                },
+                tecnico: {
+                    select: {
+                        id: true,
+                        nome: true,
+                        email: true,
+                        role: true,
+                        ativo: true
+                    }
+                }
+            }
+        });
+    }
+
     static async findAlertaStatusOfTecnicoById(id) {
         return await prisma.alerta.findFirst({
             where: {
@@ -178,7 +256,15 @@ class AlertaModel {
             include: {
                 sensor: true,
                 maquina: true,
-                tecnico: { select: { nome: true } }
+                tecnico: {
+                    select: {
+                        id: true,
+                        nome: true,
+                        email: true,
+                        role: true,
+                        ativo: true
+                    }
+                }
             }
         });
     }

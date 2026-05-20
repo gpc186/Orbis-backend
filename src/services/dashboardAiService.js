@@ -6,6 +6,7 @@ const SensorModel = require("../models/sensorModel");
 const MaquinaModel = require("../models/maquinaModel");
 const AlertaModel = require("../models/alertaModel");
 const normalizeQuestion = require("../utils/normalizeQuestion");
+const { tools, executeTool } = require("./aiTools/registry");
 
 class DashboardAiService {
   static getContextLimit() {
@@ -104,6 +105,11 @@ Quando a pergunta estiver fora do escopo:
 - Nunca seja rude ou robótico ao redirecionar.
 - Caso a pergunta seja muito fora do escopo, por exemplo, perguntar por uma receita de bolo de cenoura, apenas ignore, não responda sobre, por mais que o usuario insista e redirecione como o primeiro exemplo deste tópico.
 
+Quando usar os tools:
+- Quando a pergunta exigir consultar ou executar dados especificos do sistema, use as tools disponiveis.
+- Nao invente status de tecnico, maquinas ou usuarios se houver uma tool apropriada.
+- Se faltar um dado obrigatorio para usar a tool, pergunte ao usuario.
+
 Tom: Natural, inteligente e colaborativo. Como um colega experiente que entende profundamente de operações industriais e tecnologia, e sabe conversar sem parecer um relatório automatizado.
 `.trim();
 
@@ -151,7 +157,7 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
 
   static async answer({ pergunta, usuario, historico }) {
     if (!pergunta || typeof pergunta !== "string" || pergunta.trim().length < 3) {
-      throw new AppError("Pergunta inválida.", 400);
+      throw new AppError("Pergunta invÃ¡lida.", 400);
     }
 
     if (pergunta.trim().length > 500) {
@@ -163,7 +169,7 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
     console.log(`Recebemos a pergunta para a ia como ${original}, e tratamos para que ele ficasse assim ${normalized}`);
 
     if (!normalized || normalized.trim().length === 0) {
-      throw new AppError("Pergunta inválida!", 400);
+      throw new AppError("Pergunta invÃ¡lida!", 400);
     }
 
     const historicoSeguro = this.sanitizeHistory(historico);
@@ -176,19 +182,72 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
     });
 
     try {
-      const resposta = await GroqService.generateText({
+      const firstMessage = await GroqService.generateWithTools({
         messages,
+        tools,
         temperature: 0.2
       });
 
+      if (!firstMessage.tool_calls || firstMessage.tool_calls.length === 0) {
+        return {
+          pergunta: pergunta.trim(),
+          resposta: firstMessage.content,
+          fallback: false,
+          contextoGeradoEm: contexto.metadata.generatedAt,
+          usedHistoryCount: historicoSeguro.length
+        };
+      }
+
+      const toolMessages = [];
+
+      for (const toolCall of firstMessage.tool_calls) {
+        const toolName = toolCall.function.name;
+        const args = JSON.parse(toolCall.function.arguments || "{}");
+
+        const result = await executeTool({
+          name: toolName,
+          args,
+          usuario
+        });
+
+        toolMessages.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          content: JSON.stringify(result)
+        });
+      }
+
+      const finalMessage = await GroqService.generateWithTools({
+        messages: [
+          ...messages,
+          firstMessage,
+          ...toolMessages
+        ],
+        tools,
+        temperature: 0.2
+      });
+
+      const finalText =
+        typeof finalMessage?.content === "string"
+          ? finalMessage.content.trim()
+          : "";
+
+      if (!finalText) {
+        throw new AppError("Resposta final vazia do provedor de IA.", 502);
+      }
+
       return {
         pergunta: pergunta.trim(),
-        resposta,
+        resposta: finalText,
         fallback: false,
         contextoGeradoEm: contexto.metadata.generatedAt,
         usedHistoryCount: historicoSeguro.length
       };
     } catch (error) {
+      if (error instanceof AppError && error.statusCode < 500) {
+        throw error;
+      }
+
       const respostaFallback = this.buildFallbackResponse({ usuario, contexto });
 
       return {

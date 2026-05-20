@@ -129,6 +129,58 @@ class UsuarioModel {
         });
     };
 
+    static async findByNome({ nome, take = 10, ativo, role }) {
+        return await prisma.usuario.findMany({
+            where: {
+                nome: {
+                    contains: nome,
+                    mode: "insensitive"
+                },
+                ...(typeof ativo === "boolean" ? { ativo } : {}),
+                ...(role ? { role } : {})
+            },
+            take,
+            orderBy: { nome: "asc" },
+            select: {
+                id: true,
+                nome: true,
+                email: true,
+                role: true,
+                ativo: true,
+                especialidade: true,
+                telefone: true,
+                fotoPerfil: true,
+                caminhoFoto: true
+            }
+        });
+    };
+
+    static async findTecnicosByNome({ nome, take = 10, ativo }) {
+        return await prisma.usuario.findMany({
+            where: {
+                role: "TECNICO",
+                nome: {
+                    contains: nome,
+                    mode: "insensitive"
+                },
+                ...(typeof ativo === "boolean" ? { ativo } : {})
+            },
+            take,
+            orderBy: { nome: "asc" },
+            select: {
+                id: true,
+                nome: true,
+                email: true,
+                role: true,
+                ativo: true,
+                especialidade: true,
+                fotoPerfil: true,
+                caminhoFoto: true,
+                telefone: true
+            }
+        });
+    };
+
     /**
      * Atualiza campos requisitados pelo service no banco de dados
      * @param {number} id

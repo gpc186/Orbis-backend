@@ -19,6 +19,36 @@ class MaquinaModel {
         });
     }
 
+    static async findByNome({ nome, take = 10, ativo }) {
+        return await prisma.maquina.findMany({
+            where: {
+                nome: {
+                    contains: nome,
+                    mode: "insensitive"
+                },
+                ...(typeof ativo === "boolean" ? { ativo } : {})
+            },
+            take,
+            orderBy: { nome: "asc" },
+            select: {
+                id: true,
+                nome: true,
+                setor: true,
+                tipo: true,
+                criticidade: true,
+                ativo: true,
+                integridade: true,
+                scoreEstabilidade: true,
+                previsaoManutencao: true,
+                janelaManuInicio: true,
+                janelaManuFim: true,
+                imagem: true,
+                caminhoImagem: true,
+                criadoEm: true
+            }
+        });
+    }
+
     static async update(id, data) {
         return await prisma.maquina.update({ where: { id: parseInt(id) }, data });
     }
@@ -54,6 +84,36 @@ class MaquinaModel {
                 integridade: true,
                 criticidade: true,
                 setor: true, 
+            }
+        });
+    }
+
+    static async findComAlertaAtivo({ limit = 10 } = {}) {
+        const safeLimit = Number(limit) > 0 ? Number(limit) : 10;
+
+        return prisma.maquina.findMany({
+            where: {
+                ativo: true,
+                alertas: {
+                    some: {
+                        status: "ATIVO"
+                    }
+                }
+            },
+            orderBy: { integridade: "asc" },
+            take: safeLimit,
+            select: {
+                id: true,
+                nome: true,
+                setor: true,
+                tipo: true,
+                criticidade: true,
+                ativo: true,
+                integridade: true,
+                scoreEstabilidade: true,
+                previsaoManutencao: true,
+                janelaManuInicio: true,
+                janelaManuFim: true
             }
         });
     }

@@ -210,6 +210,61 @@ class AlertaService {
       throw new AppError("Erro ao buscar alerta.", 500);
     }
   }
+
+  static async findAtivos({ limit = 10 }) {
+    const safeLimit = Math.min(Math.max(Number(limit || 10), 1), 20);
+
+    try {
+      const dados = await AlertaModel.findAtivos({ limit: safeLimit });
+      return {
+        total: dados.length,
+        dados
+      };
+    } catch (error) {
+      logger.error("alerta_find_active_error", { limit: safeLimit, error });
+      throw new AppError("Erro ao buscar alertas ativos.", 500);
+    }
+  }
+
+  static async findByMaquinaId(maquinaId, { limit = 10, somenteAtivos } = {}) {
+    const maquinaIdNum = parseInt(maquinaId);
+
+    if (Number.isNaN(maquinaIdNum)) {
+      throw new AppError("Id da maquina invalido!", 400);
+    }
+
+    const safeLimit = Math.min(Math.max(Number(limit || 10), 1), 20);
+
+    try {
+      const maquina = await MaquinaModel.findById(maquinaIdNum);
+      if (!maquina) {
+        throw new AppError("Maquina nao encontrada.", 404);
+      }
+
+      const dados = await AlertaModel.findByMaquinaId(maquinaIdNum, {
+        skip: 0,
+        take: safeLimit,
+        status: somenteAtivos ? "ATIVO" : undefined
+      });
+
+      return {
+        total: dados.length,
+        dados
+      };
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      logger.error("alerta_find_by_maquina_error", {
+        maquinaId: maquinaIdNum,
+        limit: safeLimit,
+        somenteAtivos,
+        error
+      });
+      throw new AppError("Erro ao buscar alertas da maquina.", 500);
+    }
+  }
 }
 
 module.exports = AlertaService;
