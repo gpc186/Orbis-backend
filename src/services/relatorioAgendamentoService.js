@@ -211,6 +211,8 @@ class RelatorioAgendamentoService {
         await RelatorioAgendamentoModel.clearLock(item.id);
       }
     }
+
+    return processed;
   }
 }
 module.exports = RelatorioAgendamentoService;

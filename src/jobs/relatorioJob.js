@@ -22,7 +22,7 @@ if (enabled) {
         const processed = await RelatorioAgendamentoService.processDueSchedules();
 
         logger.info("relatorio_job_finished", {
-          processedCount: processed.length,
+          processedCount: Array.isArray(processed) ? processed.length : 0,
           durationMs: Date.now() - startedAt
         });
       } catch (error) {
