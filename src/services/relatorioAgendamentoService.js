@@ -203,7 +203,7 @@ class RelatorioAgendamentoService {
       error: error.message
     });
   } finally {
-    await RelatorioAgendamentoModel.unlock(item.id);
+    await RelatorioAgendamentoModel.clearLock(item.id);
   }
 }
 }
