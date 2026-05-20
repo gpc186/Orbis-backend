@@ -147,7 +147,13 @@ class RelatorioAgendamentoService {
     };
 
     if (normalized.status === "ATIVO") {
-      data.proximoEnvioEm = computeNextRun(current, new Date());
+      data.proximoEnvioEm = computeNextRun({
+        frequencia: current.frequencia,
+        hora: current.hora,
+        minuto: current.minuto,
+        diaSemana: current.diaSemana,
+        diaMes: current.diaMes
+      });
       data.ultimoErroEm = null;
     }
 
@@ -181,6 +187,7 @@ class RelatorioAgendamentoService {
 
   static async processDueSchedules() {
     const dueItems = await RelatorioAgendamentoModel.listDue(new Date());
+
     const processed = [];
 
     for (const item of dueItems) {
@@ -200,11 +207,10 @@ class RelatorioAgendamentoService {
           status: "FALHOU",
           error: error.message
         });
+      } finally {
+        await RelatorioAgendamentoModel.clearLock(item.id);
       }
     }
-
-    return processed;
   }
 }
-
 module.exports = RelatorioAgendamentoService;
