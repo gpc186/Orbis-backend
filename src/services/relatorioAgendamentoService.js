@@ -185,27 +185,32 @@ class RelatorioAgendamentoService {
     });
   }
 
-  for (const item of dueItems) {
-  const locked = await RelatorioAgendamentoModel.tryLock(item.id, new Date());
-  if (!locked) continue;
+  static async processDueSchedules() {
+    const dueItems = await RelatorioAgendamentoModel.listDue(new Date());
 
-  try {
-    const result = await RelatorioExecucaoService.executarAgendamento(item.id);
-    processed.push({
-      agendamentoId: item.id,
-      status: "ENVIADO",
-      result
-    });
-  } catch (error) {
-    processed.push({
-      agendamentoId: item.id,
-      status: "FALHOU",
-      error: error.message
-    });
-  } finally {
-    await RelatorioAgendamentoModel.clearLock(item.id);
+    const processed = [];
+
+    for (const item of dueItems) {
+      const locked = await RelatorioAgendamentoModel.tryLock(item.id, new Date());
+      if (!locked) continue;
+
+      try {
+        const result = await RelatorioExecucaoService.executarAgendamento(item.id);
+        processed.push({
+          agendamentoId: item.id,
+          status: "ENVIADO",
+          result
+        });
+      } catch (error) {
+        processed.push({
+          agendamentoId: item.id,
+          status: "FALHOU",
+          error: error.message
+        });
+      } finally {
+        await RelatorioAgendamentoModel.clearLock(item.id);
+      }
+    }
   }
 }
-}
-
 module.exports = RelatorioAgendamentoService;
