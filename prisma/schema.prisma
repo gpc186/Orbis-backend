@@ -211,7 +211,7 @@ model Manutencao {
   status     StatusManutencao
   criadoEm   DateTime         @default(now())
 
-  alerta  Alerta         @relation(fields: [alertaId], references: [id])
+  alerta  Alerta         @relation(fields: [alertaId], references: [id], onDelete: Cascade)
   usuario Usuario        @relation(fields: [usuarioId], references: [id])
   eventos AlertaEvento[]
 }
