@@ -194,7 +194,7 @@ model AlertaEvento {
   descricao      String?       @db.Text
   criadoEm       DateTime      @default(now())
 
-  alerta     Alerta      @relation(fields: [alertaId], references: [id])
+  alerta     Alerta      @relation(fields: [alertaId], references: [id], onDelete: Cascade)
   usuario    Usuario?    @relation(fields: [usuarioId], references: [id])
   manutencao Manutencao? @relation(fields: [manutencaoId], references: [id])
 
