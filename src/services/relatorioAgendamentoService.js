@@ -147,7 +147,13 @@ class RelatorioAgendamentoService {
     };
 
     if (normalized.status === "ATIVO") {
-      data.proximoEnvioEm = computeNextRun(current, new Date());
+      data.proximoEnvioEm = computeNextRun({
+        frequencia: current.frequencia,
+        hora: current.hora,
+        minuto: current.minuto,
+        diaSemana: current.diaSemana,
+        diaMes: current.diaMes
+      });
       data.ultimoErroEm = null;
     }
 
@@ -179,32 +185,27 @@ class RelatorioAgendamentoService {
     });
   }
 
-  static async processDueSchedules() {
-    const dueItems = await RelatorioAgendamentoModel.listDue(new Date());
-    const processed = [];
+  for (const item of dueItems) {
+  const locked = await RelatorioAgendamentoModel.tryLock(item.id, new Date());
+  if (!locked) continue;
 
-    for (const item of dueItems) {
-      const locked = await RelatorioAgendamentoModel.tryLock(item.id, new Date());
-      if (!locked) continue;
-
-      try {
-        const result = await RelatorioExecucaoService.executarAgendamento(item.id);
-        processed.push({
-          agendamentoId: item.id,
-          status: "ENVIADO",
-          result
-        });
-      } catch (error) {
-        processed.push({
-          agendamentoId: item.id,
-          status: "FALHOU",
-          error: error.message
-        });
-      }
-    }
-
-    return processed;
+  try {
+    const result = await RelatorioExecucaoService.executarAgendamento(item.id);
+    processed.push({
+      agendamentoId: item.id,
+      status: "ENVIADO",
+      result
+    });
+  } catch (error) {
+    processed.push({
+      agendamentoId: item.id,
+      status: "FALHOU",
+      error: error.message
+    });
+  } finally {
+    await RelatorioAgendamentoModel.unlock(item.id);
   }
+}
 }
 
 module.exports = RelatorioAgendamentoService;
