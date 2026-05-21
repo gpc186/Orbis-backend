@@ -8,6 +8,7 @@ class PredicaoService {
     static LIMIAR_MANUTENCAO = 70;
     static LIMIAR_FALHA = 30;
     static LIMITE_MAXIMO_DIAS_PREVISAO = 90;
+    static DIAS_ANTECEDENCIA_FIM_JANELA = 2;
 
     static calcularHealthScore(sensor) {
         const temp = sensor.temperatura || sensor.ultimaTemperatura || 0;
@@ -100,6 +101,17 @@ class PredicaoService {
         });
     }
 
+    static obterReferenciaTemporal(pontos) {
+        const ultimoPonto = pontos[pontos.length - 1]?.criadoEm;
+        const agora = new Date();
+
+        if (!ultimoPonto) {
+            return agora;
+        }
+
+        return ultimoPonto > agora ? ultimoPonto : agora;
+    }
+
     static async previsaoManutencao(maquinaId) {
         try {
             const MaquinaModel = require('../models/maquinaModel');
@@ -124,6 +136,7 @@ class PredicaoService {
             }
 
             const dataBase = pontos[0].criadoEm;
+            const referenciaTemporal = this.obterReferenciaTemporal(pontos);
             const dataInicioManutencao = this.projetarDataLimiar(
                 regressao,
                 this.LIMIAR_MANUTENCAO,
@@ -135,13 +148,25 @@ class PredicaoService {
                 dataBase
             );
 
-            if (!dataFalha) {
+            if (!dataFalha || dataFalha <= referenciaTemporal) {
                 return await this.limparPrevisao(maquinaId, MaquinaModel);
             }
 
-            const janelaManuInicio = dataInicioManutencao && dataInicioManutencao < dataFalha
-                ? dataInicioManutencao
-                : null;
+            let janelaManuInicio = dataInicioManutencao;
+            if (!janelaManuInicio || janelaManuInicio < referenciaTemporal) {
+                janelaManuInicio = new Date(referenciaTemporal.getTime());
+            }
+
+            let janelaManuFim = new Date(dataFalha.getTime());
+            janelaManuFim.setDate(janelaManuFim.getDate() - this.DIAS_ANTECEDENCIA_FIM_JANELA);
+
+            if (janelaManuFim < referenciaTemporal) {
+                janelaManuFim = new Date(referenciaTemporal.getTime());
+            }
+
+            if (janelaManuInicio > janelaManuFim) {
+                janelaManuFim = new Date(janelaManuInicio.getTime());
+            }
 
             console.log(
                 `[PREDICAO] Maquina ${maquinaId}: inclinacao=${regressao.slope.toFixed(4)} ` +
@@ -152,7 +177,7 @@ class PredicaoService {
             return await MaquinaModel.update(maquinaId, {
                 previsaoManutencao: dataFalha,
                 janelaManuInicio,
-                janelaManuFim: dataFalha
+                janelaManuFim
             });
         } catch (error) {
             throw new AppError("Erro ao calcular previsao de manutencao.", 500);
