@@ -1,19 +1,25 @@
+const { SimpleLinearRegression } = require('ml-regression-simple-linear');
 const AppError = require('../utils/appErrorUtils');
 
 class PredicaoService {
+    static MIN_PONTOS_REGRESSAO = 8;
+    static LIMITE_PONTOS_REGRESSAO = 30;
+    static R2_MINIMO = 0.6;
+    static LIMIAR_MANUTENCAO = 70;
+    static LIMIAR_FALHA = 30;
+    static LIMITE_MAXIMO_DIAS_PREVISAO = 90;
+    static DIAS_ANTECEDENCIA_FIM_JANELA = 2;
+
     static calcularHealthScore(sensor) {
-        // Pegamos os valores que vieram da leitura atual ou os que já estavam no sensor
         const temp = sensor.temperatura || sensor.ultimaTemperatura || 0;
         const vibra = sensor.vibracao || sensor.ultimaVibracao || 0;
 
-        // Evitar divisão por zero se os limites não estiverem configurados
         const diffTemp = (sensor.limiteTemperatura - sensor.idealTemperatura) || 1;
         const diffVibra = (sensor.limiteVibracao - sensor.idealVibracao) || 1;
 
         let scoreTemp = 1 - (temp - sensor.idealTemperatura) / diffTemp;
         let scoreVibra = 1 - (vibra - sensor.idealVibracao) / diffVibra;
 
-        // Trava entre 0 e 1
         scoreTemp = Math.max(0, Math.min(1, scoreTemp));
         scoreVibra = Math.max(0, Math.min(1, scoreVibra));
 
@@ -28,75 +34,153 @@ class PredicaoService {
 
             if (!maquina || !maquina.sensores || maquina.sensores.length === 0) return 100;
 
-            // Passamos os dados atuais para o cálculo
-            const scores = maquina.sensores.map(s => this.calcularHealthScore(s));
+            const scores = maquina.sensores.map((sensor) => this.calcularHealthScore(sensor));
 
-            // Garante que mediaSaude seja um número válido (0 a 100)
             let mediaSaude = scores.reduce((a, b) => a + b, 0) / scores.length;
             mediaSaude = isNaN(mediaSaude) ? 0 : parseFloat(mediaSaude.toFixed(2));
 
-            console.log(`--- ATUALIZANDO MÁQUINA ${maquinaId} | SCORE: ${mediaSaude} ---`);
+            console.log(`--- ATUALIZANDO MAQUINA ${maquinaId} | SCORE: ${mediaSaude} ---`);
 
             await MaquinaModel.update(maquinaId, { integridade: mediaSaude });
 
             return mediaSaude;
         } catch (error) {
-            throw new AppError("Erro ao atualizar saúde da máquina.", 500);
+            throw new AppError("Erro ao atualizar saude da maquina.", 500);
         }
     }
 
-    static async previsaoManutencao(maquinaId, scoreHojeAtual = null) {
+    static criarPontosRegressao(historico) {
+        if (!historico.length) return [];
+
+        const dataBase = new Date(historico[0].criadoEm);
+
+        return historico.map((registro) => ({
+            x: (new Date(registro.criadoEm).getTime() - dataBase.getTime()) / (1000 * 60 * 60),
+            y: Number(registro.integridade),
+            criadoEm: new Date(registro.criadoEm)
+        }));
+    }
+
+    static criarModeloRegressao(pontos) {
+        if (pontos.length < 2) return null;
+
+        const x = pontos.map((ponto) => ponto.x);
+        const y = pontos.map((ponto) => ponto.y);
+        const modelo = new SimpleLinearRegression(x, y);
+        const score = modelo.score(x, y);
+
+        return {
+            modelo,
+            score,
+            slope: modelo.slope,
+            intercept: modelo.intercept
+        };
+    }
+
+    static projetarDataLimiar(regressao, limiar, dataBase) {
+        if (!regressao || regressao.slope >= 0) return null;
+
+        const horasAteLimiar = regressao.modelo.computeX(limiar);
+
+        if (!Number.isFinite(horasAteLimiar) || horasAteLimiar <= 0) {
+            return null;
+        }
+
+        if (horasAteLimiar > (this.LIMITE_MAXIMO_DIAS_PREVISAO * 24)) {
+            return null;
+        }
+
+        return new Date(dataBase.getTime() + (horasAteLimiar * 60 * 60 * 1000));
+    }
+
+    static async limparPrevisao(maquinaId, MaquinaModel) {
+        return await MaquinaModel.update(maquinaId, {
+            previsaoManutencao: null,
+            janelaManuInicio: null,
+            janelaManuFim: null
+        });
+    }
+
+    static obterReferenciaTemporal(pontos) {
+        const ultimoPonto = pontos[pontos.length - 1]?.criadoEm;
+        const agora = new Date();
+
+        if (!ultimoPonto) {
+            return agora;
+        }
+
+        return ultimoPonto > agora ? ultimoPonto : agora;
+    }
+
+    static async previsaoManutencao(maquinaId) {
         try {
             const MaquinaModel = require('../models/maquinaModel');
-            const LeituraModel = require('../models/leituraModel');
+            const HistoricoIntegridadeModel = require('../models/historicoIntegridadeModel');
 
             const maquina = await MaquinaModel.findById(maquinaId);
-            const umDiaAtras = new Date(Date.now() - 24 * 60 * 60 * 1000); // 2 minutos para teste
+            if (!maquina) return null;
 
-            const leituraOntem = await LeituraModel.findUnique(maquinaId, umDiaAtras);
+            const historico = await HistoricoIntegridadeModel.findSerieByMaquina(maquinaId, {
+                limite: this.LIMITE_PONTOS_REGRESSAO
+            });
 
-            // Se não houver leitura anterior, não temos como calcular a velocidade de queda
-            if (!maquina || !leituraOntem) return null;
-
-            const dadosOntem = { ...leituraOntem.sensor, ...leituraOntem };
-            const scoreOntem = this.calcularHealthScore(dadosOntem);
-            const scoreHoje = scoreHojeAtual === null
-                ? await this.atualizarSaudeMaquina(maquinaId)
-                : scoreHojeAtual;
-
-            const quedaPeriodo = scoreOntem - scoreHoje;
-
-            // SÓ calcula se houve queda real e se a saúde atual não é zero
-            if (quedaPeriodo <= 0 || scoreHoje <= 0) {
-                return await MaquinaModel.update(maquinaId, { previsaoManutencao: null });
+            if (historico.length < this.MIN_PONTOS_REGRESSAO) {
+                return await this.limparPrevisao(maquinaId, MaquinaModel);
             }
 
-            // 1. Data de Falha (0%)
-            const tempoAteZero = Math.floor(scoreHoje / quedaPeriodo);
-            const dataFalha = new Date();
-            dataFalha.setDate(dataFalha.getDate() + tempoAteZero);
+            const pontos = this.criarPontosRegressao(historico);
+            const regressao = this.criarModeloRegressao(pontos);
 
-            // 2. Janela de Início (70%)
-            let ManuInicio = new Date();
-            if (scoreHoje > 70) {
-                const quedaNecessariaPara70 = scoreHoje - 70;
-                const tempoAte70 = Math.floor(quedaNecessariaPara70 / quedaPeriodo);
-                ManuInicio.setDate(ManuInicio.getDate() + tempoAte70);
+            if (!regressao || regressao.slope >= 0 || regressao.score.r2 < this.R2_MINIMO) {
+                return await this.limparPrevisao(maquinaId, MaquinaModel);
             }
 
-            // 3. Janela de Fim (Data da falha menos 2 dias)
-            const ManuFim = new Date(dataFalha.getTime());
-            ManuFim.setDate(ManuFim.getDate() - 2);
+            const dataBase = pontos[0].criadoEm;
+            const referenciaTemporal = this.obterReferenciaTemporal(pontos);
+            const dataInicioManutencao = this.projetarDataLimiar(
+                regressao,
+                this.LIMIAR_MANUTENCAO,
+                dataBase
+            );
+            const dataFalha = this.projetarDataLimiar(
+                regressao,
+                this.LIMIAR_FALHA,
+                dataBase
+            );
 
-            console.log(`[PREDIÇÃO] Máquina ${maquinaId}: Falha em ${tempoAteZero}min | Início: ${ManuInicio.toLocaleTimeString()}`);
+            if (!dataFalha || dataFalha <= referenciaTemporal) {
+                return await this.limparPrevisao(maquinaId, MaquinaModel);
+            }
+
+            let janelaManuInicio = dataInicioManutencao;
+            if (!janelaManuInicio || janelaManuInicio < referenciaTemporal) {
+                janelaManuInicio = new Date(referenciaTemporal.getTime());
+            }
+
+            let janelaManuFim = new Date(dataFalha.getTime());
+            janelaManuFim.setDate(janelaManuFim.getDate() - this.DIAS_ANTECEDENCIA_FIM_JANELA);
+
+            if (janelaManuFim < referenciaTemporal) {
+                janelaManuFim = new Date(referenciaTemporal.getTime());
+            }
+
+            if (janelaManuInicio > janelaManuFim) {
+                janelaManuFim = new Date(janelaManuInicio.getTime());
+            }
+
+            console.log(
+                `[PREDICAO] Maquina ${maquinaId}: inclinacao=${regressao.slope.toFixed(4)} ` +
+                `intercepto=${regressao.intercept.toFixed(4)} ` +
+                `r2=${regressao.score.r2.toFixed(4)} falha=${dataFalha.toISOString()}`
+            );
 
             return await MaquinaModel.update(maquinaId, {
                 previsaoManutencao: dataFalha,
-                janelaManuInicio: ManuInicio,
-                janelaManuFim: ManuFim
+                janelaManuInicio,
+                janelaManuFim
             });
         } catch (error) {
-            throw new AppError("Erro ao calcular previsão de manutenção.", 500);
+            throw new AppError("Erro ao calcular previsao de manutencao.", 500);
         }
     }
 }
