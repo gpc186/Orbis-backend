@@ -1,0 +1,198 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-05-21T00:00:00.000Z",
+  "__export_source": "codex:orbis-predicao-alertas",
+  "resources": [
+    {
+      "_id": "wrk_orbis_predicao_alertas",
+      "_type": "workspace",
+      "name": "Orbis Predicao Alertas",
+      "description": "Colecao para validar login, consulta da maquina, historico de integridade e predicao de proximo alerta/instabilidade.",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_orbis_predicao_alertas_base",
+      "_type": "environment",
+      "parentId": "wrk_orbis_predicao_alertas",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:3333",
+        "token": "",
+        "refresh_token": "",
+        "login_email": "admin@orbis.local",
+        "login_senha": "Senha123",
+        "maquina_id": "1"
+      }
+    },
+    {
+      "_id": "fld_predicao_health",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_predicao_alertas",
+      "name": "Health"
+    },
+    {
+      "_id": "req_predicao_health",
+      "_type": "request",
+      "parentId": "fld_predicao_health",
+      "name": "Health",
+      "method": "GET",
+      "url": "{{ _.base_url }}/health",
+      "headers": [],
+      "body": {},
+      "description": "Confere se a API esta no ar antes de testar autenticacao e predicao."
+    },
+    {
+      "_id": "fld_predicao_auth",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_predicao_alertas",
+      "name": "Auth"
+    },
+    {
+      "_id": "req_predicao_auth_login",
+      "_type": "request",
+      "parentId": "fld_predicao_auth",
+      "name": "Login",
+      "method": "POST",
+      "url": "{{ _.base_url }}/auth/login",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"{{ _.login_email }}\",\n  \"senha\": \"{{ _.login_senha }}\"\n}"
+      },
+      "description": "Use a resposta para preencher token com accessToken e refresh_token com refreshToken no environment."
+    },
+    {
+      "_id": "req_predicao_auth_refresh",
+      "_type": "request",
+      "parentId": "fld_predicao_auth",
+      "name": "Refresh Token",
+      "method": "POST",
+      "url": "{{ _.base_url }}/auth/refresh",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"token\": \"{{ _.refresh_token }}\"\n}"
+      },
+      "description": "Gera um novo accessToken a partir do refresh_token salvo no environment."
+    },
+    {
+      "_id": "fld_predicao_maquinas",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_predicao_alertas",
+      "name": "Maquinas"
+    },
+    {
+      "_id": "req_predicao_maquinas_list",
+      "_type": "request",
+      "parentId": "fld_predicao_maquinas",
+      "name": "Listar Maquinas",
+      "method": "GET",
+      "url": "{{ _.base_url }}/maquinas",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Lista as maquinas ativas. Escolha um id e preencha maquina_id no environment."
+    },
+    {
+      "_id": "req_predicao_maquina_show",
+      "_type": "request",
+      "parentId": "fld_predicao_maquinas",
+      "name": "Buscar Maquina",
+      "method": "GET",
+      "url": "{{ _.base_url }}/maquinas/{{ _.maquina_id }}",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Consulta a maquina escolhida sem alterar o payload atual."
+    },
+    {
+      "_id": "req_predicao_maquina_historico",
+      "_type": "request",
+      "parentId": "fld_predicao_maquinas",
+      "name": "Historico Integridade",
+      "method": "GET",
+      "url": "{{ _.base_url }}/maquinas/{{ _.maquina_id }}/historico-integridade",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Verifica se a maquina possui historico suficiente para o modelo de integridade."
+    },
+    {
+      "_id": "req_predicao_maquina_alertas",
+      "_type": "request",
+      "parentId": "fld_predicao_maquinas",
+      "name": "Predicao Alertas",
+      "method": "GET",
+      "url": "{{ _.base_url }}/maquinas/{{ _.maquina_id }}/predicao-alertas",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Retorna proximoAlerta, instabilidade e modeloIntegridade usando fallback MAQUINA -> TIPO_MAQUINA -> GLOBAL."
+    },
+    {
+      "_id": "fld_predicao_alertas",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_predicao_alertas",
+      "name": "Alertas"
+    },
+    {
+      "_id": "req_predicao_alertas_list",
+      "_type": "request",
+      "parentId": "fld_predicao_alertas",
+      "name": "Listar Alertas",
+      "method": "GET",
+      "url": "{{ _.base_url }}/alertas",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Ajuda a validar os tipos historicos disponiveis para a maquina e para o sistema."
+    },
+    {
+      "_id": "req_predicao_alertas_eventos",
+      "_type": "request",
+      "parentId": "fld_predicao_alertas",
+      "name": "Listar Eventos de Alerta",
+      "method": "GET",
+      "url": "{{ _.base_url }}/alertas/eventos",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Permite inspecionar a cronologia real dos alertas gerados e comparar com a predicao."
+    }
+  ]
+}

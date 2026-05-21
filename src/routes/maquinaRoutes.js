@@ -7,6 +7,7 @@ const { uploadImagemUnica, imagemProcessada } = require('../middlewares/uploadMi
 
 router.post('/', authMiddleware, MaquinaController.store)
 router.get('/', authMiddleware, MaquinaController.index)
+router.get('/:id/predicao-alertas', authMiddleware, MaquinaController.predicaoAlertas)
 router.get('/:id/historico-integridade', authMiddleware, HistoricoIntegridadeController.listByMaquina)
 router.get('/:id', authMiddleware, MaquinaController.show)
 router.put('/:id/foto', authMiddleware, uploadImagemUnica, imagemProcessada, MaquinaController.updateFoto)

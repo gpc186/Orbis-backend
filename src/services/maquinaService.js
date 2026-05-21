@@ -1,6 +1,7 @@
 const MaquinaModel = require('../models/maquinaModel');
 const AppError = require("../utils/appErrorUtils");
 const StorageService = require('./storageService');
+const AlertaPreditivoService = require('./alertaPreditivoService');
 
 class MaquinaService {
     static async create(dados) {
@@ -20,6 +21,14 @@ class MaquinaService {
         } catch (error) {
             if (error instanceof AppError) throw error;
             throw new AppError("Erro ao buscar máquina.", 500);
+        }
+    }
+    static async getPredicaoAlertas(id) {
+        try {
+            return await AlertaPreditivoService.preverPorMaquina(id);
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            throw new AppError("Erro ao calcular predicao de alertas.", 500);
         }
     }
     static async update(id, dados) {
