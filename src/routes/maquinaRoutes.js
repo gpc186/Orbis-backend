@@ -1,11 +1,13 @@
 const express = require('express')
 const router = express.Router()
 const MaquinaController = require('../controllers/maquinaController')
+const HistoricoIntegridadeController = require('../controllers/historicoIntegridadeController')
 const authMiddleware = require('../middlewares/authMiddleware')
 const { uploadImagemUnica, imagemProcessada } = require('../middlewares/uploadMiddleware')
 
 router.post('/', authMiddleware, MaquinaController.store)
 router.get('/', authMiddleware, MaquinaController.index)
+router.get('/:id/historico-integridade', authMiddleware, HistoricoIntegridadeController.listByMaquina)
 router.get('/:id', authMiddleware, MaquinaController.show)
 router.put('/:id/foto', authMiddleware, uploadImagemUnica, imagemProcessada, MaquinaController.updateFoto)
 router.put('/:id', authMiddleware, MaquinaController.update)

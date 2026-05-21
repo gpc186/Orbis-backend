@@ -45,7 +45,7 @@ class PredicaoService {
         }
     }
 
-    static async previsaoManutencao(maquinaId) {
+    static async previsaoManutencao(maquinaId, scoreHojeAtual = null) {
         try {
             const MaquinaModel = require('../models/maquinaModel');
             const LeituraModel = require('../models/leituraModel');
@@ -60,7 +60,9 @@ class PredicaoService {
 
             const dadosOntem = { ...leituraOntem.sensor, ...leituraOntem };
             const scoreOntem = this.calcularHealthScore(dadosOntem);
-            const scoreHoje = await this.atualizarSaudeMaquina(maquinaId);
+            const scoreHoje = scoreHojeAtual === null
+                ? await this.atualizarSaudeMaquina(maquinaId)
+                : scoreHojeAtual;
 
             const quedaPeriodo = scoreOntem - scoreHoje;
 
