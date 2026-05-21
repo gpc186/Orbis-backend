@@ -5,6 +5,41 @@ class HistoricoIntegridadeModel {
         return await prisma.historicoIntegridade.create({ data });
     }
 
+    static async findSerieByMaquina(maquinaId, { limite = 30, dataInicio, dataFim } = {}) {
+        const where = {
+            maquinaId: Number(maquinaId)
+        };
+
+        if (dataInicio || dataFim) {
+            where.criadoEm = {};
+
+            if (dataInicio) {
+                where.criadoEm.gte = new Date(dataInicio);
+            }
+
+            if (dataFim) {
+                where.criadoEm.lte = new Date(dataFim);
+            }
+        }
+
+        const historico = await prisma.historicoIntegridade.findMany({
+            where,
+            take: Number(limite),
+            orderBy: { criadoEm: 'desc' },
+            select: {
+                id: true,
+                maquinaId: true,
+                integridade: true,
+                scoreEstabilidade: true,
+                origem: true,
+                observacao: true,
+                criadoEm: true
+            }
+        });
+
+        return historico.reverse();
+    }
+
     static async findAll({ maquinaId, dataInicio, dataFim, limite = 100 } = {}) {
         const where = {};
 

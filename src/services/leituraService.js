@@ -46,8 +46,8 @@ class leituraService {
       const novaLeitura = await leituraModel.store(dadosLeitura);
 
       try {
-        const scoreHoje = await PredicaoService.atualizarSaudeMaquina(sensor.maquinaId);
-        await PredicaoService.previsaoManutencao(sensor.maquinaId, scoreHoje);
+        await PredicaoService.atualizarSaudeMaquina(sensor.maquinaId);
+        await PredicaoService.previsaoManutencao(sensor.maquinaId);
       } catch (error) {
         logger.error("leitura_predictive_processing_failed", {
           sensorId: sensor.id,
