@@ -30,6 +30,7 @@ const dashboardAiRoutes = require("./routes/dashboardAiRoutes");
 const validarEnv = require("./utils/validarEnv");
 const { iniciarSimuladorJob } = require("./jobs/simuladorJob");
 const alertaRoutes = require("./routes/alertaRoutes");
+const historicoIntegridadeRoutes = require("./routes/historicoIntegridadeRoutes");
 const connectMQTT = require("./services/mqttService");
 const ReadinessService = require("./services/readinessService");
 
@@ -67,6 +68,7 @@ app.use("/manutencoes", manutencaoRoutes);
 app.use("/tecnicos", tecnicoRoutes);
 app.use("/dashboard", dashboardRoutes);
 app.use("/alertas", alertaRoutes);
+app.use("/historico-integridade", historicoIntegridadeRoutes);
 app.use("/auth", authRoutes);
 app.use("/usuarios", usuarioRoutes);
 app.use("/perfil", perfilRoutes);

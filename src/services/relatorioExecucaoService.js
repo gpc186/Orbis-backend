@@ -2,10 +2,10 @@ const AppError = require("../utils/appErrorUtils");
 const RelatorioAgendamentoModel = require("../models/relatorioAgendamentoModel");
 const RelatorioExecucaoModel = require("../models/relatorioExecucaoModel");
 const RelatorioRendererService = require("./relatorioRendererService");
-const RelatorioDispatchService = require("./relatorioDispatchService");
 const { computeNextRun, formatReportDateTime } = require("../utils/reportScheduleUtils");
 const { validatePreviewPayload } = require("../utils/reportValidation");
 const { normalizeEmails, isValidEmail } = require("../utils/emailValidation");
+const EmailService = require("./emailService");
 
 class RelatorioExecucaoService {
   static mapExecutionResponse(execucao) {
@@ -62,12 +62,8 @@ class RelatorioExecucaoService {
     });
 
     try {
-      const dispatch = await RelatorioDispatchService.send({
-        emailsDestino,
-        subject: rendered.subject,
-        html: rendered.html,
-        text: rendered.text
-      });
+
+      const dispatch = await EmailService.send({ to: emailsDestino, subject: rendered.subject, html: rendered.html, text: rendered.text })
 
       await RelatorioExecucaoModel.markSuccess(execution.id, {
         provider: dispatch.provider,
@@ -132,12 +128,8 @@ class RelatorioExecucaoService {
       });
 
       attemptedAt = new Date();
-      const dispatch = await RelatorioDispatchService.send({
-        emailsDestino,
-        subject: rendered.subject,
-        html: rendered.html,
-        text: rendered.text
-      });
+
+      const dispatch = await EmailService.send({ to: emailsDestino, subject: rendered.subject, html: rendered.html, text: rendered.text })
 
       let nextRunAt = agendamento.proximoEnvioEm;
       const updates = [

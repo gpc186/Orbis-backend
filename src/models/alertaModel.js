@@ -231,6 +231,96 @@ class AlertaModel {
         return await prisma.alerta.count({ where: { status: "ATIVO" } });
     };
 
+    static async findByMaquinaAndTipos(maquinaId, tipos) {
+        return await prisma.alerta.findMany({
+            where: {
+                maquinaId: Number(maquinaId),
+                tipo: { in: tipos }
+            },
+            select: {
+                id: true,
+                maquinaId: true,
+                tipo: true,
+                status: true,
+                criadoEm: true
+            },
+            orderBy: { criadoEm: "desc" }
+        });
+    };
+
+    static async findByTipoMaquinaAndTipos(tipoMaquina, tipos) {
+        return await prisma.alerta.findMany({
+            where: {
+                tipo: { in: tipos },
+                maquina: { tipo: tipoMaquina }
+            },
+            select: {
+                id: true,
+                maquinaId: true,
+                tipo: true,
+                status: true,
+                criadoEm: true
+            },
+            orderBy: { criadoEm: "desc" }
+        });
+    };
+
+    static async findByTipos(tipos) {
+        return await prisma.alerta.findMany({
+            where: {
+                tipo: { in: tipos }
+            },
+            select: {
+                id: true,
+                maquinaId: true,
+                tipo: true,
+                status: true,
+                criadoEm: true
+            },
+            orderBy: { criadoEm: "desc" }
+        });
+    };
+
+    static async findByMaquinaPeriodo(maquinaId, { dataInicio, dataFim, tipos, statuses } = {}) {
+        const where = {
+            maquinaId: Number(maquinaId)
+        };
+
+        if (dataInicio || dataFim) {
+            where.criadoEm = {};
+
+            if (dataInicio) {
+                where.criadoEm.gte = new Date(dataInicio);
+            }
+
+            if (dataFim) {
+                where.criadoEm.lte = new Date(dataFim);
+            }
+        }
+
+        if (Array.isArray(tipos) && tipos.length) {
+            where.tipo = { in: tipos };
+        }
+
+        if (Array.isArray(statuses) && statuses.length) {
+            where.status = { in: statuses };
+        }
+
+        return await prisma.alerta.findMany({
+            where,
+            select: {
+                id: true,
+                sensorId: true,
+                maquinaId: true,
+                tipo: true,
+                status: true,
+                criadoEm: true,
+                encerradoEm: true
+            },
+            orderBy: { criadoEm: "desc" }
+        });
+    };
+
     static async countAlertasToday(hoje) {
         return await prisma.alerta.count({ where: { criadoEm: { gte: hoje } } });
     };

@@ -2,7 +2,21 @@ const prisma = require('../prisma/prisma');
 
 class MaquinaModel {
     static async create(data) {
-        return await prisma.maquina.create({ data });
+        return await prisma.$transaction(async (tx) => {
+            const maquina = await tx.maquina.create({ data });
+
+            await tx.historicoIntegridade.create({
+                data: {
+                    maquinaId: maquina.id,
+                    integridade: maquina.integridade,
+                    scoreEstabilidade: maquina.scoreEstabilidade,
+                    origem: "CADASTRO_MAQUINA",
+                    observacao: "Registro inicial de integridade."
+                }
+            });
+
+            return maquina;
+        });
     }
 
     static async findAll() {
@@ -50,7 +64,22 @@ class MaquinaModel {
     }
 
     static async update(id, data) {
-        return await prisma.maquina.update({ where: { id: parseInt(id) }, data });
+        return await prisma.$transaction(async (tx) => {
+            const maquina = await tx.maquina.update({ where: { id: parseInt(id) }, data });
+
+            if (data.integridade !== undefined || data.scoreEstabilidade !== undefined) {
+                await tx.historicoIntegridade.create({
+                    data: {
+                        maquinaId: maquina.id,
+                        integridade: maquina.integridade,
+                        scoreEstabilidade: maquina.scoreEstabilidade,
+                        origem: "ATUALIZACAO_MAQUINA"
+                    }
+                });
+            }
+
+            return maquina;
+        });
     }
 
     static async delete(id) {
