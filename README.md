@@ -30,9 +30,10 @@ A API é responsável por:
 
 - Node.js 18 ou superior
 - Banco PostgreSQL acessível pela `DATABASE_URL`
-- Buckets no Supabase Storage para imagens:
+- Buckets no Supabase Storage:
   - `profile-images`
   - `machine-images`
+  - `machine-manuals`
 
 ## Como executar
 
@@ -59,6 +60,7 @@ DATABASE_URL="sua_url_do_postgres"
 JWT_SECRET="sua_chave_jwt"
 SUPABASE_URL="sua_url_do_supabase"
 SUPABASE_SERVICE_ROLE="sua_service_role"
+GROQ_API_KEY="sua_chave_groq"
 ```
 
 ### Utilizadas pela aplicação
@@ -71,6 +73,13 @@ REPORT_JOB_ENABLED=false
 REPORT_JOB_CRON="* * * * *"
 PORT=3333
 NODE_ENV="DEVELOPMENT"
+GROQ_MODEL="llama-3.3-70b-versatile"
+GROQ_EMBEDDING_MODEL="nomic-embed-text-v1_5"
+MANUAL_MAX_TEXT_CHARS=100000
+MANUAL_CHUNK_SIZE=1800
+MANUAL_CHUNK_OVERLAP=250
+MANUAL_MAX_CHUNKS=40
+MANUAL_ANALYSIS_CHUNKS=8
 ```
 
 O fluxo de relatorios usa timezone fixo `America/Sao_Paulo`.
@@ -149,6 +158,24 @@ src/
 - `ultimaLeituraEm`
 - `criadoEm`
 
+### Manual da maquina
+
+- `id`
+- `maquinaId`
+- `nomeArquivo`
+- `mimeType`
+- `tamanhoBytes`
+- `url`
+- `caminho`
+- `textoExtraido`
+- `embedding`
+- `chunks`
+- `especificacoes`
+- `modeloEmbedding`
+- `modeloAnalise`
+- `criadoEm`
+- `atualizadoEm`
+
 ### Leitura
 
 - `id`
@@ -215,6 +242,14 @@ src/
 - quando a manutenção é `RESOLVIDO`, o alerta é encerrado como `RESOLVIDO`;
 - quando a manutenção é `ENCERRADO_SEM_SOLUCAO`, o alerta volta para `ATIVO` e o técnico é desvinculado.
 
+### Manual tecnico da maquina
+
+- `POST /maquinas` pode receber um PDF no campo multipart `manual` junto com os dados da maquina;
+- `PUT /maquinas/:id/manual` cria ou substitui o manual de uma maquina existente;
+- o PDF e armazenado no bucket `machine-manuals`, e o banco guarda metadados, texto extraido, chunks, embeddings e especificacoes extraidas;
+- o retorno inclui as especificacoes extraidas em `manual.especificacoes`;
+- a extracao usa embeddings para selecionar trechos do manual antes de pedir ao Groq um JSON com limites e valores ideais.
+
 ## Rotas
 
 ### Healthcheck
@@ -269,6 +304,7 @@ src/
 | GET | `/maquinas/:id` | Autenticado |
 | PUT | `/maquinas/:id` | Autenticado |
 | PUT | `/maquinas/:id/foto` | Autenticado |
+| PUT | `/maquinas/:id/manual` | Autenticado |
 | DELETE | `/maquinas/:id` | Autenticado |
 
 ### Sensores
@@ -316,6 +352,14 @@ src/
   - `image/webp`
 - tamanho máximo: `15 MB`
 - a imagem é convertida para `webp`
+
+## Upload de manuais
+
+- campo esperado no multipart: `manual`
+- formato aceito: `application/pdf`
+- tamanho maximo: `25 MB`
+- no cadastro, envie os campos da maquina e o PDF no mesmo `multipart/form-data`
+- a resposta do cadastro retorna o manual persistido em `manual`
 
 ## Jobs agendados
 
