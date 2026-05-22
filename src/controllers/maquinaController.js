@@ -3,7 +3,7 @@ const AppError = require('../utils/appErrorUtils');
 class MaquinaController {
     static async store(req, res, next) {
         try {
-            const nova = await MaquinaService.create(req.body);
+            const nova = await MaquinaService.create(req.body, req.file);
             return res.status(201).json(nova);
         } catch (error) {
             next(error)
@@ -49,6 +49,18 @@ class MaquinaController {
             const maquinaId = req.params.id;
             const buffer = req.file.buffer;
             const response = await MaquinaService.updateFotoMaquina({ maquinaId, buffer });
+            return res.status(200).json(response);
+        } catch (error) {
+            next(error);
+        };
+    };
+    static async updateManual(req, res, next){
+        if(!req.file){
+            return next(new AppError("Manual nÃ£o enviado!", 400));
+        };
+        try {
+            const maquinaId = req.params.id;
+            const response = await MaquinaService.updateManualMaquina({ maquinaId, file: req.file });
             return res.status(200).json(response);
         } catch (error) {
             next(error);

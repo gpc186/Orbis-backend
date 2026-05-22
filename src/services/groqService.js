@@ -15,7 +15,7 @@ class GroqService {
   }
 
   static getConfig() {
-    const { GROQ_API_KEY, GROQ_MODEL } = process.env;
+    const { GROQ_API_KEY, GROQ_MODEL, GROQ_EMBEDDING_MODEL } = process.env;
 
     if (!GROQ_API_KEY) {
       throw new AppError("GROQ_API_KEY nao configurada.", 500);
@@ -23,7 +23,8 @@ class GroqService {
 
     return {
       apiKey: GROQ_API_KEY,
-      model: GROQ_MODEL || "llama-3.3-70b-versatile"
+      model: GROQ_MODEL || "llama-3.3-70b-versatile",
+      embeddingModel: GROQ_EMBEDDING_MODEL || "nomic-embed-text-v1_5"
     };
   }
 
@@ -92,6 +93,53 @@ class GroqService {
       }
 
       throw new AppError("Falha ao consultar a IA (Groq).", 502);
+    }
+  }
+
+  static async generateEmbeddings({ input, type = "document" }) {
+    const values = Array.isArray(input) ? input : [input];
+    const cleaned = values
+      .map((item) => String(item || "").trim())
+      .filter((item) => item.length > 0);
+
+    if (cleaned.length === 0) {
+      throw new AppError("Texto invalido para embedding.", 400);
+    }
+
+    const prefix = type === "query" ? "search_query" : "search_document";
+    const client = this.getClient();
+    const { embeddingModel } = this.getConfig();
+
+    try {
+      const response = await client.embeddings.create({
+        model: embeddingModel,
+        input: cleaned.map((text) => `${prefix}: ${text}`),
+        encoding_format: "float"
+      });
+
+      const embeddings = response?.data
+        ?.sort((a, b) => a.index - b.index)
+        ?.map((item) => item.embedding);
+
+      if (!embeddings || embeddings.length !== cleaned.length) {
+        throw new AppError("Resposta invalida do provedor de embeddings.", 502);
+      }
+
+      return embeddings;
+    } catch (error) {
+      logger.error("groq_embedding_error", {
+        model: embeddingModel,
+        inputCount: cleaned.length,
+        statusCode: error?.status || 502,
+        error
+      });
+
+      if (error instanceof AppError) throw error;
+      if (error?.status === 429) {
+        throw new AppError("Limite de uso da IA atingido. Tente novamente em instantes.", 429);
+      }
+
+      throw new AppError("Falha ao gerar embeddings com a IA (Groq).", 502);
     }
   }
 }
