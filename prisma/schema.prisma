@@ -128,6 +128,22 @@ model Maquina {
 
   sensores Sensor[]
   alertas  Alerta[]
+  historicoIntegridade HistoricoIntegridade[]
+}
+
+model HistoricoIntegridade {
+  id                 Int      @id @default(autoincrement())
+  maquinaId          Int
+  integridade        Float
+  scoreEstabilidade  Float?
+  origem             String?
+  observacao         String?  @db.Text
+  criadoEm           DateTime @default(now())
+
+  maquina Maquina @relation(fields: [maquinaId], references: [id], onDelete: Cascade)
+
+  @@index([maquinaId, criadoEm])
+  @@index([criadoEm])
 }
 
 model Sensor {
@@ -302,4 +318,21 @@ model RelatorioExecucao {
 
   @@index([agendamentoId, iniciadoEm])
   @@index([status, iniciadoEm])
+}
+model AiActionConfirmation {
+  id          String   @id @default(uuid())
+  usuarioId   Int
+  actionName  String
+  actionData  Json
+  actionLabel String
+  summary     Json?
+  status      StatusAiActionConfirmation @default(PENDING)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  resolvedAt  DateTime?
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, status, expiresAt])
+  @@index([status, expiresAt])
 }

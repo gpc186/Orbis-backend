@@ -4,14 +4,16 @@ const test = require("node:test");
 const DashboardAiService = require("./dashboardAiService");
 const GroqService = require("./groqService");
 const UsuarioService = require("./usuarioService");
+const AiToolsRegistry = require("./aiTools/registry");
+const AiConfirmationService = require("./aiConfirmationService");
+const AppError = require("../utils/appErrorUtils");
 
 test("DashboardAiService faz fallback quando a resposta final da tool volta sem texto", async () => {
   const originalBuildContext = DashboardAiService.buildContext;
   const originalBuildPrompts = DashboardAiService.buildPrompts;
   const originalGenerateWithTools = GroqService.generateWithTools;
+  const originalGenerateText = GroqService.generateText;
   const originalFindByNome = UsuarioService.findByNome;
-
-  let callCount = 0;
 
   DashboardAiService.buildContext = async () => ({
     metadata: {
@@ -62,27 +64,20 @@ test("DashboardAiService faz fallback quando a resposta final da tool volta sem 
     }]
   });
 
-  GroqService.generateWithTools = async () => {
-    callCount += 1;
+  GroqService.generateWithTools = async () => ({
+    role: "assistant",
+    tool_calls: [{
+      id: "tool-call-1",
+      type: "function",
+      function: {
+        name: "buscar_usuario_por_nome",
+        arguments: JSON.stringify({ nome: "Carlos" })
+      }
+    }]
+  });
 
-    if (callCount === 1) {
-      return {
-        role: "assistant",
-        tool_calls: [{
-          id: "tool-call-1",
-          type: "function",
-          function: {
-            name: "buscar_usuario_por_nome",
-            arguments: JSON.stringify({ nome: "Carlos" })
-          }
-        }]
-      };
-    }
-
-    return {
-      role: "assistant",
-      content: "   "
-    };
+  GroqService.generateText = async () => {
+    throw new AppError("Resposta final vazia do provedor de IA.", 502);
   };
 
   try {
@@ -100,6 +95,109 @@ test("DashboardAiService faz fallback quando a resposta final da tool volta sem 
     DashboardAiService.buildContext = originalBuildContext;
     DashboardAiService.buildPrompts = originalBuildPrompts;
     GroqService.generateWithTools = originalGenerateWithTools;
+    GroqService.generateText = originalGenerateText;
     UsuarioService.findByNome = originalFindByNome;
+  }
+});
+
+test("DashboardAiService retorna confirmacao para tool de escrita", async () => {
+  const originalBuildContext = DashboardAiService.buildContext;
+  const originalBuildPrompts = DashboardAiService.buildPrompts;
+  const originalGenerateWithTools = GroqService.generateWithTools;
+  const originalPrepareWriteToolAction = AiToolsRegistry.prepareWriteToolAction;
+  const originalCreate = AiConfirmationService.create;
+
+  DashboardAiService.buildContext = async () => ({
+    metadata: {
+      generatedAt: "2026-05-20T12:00:00.000Z",
+      usuario: { id: 1, nome: "Admin", role: "ADMIN" }
+    },
+    resumo: {},
+    colecoes: { topAlertas: [], maquinasCriticas: [], sensoresOffline: [] },
+    destaques: []
+  });
+
+  DashboardAiService.buildPrompts = () => ({
+    messages: [
+      { role: "system", content: "Teste" },
+      { role: "user", content: "Pause o agendamento 12" }
+    ]
+  });
+
+  GroqService.generateWithTools = async () => ({
+    role: "assistant",
+    tool_calls: [{
+      id: "tool-call-1",
+      type: "function",
+      function: {
+        name: "pausar_agendamento_relatorio",
+        arguments: JSON.stringify({ id: 12 })
+      }
+    }]
+  });
+
+  AiToolsRegistry.prepareWriteToolAction = async () => ({
+    name: "pausar_agendamento_relatorio",
+    args: { id: 12 },
+    actionLabel: "Pausar agendamento",
+    summary: { id: 12, nome: "Relatorio Semanal" }
+  });
+
+  AiConfirmationService.create = async () => ({
+    id: "confirmation-1",
+    actionName: "pausar_agendamento_relatorio",
+    actionLabel: "Pausar agendamento",
+    summary: { id: 12, nome: "Relatorio Semanal" },
+    expiresAt: "2026-05-20T12:10:00.000Z"
+  });
+
+  try {
+    const result = await DashboardAiService.answer({
+      pergunta: "Pause o agendamento 12",
+      usuario: { id: 1, nome: "Admin", role: "ADMIN" },
+      historico: []
+    });
+
+    assert.equal(result.requiresConfirmation, true);
+    assert.equal(result.confirmation.type, "tool_action");
+    assert.equal(result.confirmation.actionLabel, "Pausar agendamento");
+    assert.equal(result.confirmation.id, "confirmation-1");
+  } finally {
+    DashboardAiService.buildContext = originalBuildContext;
+    DashboardAiService.buildPrompts = originalBuildPrompts;
+    GroqService.generateWithTools = originalGenerateWithTools;
+    AiToolsRegistry.prepareWriteToolAction = originalPrepareWriteToolAction;
+    AiConfirmationService.create = originalCreate;
+  }
+});
+
+test("DashboardAiService resolve cancelamento de confirmacao", async () => {
+  const originalCancel = AiConfirmationService.cancel;
+  const originalExecuteWriteTool = AiToolsRegistry.executeWriteTool;
+
+  AiConfirmationService.cancel = async () => ({
+    actionLabel: "Pausar agendamento"
+  });
+
+  AiToolsRegistry.executeWriteTool = async () => ({
+    message: "nao deveria executar"
+  });
+
+  try {
+    const result = await DashboardAiService.answer({
+      pergunta: "cancelar acao pendente",
+      usuario: { id: 1, nome: "Admin", role: "ADMIN" },
+      confirmationResponse: {
+        id: "confirmation-1",
+        decision: "cancel"
+      }
+    });
+
+    assert.equal(result.confirmationResolved, true);
+    assert.equal(result.confirmationDecision, "cancel");
+    assert.equal(result.requiresConfirmation, false);
+  } finally {
+    AiConfirmationService.cancel = originalCancel;
+    AiToolsRegistry.executeWriteTool = originalExecuteWriteTool;
   }
 });

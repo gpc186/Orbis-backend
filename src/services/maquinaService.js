@@ -22,6 +22,44 @@ class MaquinaService {
             throw new AppError("Erro ao buscar máquina.", 500);
         }
     }
+    static async findDetalhadaById(id) {
+        try {
+            const maquina = await MaquinaModel.findById(id, {
+                include: {
+                    sensores: true,
+                    alertas: {
+                        where: { status: "ATIVO" },
+                        orderBy: { criadoEm: "desc" },
+                        take: 10,
+                        include: {
+                            sensor: {
+                                select: {
+                                    id: true,
+                                    tipo: true,
+                                    status: true
+                                }
+                            },
+                            tecnico: {
+                                select: {
+                                    id: true,
+                                    nome: true,
+                                    email: true,
+                                    role: true,
+                                    ativo: true
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            if (!maquina) throw new AppError("MÃ¡quina nÃ£o encontrada.", 404);
+            return maquina;
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            throw new AppError("Erro ao buscar mÃ¡quina detalhada.", 500);
+        }
+    }
     static async findByNome({ nome, limit = 10, somenteAtivas }) {
         const nomeNormalizado = String(nome || "").trim();
 

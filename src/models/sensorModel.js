@@ -73,6 +73,27 @@ class SensorModel {
             }
         });
     }
+    static async findByMaquinaId({ maquinaId, status, take = 10 }) {
+        return await prisma.sensor.findMany({
+            where: {
+                maquinaId: parseInt(maquinaId),
+                ...(status ? { status } : {})
+            },
+            take,
+            orderBy: { tipo: "asc" },
+            include: {
+                maquina: {
+                    select: {
+                        id: true,
+                        nome: true,
+                        setor: true,
+                        criticidade: true,
+                        ativo: true
+                    }
+                }
+            }
+        });
+    }
     static async update(id, data) {
         return await prisma.sensor.update({
             where: { id: parseInt(id) },

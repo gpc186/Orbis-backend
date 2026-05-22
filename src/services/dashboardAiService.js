@@ -6,7 +6,9 @@ const SensorModel = require("../models/sensorModel");
 const MaquinaModel = require("../models/maquinaModel");
 const AlertaModel = require("../models/alertaModel");
 const normalizeQuestion = require("../utils/normalizeQuestion");
-const { tools, executeTool } = require("./aiTools/registry");
+const logger = require("../utils/logger");
+const AiConfirmationService = require("./aiConfirmationService");
+const AiToolsRegistry = require("./aiTools/registry");
 
 class DashboardAiService {
   static getContextLimit() {
@@ -109,6 +111,8 @@ Quando usar os tools:
 - Quando a pergunta exigir consultar ou executar dados especificos do sistema, use as tools disponiveis.
 - Nao invente status de tecnico, maquinas ou usuarios se houver uma tool apropriada.
 - Se faltar um dado obrigatorio para usar a tool, pergunte ao usuario.
+- Acoes que alteram dados exigem confirmacao explicita do usuario antes da execucao.
+- Quando uma acao exigir confirmacao, descreva exatamente o que sera feito antes de pedir a confirmacao.
 
 Tom: Natural, inteligente e colaborativo. Como um colega experiente que entende profundamente de operações industriais e tecnologia, e sabe conversar sem parecer um relatório automatizado.
 `.trim();
@@ -155,7 +159,125 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
       .slice(-maxMessages);
   }
 
-  static async answer({ pergunta, usuario, historico }) {
+  static buildConfirmationSummaryText(confirmation) {
+    const summary = confirmation.summary || {};
+
+    if (confirmation.actionName === "pausar_agendamento_relatorio") {
+      return `Vou pausar o agendamento ${summary.id} (${summary.nome}), que hoje esta com status ${summary.statusAtual}.`;
+    }
+
+    if (confirmation.actionName === "deletar_agendamento_relatorio") {
+      return `Vou deletar o agendamento ${summary.id} (${summary.nome}) e remover sua configuracao ativa.`;
+    }
+
+    if (confirmation.actionName === "executar_agendamento_relatorio_agora") {
+      return `Vou executar agora o agendamento ${summary.id} (${summary.nome}) e disparar o envio para os destinatarios configurados.`;
+    }
+
+    if (confirmation.actionName === "enviar_relatorio_agora") {
+      const emailsDestino = Array.isArray(summary.emailsDestino)
+        ? summary.emailsDestino.join(", ")
+        : "os destinatarios informados";
+      const secoes = Array.isArray(summary.secoes) && summary.secoes.length > 0
+        ? summary.secoes.join(", ")
+        : "as secoes informadas";
+
+      return `Vou enviar agora o relatorio ${summary.nome || "Relatorio Operacional"} para ${emailsDestino}, usando as secoes ${secoes}.`;
+    }
+
+    if (confirmation.actionName === "atualizar_limites_sensor") {
+      const alteracoes = Array.isArray(summary.alteracoes)
+        ? summary.alteracoes
+            .map((item) => `${item.campo}: ${item.valorAtual} -> ${item.novoValor}`)
+            .join(", ")
+        : "os valores informados";
+
+      return `Vou atualizar os limites do sensor ${summary.id}${summary.maquinaNome ? ` da maquina ${summary.maquinaNome}` : ""} com estas alteracoes: ${alteracoes}.`;
+    }
+
+    return `Vou executar a acao "${confirmation.actionLabel}".`;
+  }
+
+  static buildConfirmationResponse({ confirmation, pergunta }) {
+    const summaryText = this.buildConfirmationSummaryText(confirmation);
+
+    return {
+      pergunta: typeof pergunta === "string" ? pergunta.trim() : "",
+      resposta: `${summaryText}\n\nConfirme para continuar ou cancele.`,
+      fallback: false,
+      requiresConfirmation: true,
+      confirmation: {
+        id: confirmation.id,
+        type: "tool_action",
+        actionKey: confirmation.actionName,
+        message: "Confirme se deseja continuar com esta acao.",
+        actionLabel: confirmation.actionLabel,
+        confirmLabel: "Pode fazer",
+        cancelLabel: "Cancelar",
+        confirmValue: "confirm",
+        cancelValue: "cancel",
+        summary: confirmation.summary,
+        expiresAt: confirmation.expiresAt
+      }
+    };
+  }
+
+  static async handleConfirmation({ pergunta, usuario, confirmationResponse }) {
+    const id = String(confirmationResponse?.id || "").trim();
+    const decision = String(confirmationResponse?.decision || "").trim().toLowerCase();
+
+    if (!id) {
+      throw new AppError("Id de confirmacao invalido.", 400);
+    }
+
+    if (decision !== "confirm" && decision !== "cancel") {
+      throw new AppError("Decisao de confirmacao invalida.", 400);
+    }
+
+    if (decision === "cancel") {
+      const pending = await AiConfirmationService.cancel({ id, usuario });
+
+      return {
+        pergunta: typeof pergunta === "string" ? pergunta.trim() : "",
+        resposta: `Acao cancelada: ${pending.actionLabel}.`,
+        fallback: false,
+        requiresConfirmation: false,
+        confirmationResolved: true,
+        confirmationDecision: "cancel",
+        confirmationId: id
+      };
+    }
+
+    const pending = await AiConfirmationService.getPending({ id, usuario });
+
+    const result = await AiToolsRegistry.executeWriteTool({
+      action: pending.actionData,
+      usuario
+    });
+
+    await AiConfirmationService.confirmSuccess({ id, usuario });
+
+    return {
+      pergunta: typeof pergunta === "string" ? pergunta.trim() : "",
+      resposta: result.message,
+      fallback: false,
+      requiresConfirmation: false,
+      confirmationResolved: true,
+      confirmationDecision: "confirm",
+      confirmationId: id,
+      actionResult: {
+        tool: pending.actionData.name,
+        summary: pending.summary,
+        result
+      }
+    };
+  }
+
+  static async answer({ pergunta, usuario, historico, confirmationResponse }) {
+    if (confirmationResponse) {
+      return this.handleConfirmation({ pergunta, usuario, confirmationResponse });
+    }
+
     if (!pergunta || typeof pergunta !== "string" || pergunta.trim().length < 3) {
       throw new AppError("Pergunta invÃ¡lida.", 400);
     }
@@ -166,7 +288,11 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
 
     const { original, normalized } = normalizeQuestion(pergunta, 500);
 
-    console.log(`Recebemos a pergunta para a ia como ${original}, e tratamos para que ele ficasse assim ${normalized}`);
+    logger.info("dashboard_ai_question_normalized", {
+      usuarioId: usuario?.id,
+      originalLength: String(original || "").length,
+      normalizedLength: String(normalized || "").length
+    });
 
     if (!normalized || normalized.trim().length === 0) {
       throw new AppError("Pergunta invÃ¡lida!", 400);
@@ -184,7 +310,7 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
     try {
       const firstMessage = await GroqService.generateWithTools({
         messages,
-        tools,
+        tools: AiToolsRegistry.tools,
         temperature: 0.2
       });
 
@@ -198,13 +324,41 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
         };
       }
 
+      const writeToolCall = firstMessage.tool_calls.find((toolCall) =>
+        AiToolsRegistry.isWriteTool(toolCall.function.name)
+      );
+
+      if (writeToolCall) {
+        const preparedAction = await AiToolsRegistry.prepareWriteToolAction({
+          name: writeToolCall.function.name,
+          args: JSON.parse(writeToolCall.function.arguments || "{}"),
+          usuario
+        });
+
+        const confirmation = await AiConfirmationService.create({
+          usuario,
+          action: preparedAction,
+          actionLabel: preparedAction.actionLabel,
+          summary: preparedAction.summary
+        });
+
+        return {
+          ...this.buildConfirmationResponse({
+            confirmation,
+            pergunta
+          }),
+          contextoGeradoEm: contexto.metadata.generatedAt,
+          usedHistoryCount: historicoSeguro.length
+        };
+      }
+
       const toolMessages = [];
 
       for (const toolCall of firstMessage.tool_calls) {
         const toolName = toolCall.function.name;
         const args = JSON.parse(toolCall.function.arguments || "{}");
 
-        const result = await executeTool({
+        const result = await AiToolsRegistry.executeTool({
           name: toolName,
           args,
           usuario
@@ -217,24 +371,14 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
         });
       }
 
-      const finalMessage = await GroqService.generateWithTools({
+      const finalText = await GroqService.generateText({
         messages: [
           ...messages,
           firstMessage,
           ...toolMessages
         ],
-        tools,
         temperature: 0.2
       });
-
-      const finalText =
-        typeof finalMessage?.content === "string"
-          ? finalMessage.content.trim()
-          : "";
-
-      if (!finalText) {
-        throw new AppError("Resposta final vazia do provedor de IA.", 502);
-      }
 
       return {
         pergunta: pergunta.trim(),

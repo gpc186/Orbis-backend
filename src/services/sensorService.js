@@ -87,6 +87,36 @@ class SensorService {
             throw new AppError("Erro ao buscar sensores por tipo.", 500);
         }
     }
+    static async findByMaquinaId({ maquinaId, status, limit = 10 }) {
+        const maquinaIdNum = parseInt(maquinaId);
+
+        if (!Number.isInteger(maquinaIdNum)) {
+            throw new AppError("Id da maquina invalido para busca de sensores.", 400);
+        }
+
+        const take = Math.min(Math.max(Number(limit || 10), 1), 20);
+
+        try {
+            const maquina = await MaquinaModel.findById(maquinaIdNum);
+            if (!maquina) {
+                throw new AppError("Maquina nao encontrada.", 404);
+            }
+
+            const sensores = await SensorModel.findByMaquinaId({
+                maquinaId: maquinaIdNum,
+                status,
+                take
+            });
+
+            return {
+                total: sensores.length,
+                dados: sensores
+            };
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            throw new AppError("Erro ao buscar sensores por maquina.", 500);
+        }
+    }
     static async update(id, dados) {
         try {
             // Verifica se o sensor existe
