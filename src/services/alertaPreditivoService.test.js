@@ -103,7 +103,7 @@ test("preverPorMaquina retorna previsoes nulas quando o modelo de integridade na
     modelResult: {
       ...createModelResult(),
       valido: false,
-      motivo: "modelo_invalido"
+      motivo: "tendencia_nao_confiavel"
     }
   });
 
@@ -113,7 +113,13 @@ test("preverPorMaquina retorna previsoes nulas quando o modelo de integridade na
     assert.deepEqual(resultado, {
       maquinaId: 1,
       proximoAlerta: null,
+      ausenciaProximoAlerta: {
+        motivo: "tendencia_nao_confiavel"
+      },
       instabilidade: null,
+      ausenciaInstabilidade: {
+        motivo: "tendencia_nao_confiavel"
+      },
       modeloIntegridade: {
         r2: 0.84,
         slope: -1,
@@ -151,6 +157,8 @@ test("preverPorMaquina usa o limiar da propria maquina quando ha amostras sufici
     assert.equal(resultado.proximoAlerta.amostrasLimiar, 3);
     assert.equal(resultado.proximoAlerta.confianca, 0.25);
     assert.equal(resultado.proximoAlerta.dataPrevista.toISOString(), "2026-05-22T04:00:00.000Z");
+    assert.equal(resultado.ausenciaProximoAlerta, null);
+    assert.equal(resultado.ausenciaInstabilidade, null);
     assert.deepEqual(resultado.instabilidade, {
       dataPrevista: resultado.proximoAlerta.dataPrevista,
       integridadeLimiar: 72,
@@ -205,6 +213,8 @@ test("preverPorMaquina faz fallback para o tipo da maquina e escolhe o menor can
     assert.equal(resultado.proximoAlerta.tipo, "TENDENCIA_CURTA");
     assert.equal(resultado.proximoAlerta.fonteLimiar, "TIPO_MAQUINA");
     assert.equal(resultado.proximoAlerta.dataPrevista.toISOString(), "2026-05-21T07:00:00.000Z");
+    assert.equal(resultado.ausenciaProximoAlerta, null);
+    assert.equal(resultado.ausenciaInstabilidade, null);
     assert.deepEqual(resultado.instabilidade, {
       dataPrevista: new Date("2026-05-21T08:00:00.000Z"),
       integridadeLimiar: 75,
@@ -246,6 +256,7 @@ test("preverPorMaquina faz fallback global quando o tipo da maquina nao tem amos
     assert.equal(resultado.proximoAlerta.fonteLimiar, "GLOBAL");
     assert.equal(resultado.proximoAlerta.integridadeLimiar, 70);
     assert.equal(resultado.proximoAlerta.amostrasLimiar, 3);
+    assert.equal(resultado.ausenciaProximoAlerta, null);
   } finally {
     mocks.restore();
   }
@@ -285,7 +296,14 @@ test("preverPorMaquina ignora previsoes no passado e acima de 90 dias", async ()
     const resultado = await AlertaPreditivoService.preverPorMaquina(1);
 
     assert.equal(resultado.proximoAlerta, null);
+    assert.deepEqual(resultado.ausenciaProximoAlerta, {
+      motivo: "sem_alerta_previsivel"
+    });
     assert.equal(resultado.instabilidade, null);
+    assert.deepEqual(resultado.ausenciaInstabilidade, {
+      motivo: "sem_historico_de_alertas_do_tipo",
+      tipo: "INSTABILIDADE"
+    });
   } finally {
     mocks.restore();
   }

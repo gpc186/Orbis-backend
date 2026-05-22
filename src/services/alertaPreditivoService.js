@@ -8,6 +8,16 @@ class AlertaPreditivoService {
   static TIPOS_SUPORTADOS = ["INSTABILIDADE", "TENDENCIA_CURTA", "TENDENCIA_LONGA"];
   static MIN_AMOSTRAS_LIMIAR = 3;
 
+  static MOTIVOS = {
+    HISTORICO_INSUFICIENTE: "historico_insuficiente",
+    REGRESSAO_INDISPONIVEL: "modelo_nao_pode_ser_calculado",
+    MODELO_INVALIDO: "tendencia_nao_confiavel",
+    LIMIAR_INDISPONIVEL: "sem_historico_de_alertas_do_tipo",
+    DATA_PASSADA: "evento_ja_ocorrido",
+    FORA_JANELA: "previsao_fora_da_janela",
+    SEM_PREVISAO: "sem_alerta_previsivel"
+  };
+
   static arredondar(valor, casas = 2) {
     return Number(Number(valor).toFixed(casas));
   }
@@ -127,17 +137,48 @@ class AlertaPreditivoService {
     };
   }
 
+  static criarAusenciaPrevisao(motivo, detalhes = {}) {
+    return {
+      motivo,
+      ...detalhes
+    };
+  }
+
   static async preverTipo(maquina, tipo, modeloResultado) {
     if (!modeloResultado?.valido || !modeloResultado?.modeloIntegridade) {
-      return null;
+      return {
+        predicao: null,
+        ausencia: this.criarAusenciaPrevisao(
+          modeloResultado?.motivo || this.MOTIVOS.MODELO_INVALIDO
+        )
+      };
     }
 
     const limiarHistorico = await this.obterLimiarHistorico(maquina, tipo);
     if (!limiarHistorico) {
-      return null;
+      return {
+        predicao: null,
+        ausencia: this.criarAusenciaPrevisao(this.MOTIVOS.LIMIAR_INDISPONIVEL, { tipo })
+      };
     }
 
     const modeloIntegridade = modeloResultado.modeloIntegridade;
+    const horasAteLimiar = modeloIntegridade.modelo.computeX(limiarHistorico.integridadeLimiar);
+
+    if (!Number.isFinite(horasAteLimiar) || horasAteLimiar <= 0) {
+      return {
+        predicao: null,
+        ausencia: this.criarAusenciaPrevisao(this.MOTIVOS.DATA_PASSADA, { tipo })
+      };
+    }
+
+    if (horasAteLimiar > (PredicaoService.LIMITE_MAXIMO_DIAS_PREVISAO * 24)) {
+      return {
+        predicao: null,
+        ausencia: this.criarAusenciaPrevisao(this.MOTIVOS.FORA_JANELA, { tipo })
+      };
+    }
+
     const dataPrevista = PredicaoService.projetarDataLimiar(
       modeloIntegridade,
       limiarHistorico.integridadeLimiar,
@@ -145,10 +186,16 @@ class AlertaPreditivoService {
     );
 
     if (!dataPrevista || dataPrevista <= modeloIntegridade.referenciaTemporal) {
-      return null;
+      return {
+        predicao: null,
+        ausencia: this.criarAusenciaPrevisao(this.MOTIVOS.DATA_PASSADA, { tipo })
+      };
     }
 
-    return this.montarPredicaoTipo(tipo, dataPrevista, limiarHistorico, modeloIntegridade);
+    return {
+      predicao: this.montarPredicaoTipo(tipo, dataPrevista, limiarHistorico, modeloIntegridade),
+      ausencia: null
+    };
   }
 
   static async preverPorMaquina(maquinaId) {
@@ -164,28 +211,51 @@ class AlertaPreditivoService {
       return {
         maquinaId: maquina.id,
         proximoAlerta: null,
+        ausenciaProximoAlerta: this.criarAusenciaPrevisao(
+          modeloResultado?.motivo || this.MOTIVOS.MODELO_INVALIDO
+        ),
         instabilidade: null,
+        ausenciaInstabilidade: this.criarAusenciaPrevisao(
+          modeloResultado?.motivo || this.MOTIVOS.MODELO_INVALIDO
+        ),
         modeloIntegridade
       };
     }
 
-    const previsoes = await Promise.all(
+    const resultadosPorTipo = await Promise.all(
       this.TIPOS_SUPORTADOS.map((tipo) => this.preverTipo(maquina, tipo, modeloResultado))
     );
 
-    const previsoesValidas = previsoes.filter(Boolean);
+    const previsoesValidas = resultadosPorTipo
+      .map((resultado) => resultado.predicao)
+      .filter(Boolean);
+
     const proximoAlerta = previsoesValidas.length
       ? [...previsoesValidas].sort((a, b) => a.dataPrevista - b.dataPrevista)[0]
       : null;
 
+    const resultadoInstabilidade = resultadosPorTipo[
+      this.TIPOS_SUPORTADOS.indexOf("INSTABILIDADE")
+    ] || { predicao: null, ausencia: null };
+
     const instabilidade = this.montarPredicaoInstabilidade(
-      previsoesValidas.find((predicao) => predicao.tipo === "INSTABILIDADE") || null
+      resultadoInstabilidade.predicao
     );
+
+    const ausenciaProximoAlerta = proximoAlerta
+      ? null
+      : this.criarAusenciaPrevisao(this.MOTIVOS.SEM_PREVISAO);
+
+    const ausenciaInstabilidade = instabilidade
+      ? null
+      : (resultadoInstabilidade.ausencia || this.criarAusenciaPrevisao(this.MOTIVOS.SEM_PREVISAO));
 
     return {
       maquinaId: maquina.id,
       proximoAlerta,
+      ausenciaProximoAlerta,
       instabilidade,
+      ausenciaInstabilidade,
       modeloIntegridade
     };
   }

@@ -154,7 +154,23 @@
         }
       ],
       "body": {},
-      "description": "Retorna proximoAlerta, instabilidade e modeloIntegridade usando fallback MAQUINA -> TIPO_MAQUINA -> GLOBAL."
+      "description": "Retorna proximoAlerta, instabilidade, motivos de ausencia e modeloIntegridade usando fallback MAQUINA -> TIPO_MAQUINA -> GLOBAL."
+    },
+    {
+      "_id": "req_predicao_maquina_risco",
+      "_type": "request",
+      "parentId": "fld_predicao_maquinas",
+      "name": "Predicao Risco",
+      "method": "GET",
+      "url": "{{ _.base_url }}/maquinas/{{ _.maquina_id }}/predicao-risco",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Retorna riscos de instabilidade, alerta e manutencao para 24h/72h, com classificacao, fatores principais, confianca e motivos de ausencia."
     },
     {
       "_id": "fld_predicao_alertas",

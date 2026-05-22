@@ -203,6 +203,46 @@ class AlertaModel {
         });
     };
 
+    static async findByMaquinaPeriodo(maquinaId, { dataInicio, dataFim, tipos, statuses } = {}) {
+        const where = {
+            maquinaId: Number(maquinaId)
+        };
+
+        if (dataInicio || dataFim) {
+            where.criadoEm = {};
+
+            if (dataInicio) {
+                where.criadoEm.gte = new Date(dataInicio);
+            }
+
+            if (dataFim) {
+                where.criadoEm.lte = new Date(dataFim);
+            }
+        }
+
+        if (Array.isArray(tipos) && tipos.length) {
+            where.tipo = { in: tipos };
+        }
+
+        if (Array.isArray(statuses) && statuses.length) {
+            where.status = { in: statuses };
+        }
+
+        return await prisma.alerta.findMany({
+            where,
+            select: {
+                id: true,
+                sensorId: true,
+                maquinaId: true,
+                tipo: true,
+                status: true,
+                criadoEm: true,
+                encerradoEm: true
+            },
+            orderBy: { criadoEm: "desc" }
+        });
+    };
+
     static async countAlertasToday(hoje) {
         return await prisma.alerta.count({ where: { criadoEm: { gte: hoje } } });
     };

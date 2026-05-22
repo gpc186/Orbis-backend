@@ -135,7 +135,7 @@ class PredicaoService {
             return {
                 disponivel: false,
                 valido: false,
-                motivo: "regressao_indisponivel",
+                motivo: "modelo_nao_pode_ser_calculado",
                 modeloIntegridade: null
             };
         }
@@ -155,7 +155,7 @@ class PredicaoService {
         return {
             disponivel: true,
             valido,
-            motivo: valido ? null : "modelo_invalido",
+            motivo: valido ? null : "tendencia_nao_confiavel",
             modeloIntegridade
         };
     }
