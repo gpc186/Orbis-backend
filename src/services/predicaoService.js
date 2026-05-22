@@ -112,31 +112,69 @@ class PredicaoService {
         return ultimoPonto > agora ? ultimoPonto : agora;
     }
 
+    static async obterModeloIntegridade(maquinaId) {
+        const HistoricoIntegridadeModel = require('../models/historicoIntegridadeModel');
+
+        const historico = await HistoricoIntegridadeModel.findSerieByMaquina(maquinaId, {
+            limite: this.LIMITE_PONTOS_REGRESSAO
+        });
+
+        if (historico.length < this.MIN_PONTOS_REGRESSAO) {
+            return {
+                disponivel: false,
+                valido: false,
+                motivo: "historico_insuficiente",
+                modeloIntegridade: null
+            };
+        }
+
+        const pontos = this.criarPontosRegressao(historico);
+        const regressao = this.criarModeloRegressao(pontos);
+
+        if (!regressao) {
+            return {
+                disponivel: false,
+                valido: false,
+                motivo: "modelo_nao_pode_ser_calculado",
+                modeloIntegridade: null
+            };
+        }
+
+        const modeloIntegridade = {
+            modelo: regressao.modelo,
+            score: regressao.score,
+            slope: regressao.slope,
+            intercept: regressao.intercept,
+            dataBase: pontos[0].criadoEm,
+            referenciaTemporal: this.obterReferenciaTemporal(pontos),
+            pontosUsados: pontos.length
+        };
+
+        const valido = modeloIntegridade.slope < 0 && modeloIntegridade.score.r2 >= this.R2_MINIMO;
+
+        return {
+            disponivel: true,
+            valido,
+            motivo: valido ? null : "tendencia_nao_confiavel",
+            modeloIntegridade
+        };
+    }
+
     static async previsaoManutencao(maquinaId) {
         try {
             const MaquinaModel = require('../models/maquinaModel');
-            const HistoricoIntegridadeModel = require('../models/historicoIntegridadeModel');
 
             const maquina = await MaquinaModel.findById(maquinaId);
             if (!maquina) return null;
 
-            const historico = await HistoricoIntegridadeModel.findSerieByMaquina(maquinaId, {
-                limite: this.LIMITE_PONTOS_REGRESSAO
-            });
-
-            if (historico.length < this.MIN_PONTOS_REGRESSAO) {
+            const resultadoModelo = await this.obterModeloIntegridade(maquinaId);
+            if (!resultadoModelo.disponivel || !resultadoModelo.valido || !resultadoModelo.modeloIntegridade) {
                 return await this.limparPrevisao(maquinaId, MaquinaModel);
             }
 
-            const pontos = this.criarPontosRegressao(historico);
-            const regressao = this.criarModeloRegressao(pontos);
-
-            if (!regressao || regressao.slope >= 0 || regressao.score.r2 < this.R2_MINIMO) {
-                return await this.limparPrevisao(maquinaId, MaquinaModel);
-            }
-
-            const dataBase = pontos[0].criadoEm;
-            const referenciaTemporal = this.obterReferenciaTemporal(pontos);
+            const regressao = resultadoModelo.modeloIntegridade;
+            const dataBase = regressao.dataBase;
+            const referenciaTemporal = regressao.referenciaTemporal;
             const dataInicioManutencao = this.projetarDataLimiar(
                 regressao,
                 this.LIMIAR_MANUTENCAO,

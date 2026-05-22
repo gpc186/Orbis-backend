@@ -33,6 +33,22 @@ class MaquinaController {
             next(error)
         }
     }
+    static async predicaoAlertas(req, res, next) {
+        try {
+            const predicao = await MaquinaService.getPredicaoAlertas(req.params.id)
+            return res.status(200).json(predicao);
+        } catch (error) {
+            next(error)
+        }
+    }
+    static async predicaoRisco(req, res, next) {
+        try {
+            const predicao = await MaquinaService.getPredicaoRisco(req.params.id)
+            return res.status(200).json(predicao);
+        } catch (error) {
+            next(error)
+        }
+    }
     static async update(req, res, next) {
         try {
             const atualizada = await MaquinaService.update(req.params.id, req.body)

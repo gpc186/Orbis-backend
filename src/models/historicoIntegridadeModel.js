@@ -5,6 +5,27 @@ class HistoricoIntegridadeModel {
         return await prisma.historicoIntegridade.create({ data });
     }
 
+    static async findLatestBefore(maquinaId, dataReferencia) {
+        return await prisma.historicoIntegridade.findFirst({
+            where: {
+                maquinaId: Number(maquinaId),
+                criadoEm: {
+                    lte: new Date(dataReferencia)
+                }
+            },
+            orderBy: { criadoEm: 'desc' },
+            select: {
+                id: true,
+                maquinaId: true,
+                integridade: true,
+                scoreEstabilidade: true,
+                origem: true,
+                observacao: true,
+                criadoEm: true
+            }
+        });
+    }
+
     static async findSerieByMaquina(maquinaId, { limite = 30, dataInicio, dataFim } = {}) {
         const where = {
             maquinaId: Number(maquinaId)

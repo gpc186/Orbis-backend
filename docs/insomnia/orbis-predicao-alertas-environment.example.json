@@ -1,0 +1,8 @@
+{
+  "base_url": "http://localhost:3333",
+  "token": "",
+  "refresh_token": "",
+  "login_email": "admin@orbis.local",
+  "login_senha": "Senha123",
+  "maquina_id": "1"
+}
