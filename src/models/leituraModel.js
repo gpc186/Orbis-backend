@@ -49,6 +49,45 @@ class LeituraModel {
         })
     }
 
+    static async findByMaquinaPeriodo(maquinaId, { dataInicio, dataFim } = {}) {
+        const where = {
+            sensor: {
+                maquinaId: Number(maquinaId)
+            }
+        };
+
+        if (dataInicio || dataFim) {
+            where.criadoEm = {};
+
+            if (dataInicio) {
+                where.criadoEm.gte = new Date(dataInicio);
+            }
+
+            if (dataFim) {
+                where.criadoEm.lte = new Date(dataFim);
+            }
+        }
+
+        return await prisma.leitura.findMany({
+            where,
+            include: {
+                sensor: {
+                    select: {
+                        id: true,
+                        tipo: true,
+                        limiteTemperatura: true,
+                        idealTemperatura: true,
+                        limiteVibracao: true,
+                        idealVibracao: true,
+                        desvioMaximoTemp: true,
+                        desvioMaximoVibra: true
+                    }
+                }
+            },
+            orderBy: { criadoEm: 'asc' }
+        });
+    }
+
     static async limpeza(trintaDiasAtras){
         return await prisma.leitura.deleteMany({
             where: { criadoEm: { lt: trintaDiasAtras }}
