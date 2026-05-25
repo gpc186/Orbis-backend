@@ -3,12 +3,105 @@ const MaquinaService = require("../maquinaService");
 const SensorService = require("../sensorService");
 const AlertaService = require("../alertaService");
 const ManutecaoService = require("../manutencaoService");
+const DashboardService = require("../dashboardService");
 const RelatorioAgendamentoService = require("../relatorioAgendamentoService");
 const RelatorioExecucaoService = require("../relatorioExecucaoService");
 const { validatePreviewPayload } = require("../../utils/reportValidation");
 const AppError = require("../../utils/appErrorUtils");
 
 const tools = [
+  {
+    type: "function",
+    function: {
+      name: "buscar_dashboard_resumo",
+      description: "Busca o resumo operacional atual do dashboard com maquinas, alertas, sensores e tecnicos",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "buscar_dashboard_top_alertas",
+      description: "Lista os alertas ativos mais relevantes do dashboard",
+      parameters: {
+        type: "object",
+        properties: {
+          limite: {
+            type: "integer",
+            description: "Quantidade maxima de alertas retornados"
+          }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "buscar_dashboard_maquinas_criticas",
+      description: "Lista as maquinas mais criticas do dashboard pelo menor indice de integridade",
+      parameters: {
+        type: "object",
+        properties: {
+          limite: {
+            type: "integer",
+            description: "Quantidade maxima de maquinas retornadas"
+          }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "buscar_dashboard_sensores_offline",
+      description: "Lista sensores offline recentes do dashboard",
+      parameters: {
+        type: "object",
+        properties: {
+          limite: {
+            type: "integer",
+            description: "Quantidade maxima de sensores retornados"
+          }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "buscar_dashboard_destaques",
+      description: "Lista os destaques operacionais resumidos do dashboard",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "buscar_contexto_operacional_dashboard",
+      description: "Busca o contexto operacional agregado do dashboard com resumo, top alertas, maquinas criticas, sensores offline e destaques",
+      parameters: {
+        type: "object",
+        properties: {
+          limite: {
+            type: "integer",
+            description: "Quantidade maxima de itens por colecao"
+          }
+        },
+        required: []
+      }
+    }
+  },
   {
     type: "function",
     function: {
@@ -1054,6 +1147,62 @@ async function executeTool({ name, args, usuario }) {
 
   if (isWriteTool(name)) {
     throw new AppError("Esta tool exige confirmacao antes da execucao.", 400);
+  }
+
+  if (name === "buscar_dashboard_resumo") {
+    return await DashboardService.resume();
+  }
+
+  if (name === "buscar_dashboard_top_alertas") {
+    const limite = normalizeLimit(args?.limite);
+    const dados = await DashboardService.getTopAlertas({ limit: limite });
+
+    return {
+      total: dados.length,
+      alertas: dados.map(mapAlerta)
+    };
+  }
+
+  if (name === "buscar_dashboard_maquinas_criticas") {
+    const limite = normalizeLimit(args?.limite);
+    const dados = await DashboardService.getMaquinasCriticas({ limit: limite });
+
+    return {
+      total: dados.length,
+      maquinas: dados.map(mapMaquina)
+    };
+  }
+
+  if (name === "buscar_dashboard_sensores_offline") {
+    const limite = normalizeLimit(args?.limite);
+    const dados = await DashboardService.getSensoresOffline({ limit: limite });
+
+    return {
+      total: dados.length,
+      sensores: dados.map(mapSensor)
+    };
+  }
+
+  if (name === "buscar_dashboard_destaques") {
+    const dados = await DashboardService.getDestaques();
+
+    return {
+      total: dados.length,
+      destaques: dados
+    };
+  }
+
+  if (name === "buscar_contexto_operacional_dashboard") {
+    const limite = normalizeLimit(args?.limite, 5);
+    const dados = await DashboardService.getOperationalContext({ limit: limite });
+
+    return {
+      resumo: dados.resumo,
+      topAlertas: dados.topAlertas.map(mapAlerta),
+      maquinasCriticas: dados.maquinasCriticas.map(mapMaquina),
+      sensoresOffline: dados.sensoresOffline.map(mapSensor),
+      destaques: dados.destaques
+    };
   }
 
   if (name === "buscar_usuario_por_id") {

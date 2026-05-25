@@ -6,12 +6,147 @@ const SensorService = require("../sensorService");
 const AlertaService = require("../alertaService");
 const MaquinaService = require("../maquinaService");
 const ManutecaoService = require("../manutencaoService");
+const DashboardService = require("../dashboardService");
 const RelatorioAgendamentoService = require("../relatorioAgendamentoService");
 const RelatorioExecucaoService = require("../relatorioExecucaoService");
 const AppError = require("../../utils/appErrorUtils");
 const { executeTool } = require("./registry");
 
 const admin = { id: 1, role: "ADMIN" };
+
+test("executeTool consulta resumo do dashboard", async () => {
+  const originalResume = DashboardService.resume;
+
+  DashboardService.resume = async () => ({
+    totalMaquinas: 12,
+    maquinasEmAlerta: 3,
+    maquinasFuncionando: 9,
+    alertasAtivos: 5,
+    alertasHoje: 2,
+    tecnicosAtivos: 4,
+    integridadeMedia: 87.4,
+    sensoresOnline: 20,
+    alertaSemAtendimento: 1,
+    alertasAtendidosHoje: 1
+  });
+
+  try {
+    const result = await executeTool({
+      name: "buscar_dashboard_resumo",
+      args: {},
+      usuario: admin
+    });
+
+    assert.equal(result.totalMaquinas, 12);
+    assert.equal(result.alertasAtivos, 5);
+  } finally {
+    DashboardService.resume = originalResume;
+  }
+});
+
+test("executeTool consulta top alertas do dashboard", async () => {
+  const originalGetTopAlertas = DashboardService.getTopAlertas;
+
+  DashboardService.getTopAlertas = async () => ([
+    {
+      id: 8,
+      tipo: "INSTABILIDADE",
+      status: "ATIVO",
+      mensagem: "Oscilacao detectada",
+      criadoEm: "2026-05-20T12:00:00.000Z",
+      encerradoEm: null,
+      sensor: { id: 2, tipo: "Vibracao", status: "ONLINE" },
+      maquina: { id: 5, nome: "Prensa 02", setor: "Usinagem", criticidade: "MEDIA", ativo: true, integridade: 72 },
+      tecnico: null
+    }
+  ]);
+
+  try {
+    const result = await executeTool({
+      name: "buscar_dashboard_top_alertas",
+      args: { limite: 5 },
+      usuario: admin
+    });
+
+    assert.equal(result.total, 1);
+    assert.equal(result.alertas[0].id, 8);
+  } finally {
+    DashboardService.getTopAlertas = originalGetTopAlertas;
+  }
+});
+
+test("executeTool consulta contexto operacional do dashboard", async () => {
+  const originalGetOperationalContext = DashboardService.getOperationalContext;
+
+  DashboardService.getOperationalContext = async () => ({
+    resumo: {
+      totalMaquinas: 12,
+      maquinasEmAlerta: 3,
+      maquinasFuncionando: 9,
+      alertasAtivos: 5,
+      alertasHoje: 2,
+      tecnicosAtivos: 4,
+      integridadeMedia: 87.4,
+      sensoresOnline: 20,
+      alertaSemAtendimento: 1,
+      alertasAtendidosHoje: 1
+    },
+    topAlertas: [{
+      id: 8,
+      tipo: "INSTABILIDADE",
+      status: "ATIVO",
+      mensagem: "Oscilacao detectada",
+      criadoEm: "2026-05-20T12:00:00.000Z",
+      encerradoEm: null,
+      sensor: { id: 2, tipo: "Vibracao", status: "ONLINE" },
+      maquina: { id: 5, nome: "Prensa 02", setor: "Usinagem", criticidade: "MEDIA", ativo: true, integridade: 72 },
+      tecnico: null
+    }],
+    maquinasCriticas: [{
+      id: 7,
+      nome: "Prensa 07",
+      setor: "Corte",
+      tipo: "Prensa",
+      criticidade: "ALTA",
+      ativo: true,
+      integridade: 63,
+      scoreEstabilidade: 59,
+      previsaoManutencao: null,
+      janelaManuInicio: null,
+      janelaManuFim: null
+    }],
+    sensoresOffline: [{
+      id: 12,
+      tipo: "Temperatura",
+      status: "OFFLINE",
+      limiteTemperatura: 90,
+      idealTemperatura: 60,
+      limiteVibracao: 20,
+      idealVibracao: 6,
+      ultimaTemperatura: 58,
+      ultimaVibracao: 5,
+      ultimaLeituraEm: "2026-05-20T12:00:00.000Z",
+      maquina: { id: 4, nome: "Prensa 01", setor: "Corte", criticidade: "ALTA", ativo: true }
+    }],
+    destaques: ["5 alertas ativos no momento."]
+  });
+
+  try {
+    const result = await executeTool({
+      name: "buscar_contexto_operacional_dashboard",
+      args: { limite: 5 },
+      usuario: admin
+    });
+
+    assert.equal(result.resumo.totalMaquinas, 12);
+    assert.equal(result.topAlertas.length, 1);
+    assert.equal(result.maquinasCriticas.length, 1);
+    assert.equal(result.sensoresOffline.length, 1);
+    assert.equal(result.destaques.length, 1);
+  } finally {
+    DashboardService.getOperationalContext = originalGetOperationalContext;
+  }
+});
 
 test("executeTool bloqueia usuario nao ADMIN", async () => {
   await assert.rejects(

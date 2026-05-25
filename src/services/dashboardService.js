@@ -2,6 +2,9 @@ const AlertaService = require("../services/alertaService");
 const MaquinaService = require("../services/maquinaService");
 const SensorService = require("../services/sensorService");
 const UsuarioService = require("../services/usuarioService");
+const AlertaModel = require("../models/alertaModel");
+const MaquinaModel = require("../models/maquinaModel");
+const SensorModel = require("../models/sensorModel");
 
 class DashboardService {
     static async resume() {
@@ -18,6 +21,59 @@ class DashboardService {
         ]);
          
         return { totalMaquinas, maquinasEmAlerta, maquinasFuncionando: totalMaquinas - maquinasEmAlerta, alertasAtivos, alertasHoje, tecnicosAtivos, integridadeMedia: integridadeMedia._avg.integridade, sensoresOnline, alertaSemAtendimento, alertasAtendidosHoje }
+    }
+
+    static buildDestaquesFromResumo(resumo = {}) {
+        const destaques = [];
+
+        if ((resumo.alertasAtivos || 0) > 0) {
+            destaques.push(`${resumo.alertasAtivos} alertas ativos no momento.`);
+        }
+        if ((resumo.maquinasEmAlerta || 0) > 0) {
+            destaques.push(`${resumo.maquinasEmAlerta} maquinas em alerta.`);
+        }
+        if ((resumo.alertaSemAtendimento || 0) > 0) {
+            destaques.push(`${resumo.alertaSemAtendimento} alertas sem atendimento.`);
+        }
+
+        return destaques;
+    }
+
+    static async getTopAlertas({ limit = 5 } = {}) {
+        const safeLimit = Math.min(Math.max(Number(limit || 5), 1), 20);
+        return AlertaModel.listTopAtivos({ limit: safeLimit });
+    }
+
+    static async getMaquinasCriticas({ limit = 5 } = {}) {
+        const safeLimit = Math.min(Math.max(Number(limit || 5), 1), 20);
+        return MaquinaModel.listPioresIntegridade({ limit: safeLimit });
+    }
+
+    static async getSensoresOffline({ limit = 5 } = {}) {
+        const safeLimit = Math.min(Math.max(Number(limit || 5), 1), 20);
+        return SensorModel.listOfflineRecentes({ limit: safeLimit });
+    }
+
+    static async getDestaques({ resumo } = {}) {
+        const resumoAtual = resumo || await this.resume();
+        return this.buildDestaquesFromResumo(resumoAtual);
+    }
+
+    static async getOperationalContext({ limit = 5 } = {}) {
+        const resumo = await this.resume();
+        const [topAlertas, maquinasCriticas, sensoresOffline] = await Promise.all([
+            this.getTopAlertas({ limit }),
+            this.getMaquinasCriticas({ limit }),
+            this.getSensoresOffline({ limit })
+        ]);
+
+        return {
+            resumo,
+            topAlertas,
+            maquinasCriticas,
+            sensoresOffline,
+            destaques: this.buildDestaquesFromResumo(resumo)
+        };
     }
 }
 

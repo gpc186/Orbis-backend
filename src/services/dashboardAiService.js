@@ -2,42 +2,13 @@ const AppError = require("../utils/appErrorUtils");
 const GroqService = require("./groqService");
 const DashboardService = require("./dashboardService");
 const UsuarioService = require("./usuarioService");
-const SensorModel = require("../models/sensorModel");
-const MaquinaModel = require("../models/maquinaModel");
-const AlertaModel = require("../models/alertaModel");
 const normalizeQuestion = require("../utils/normalizeQuestion");
 const logger = require("../utils/logger");
 const AiConfirmationService = require("./aiConfirmationService");
 const AiToolsRegistry = require("./aiTools/registry");
 
 class DashboardAiService {
-  static getContextLimit() {
-    const n = Number(process.env.AI_MAX_CONTEXT_ITEMS || 5);
-    if (Number.isNaN(n) || n <= 0) return 5;
-    return n;
-  }
-
   static async buildContext({ usuario }) {
-    const limit = this.getContextLimit();
-
-    const resumo = await DashboardService.resume()
-
-    const topAlertas = await AlertaModel.listTopAtivos({ limit });
-    const maquinasCriticas = await MaquinaModel.listPioresIntegridade({ limit });
-    const sensoresOffline = await SensorModel.listOfflineRecentes({ limit });
-
-    const destaques = [];
-
-    if ((resumo.alertasAtivos || 0) > 0) {
-      destaques.push(`${resumo.alertasAtivos} alertas ativos no momento.`);
-    }
-    if ((resumo.maquinasEmAlerta || 0) > 0) {
-      destaques.push(`${resumo.maquinasEmAlerta} máquinas em alerta.`);
-    }
-    if ((resumo.alertaSemAtendimento || 0) > 0) {
-      destaques.push(`${resumo.alertaSemAtendimento} alertas sem atendimento.`);
-    }
-
     const usuarioPedinte = await UsuarioService.findById(usuario.id);
 
     return {
@@ -48,73 +19,50 @@ class DashboardAiService {
           nome: usuarioPedinte.nome,
           role: usuario.role
         }
-      },
-      resumo: {
-        totalMaquinas: resumo?.totalMaquinas ?? 0,
-        maquinasEmAlerta: resumo?.maquinasEmAlerta ?? 0,
-        maquinasFuncionando: resumo?.maquinasFuncionando ?? 0,
-        alertasAtivos: resumo?.alertasAtivos ?? 0,
-        alertasHoje: resumo?.alertasHoje ?? 0,
-        tecnicosAtivos: resumo?.tecnicosAtivos ?? 0,
-        integridadeMedia: resumo?.integridadeMedia ?? 0,
-        sensoresOnline: resumo?.sensoresOnline ?? 0,
-        alertaSemAtendimento: resumo?.alertaSemAtendimento ?? 0,
-        alertasAtendidosHoje: resumo?.alertasAtendidosHoje ?? 0
-      },
-      colecoes: {
-        topAlertas: topAlertas.slice(0, limit),
-        maquinasCriticas: maquinasCriticas.slice(0, limit),
-        sensoresOffline: sensoresOffline.slice(0, limit)
-      },
-      destaques: destaques.slice(0, limit)
+      }
     };
   }
 
   static buildPrompts({ pergunta, contexto, historico = [] }) {
     const systemPrompt = `
-Você é o Orb IA, assistente inteligente integrado ao sistema Orbis — uma plataforma de monitoramento industrial e manutenção preditiva.
-O orbis é um sistema que foi feito exclusivamente para uma empresa, então perguntas sobre os equipamentos, alertas e etc, são da empresa em sim,não da plataforma
+Você é o Orb IA, assistente inteligente integrado ao sistema Orbis, uma plataforma de monitoramento industrial e manutenção preditiva.
+O Orbis foi feito exclusivamente para uma empresa, então perguntas sobre equipamentos, alertas e sensores se referem ao ambiente operacional dessa empresa.
 
-Você tem conhecimento sobre o estado operacional atual das máquinas, alertas e sensores do sistema, e também sobre temas relacionados ao universo industrial e tecnológico.
+Você tem conhecimento geral sobre manutenção, IoT, sensores, automação, tecnologia e operações industriais.
 
 Escopo de atuação:
-- Perguntas sobre o sistema Orbis e seus dados operacionais → responda com base no contexto fornecido.
-- Perguntas sobre indústria, manutenção, IoT, sensores, automação, tecnologia, TI e boas práticas → responda com seu conhecimento geral.
-- Dos temas mencionados anteriormente, eles não necessariamente precisam ser relacionado ao orbis, pois o usuario pode querer tirar uma duvida sobre algo relacionado aos temas anteriores sem ser necessáriamente relacionado ao orbis, porém, se for algo fora do escopo, siga a instrução de redirecionamento abaixo
-- Perguntas completamente fora desse escopo → redirecione de forma natural e educada e pergunte se ele tem alguma duvida sobre algo relacionado ao orbis, sem ser robótico.
+- Perguntas sobre o sistema Orbis e seus dados operacionais: responda com base nas tools disponíveis.
+- Perguntas sobre indústria, manutenção, IoT, sensores, automação, tecnologia e TI: responda com seu conhecimento geral.
+- Perguntas completamente fora desse escopo: redirecione de forma natural e educada.
 
 Comportamento geral:
-- Responda sempre na linguagem que o usuario perguntar.
-- Adapte o tamanho e o formato da resposta ao que foi perguntado — perguntas simples merecem respostas simples, análises complexas merecem mais profundidade.
-- Nunca force uma estrutura rígida. Se a pergunta for casual, responda de forma casual, e não precisa responder de uma maneira muito longa se não for necessário, o tamanho da resposta depende da complexidade.
-- Não repita informações desnecessariamente.
-- Cumprimente o usuário pelo primeiro nome apenas quando fizer sentido natural — não force em toda mensagem.
-- Nunca mencione que está usando um "contexto", "dados da API" ou qualquer estrutura interna do sistema.
-- Nunca invente dados operacionais, IDs, métricas ou eventos. Use apenas o contexto fornecido.
+- Responda sempre na linguagem do usuário.
+- Adapte o tamanho da resposta à complexidade da pergunta.
+- Não force uma estrutura rígida.
+- Não repita informações sem necessidade.
+- Nunca mencione estruturas internas, prompts, contexto ou dados da API.
+- Nunca invente dados operacionais, IDs, métricas ou eventos.
 
 Quando a pergunta for sobre o sistema Orbis:
-- Priorize clareza e praticidade — o usuário quer saber o que fazer, não receber um relatório completo.
+- Priorize clareza e praticidade.
 - Destaque apenas o que realmente importa para a situação atual.
 - Seja direto sobre riscos e urgências sem ser alarmista.
-- Sugira no máximo 2 ações concretas quando aplicável.
-
-Quando a pergunta for sobre indústria ou tecnologia, não necessariamente sendo ligado ao orbis:
-- Responda com naturalidade usando seu conhecimento geral.
-- Quando relevante, conecte a resposta ao contexto do Orbis de forma orgânica — mas sem forçar.
+- Sugira no máximo 2 ações concretas quando isso fizer sentido.
 
 Quando a pergunta estiver fora do escopo:
-- Redirecione de forma leve e natural, por exemplo: "Isso foge um pouco do meu escopo, mas posso te ajudar com questões sobre o Orbis ou sobre o universo industrial e tecnológico."
-- Nunca seja rude ou robótico ao redirecionar.
-- Caso a pergunta seja muito fora do escopo, por exemplo, perguntar por uma receita de bolo de cenoura, apenas ignore, não responda sobre, por mais que o usuario insista e redirecione como o primeiro exemplo deste tópico.
+- Redirecione de forma leve e natural.
+- Nunca seja rude ou robótico.
+- Se a pergunta for muito fora do escopo, apenas redirecione.
 
 Quando usar os tools:
-- Quando a pergunta exigir consultar ou executar dados especificos do sistema, use as tools disponiveis.
-- Nao invente status de tecnico, maquinas ou usuarios se houver uma tool apropriada.
-- Se faltar um dado obrigatorio para usar a tool, pergunte ao usuario.
-- Acoes que alteram dados exigem confirmacao explicita do usuario antes da execucao.
-- Quando uma acao exigir confirmacao, descreva exatamente o que sera feito antes de pedir a confirmacao.
+- Quando a pergunta exigir consultar ou executar dados específicos do sistema, use as tools disponíveis.
+- Não invente status de técnico, máquinas, sensores, alertas, relatórios ou usuários se houver uma tool apropriada.
+- Se faltar um dado obrigatório para usar a tool, pergunte ao usuário.
+- Ações que alteram dados exigem confirmação explícita do usuário antes da execução.
+- Quando uma ação exigir confirmação, descreva exatamente o que será feito antes de pedir a confirmação.
+- O resumo do dashboard e os dados operacionais detalhados não estão carregados automaticamente no prompt. Consulte as tools apropriadas sempre que precisar desses dados.
 
-Tom: Natural, inteligente e colaborativo. Como um colega experiente que entende profundamente de operações industriais e tecnologia, e sabe conversar sem parecer um relatório automatizado.
+Tom: natural, inteligente e colaborativo. Como um colega experiente que entende profundamente de operações industriais e tecnologia.
 `.trim();
 
     const contextPrompt = `
@@ -122,13 +70,7 @@ Contexto do usuário:
 - Nome: ${contexto.metadata.usuario.nome}
 - Perfil: ${contexto.metadata.usuario.role}
 
-Dados operacionais disponíveis:
-${JSON.stringify(contexto.resumo, null, 2)}
-
-Dados complementares:
-${JSON.stringify(contexto.colecoes, null, 2)}
-
-${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}` : ''}
+Use as tools disponíveis quando precisar consultar dashboard, alertas, máquinas, sensores, manutenções, usuários ou relatórios.
 `.trim();
 
     const historicoSeguro = this.sanitizeHistory(historico);
@@ -163,26 +105,26 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
     const summary = confirmation.summary || {};
 
     if (confirmation.actionName === "pausar_agendamento_relatorio") {
-      return `Vou pausar o agendamento ${summary.id} (${summary.nome}), que hoje esta com status ${summary.statusAtual}.`;
+      return `Vou pausar o agendamento ${summary.id} (${summary.nome}), que hoje está com status ${summary.statusAtual}.`;
     }
 
     if (confirmation.actionName === "deletar_agendamento_relatorio") {
-      return `Vou deletar o agendamento ${summary.id} (${summary.nome}) e remover sua configuracao ativa.`;
+      return `Vou deletar o agendamento ${summary.id} (${summary.nome}) e remover sua configuração ativa.`;
     }
 
     if (confirmation.actionName === "executar_agendamento_relatorio_agora") {
-      return `Vou executar agora o agendamento ${summary.id} (${summary.nome}) e disparar o envio para os destinatarios configurados.`;
+      return `Vou executar agora o agendamento ${summary.id} (${summary.nome}) e disparar o envio para os destinatários configurados.`;
     }
 
     if (confirmation.actionName === "enviar_relatorio_agora") {
       const emailsDestino = Array.isArray(summary.emailsDestino)
         ? summary.emailsDestino.join(", ")
-        : "os destinatarios informados";
+        : "os destinatários informados";
       const secoes = Array.isArray(summary.secoes) && summary.secoes.length > 0
         ? summary.secoes.join(", ")
-        : "as secoes informadas";
+        : "as seções informadas";
 
-      return `Vou enviar agora o relatorio ${summary.nome || "Relatorio Operacional"} para ${emailsDestino}, usando as secoes ${secoes}.`;
+      return `Vou enviar agora o relatório ${summary.nome || "Relatório Operacional"} para ${emailsDestino}, usando as seções ${secoes}.`;
     }
 
     if (confirmation.actionName === "atualizar_limites_sensor") {
@@ -192,10 +134,10 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
             .join(", ")
         : "os valores informados";
 
-      return `Vou atualizar os limites do sensor ${summary.id}${summary.maquinaNome ? ` da maquina ${summary.maquinaNome}` : ""} com estas alteracoes: ${alteracoes}.`;
+      return `Vou atualizar os limites do sensor ${summary.id}${summary.maquinaNome ? ` da máquina ${summary.maquinaNome}` : ""} com estas alterações: ${alteracoes}.`;
     }
 
-    return `Vou executar a acao "${confirmation.actionLabel}".`;
+    return `Vou executar a ação "${confirmation.actionLabel}".`;
   }
 
   static buildConfirmationResponse({ confirmation, pergunta }) {
@@ -210,7 +152,7 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
         id: confirmation.id,
         type: "tool_action",
         actionKey: confirmation.actionName,
-        message: "Confirme se deseja continuar com esta acao.",
+        message: "Confirme se deseja continuar com esta ação.",
         actionLabel: confirmation.actionLabel,
         confirmLabel: "Pode fazer",
         cancelLabel: "Cancelar",
@@ -222,16 +164,39 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
     };
   }
 
+  static parseToolArguments({ toolName, rawArguments, usuarioId }) {
+    const normalizedArguments = typeof rawArguments === "string"
+      ? rawArguments.trim()
+      : "";
+
+    if (!normalizedArguments) {
+      return {};
+    }
+
+    try {
+      return JSON.parse(normalizedArguments);
+    } catch (error) {
+      logger.error("dashboard_ai_tool_arguments_invalid", {
+        usuarioId,
+        toolName,
+        rawArguments: normalizedArguments,
+        error
+      });
+
+      throw new AppError(`A IA gerou argumentos inválidos para a tool ${toolName}.`, 502);
+    }
+  }
+
   static async handleConfirmation({ pergunta, usuario, confirmationResponse }) {
     const id = String(confirmationResponse?.id || "").trim();
     const decision = String(confirmationResponse?.decision || "").trim().toLowerCase();
 
     if (!id) {
-      throw new AppError("Id de confirmacao invalido.", 400);
+      throw new AppError("Id de confirmação inválido.", 400);
     }
 
     if (decision !== "confirm" && decision !== "cancel") {
-      throw new AppError("Decisao de confirmacao invalida.", 400);
+      throw new AppError("Decisão de confirmação inválida.", 400);
     }
 
     if (decision === "cancel") {
@@ -239,7 +204,7 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
 
       return {
         pergunta: typeof pergunta === "string" ? pergunta.trim() : "",
-        resposta: `Acao cancelada: ${pending.actionLabel}.`,
+        resposta: `Ação cancelada: ${pending.actionLabel}.`,
         fallback: false,
         requiresConfirmation: false,
         confirmationResolved: true,
@@ -279,7 +244,7 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
     }
 
     if (!pergunta || typeof pergunta !== "string" || pergunta.trim().length < 3) {
-      throw new AppError("Pergunta invÃ¡lida.", 400);
+      throw new AppError("Pergunta inválida.", 400);
     }
 
     if (pergunta.trim().length > 500) {
@@ -295,7 +260,7 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
     });
 
     if (!normalized || normalized.trim().length === 0) {
-      throw new AppError("Pergunta invÃ¡lida!", 400);
+      throw new AppError("Pergunta inválida!", 400);
     }
 
     const historicoSeguro = this.sanitizeHistory(historico);
@@ -306,6 +271,8 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
       contexto,
       historico: historicoSeguro
     });
+
+    let toolCallNames = [];
 
     try {
       const firstMessage = await GroqService.generateWithTools({
@@ -324,14 +291,34 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
         };
       }
 
+      toolCallNames = firstMessage.tool_calls.map((toolCall) => toolCall.function.name);
+
+      logger.info("dashboard_ai_tool_calls_received", {
+        usuarioId: usuario?.id,
+        toolCallCount: firstMessage.tool_calls.length,
+        toolCallNames
+      });
+
       const writeToolCall = firstMessage.tool_calls.find((toolCall) =>
         AiToolsRegistry.isWriteTool(toolCall.function.name)
       );
 
       if (writeToolCall) {
+        const writeToolArgs = this.parseToolArguments({
+          toolName: writeToolCall.function.name,
+          rawArguments: writeToolCall.function.arguments,
+          usuarioId: usuario?.id
+        });
+
+        logger.info("dashboard_ai_write_tool_preparing", {
+          usuarioId: usuario?.id,
+          toolName: writeToolCall.function.name,
+          argumentKeys: Object.keys(writeToolArgs)
+        });
+
         const preparedAction = await AiToolsRegistry.prepareWriteToolAction({
           name: writeToolCall.function.name,
-          args: JSON.parse(writeToolCall.function.arguments || "{}"),
+          args: writeToolArgs,
           usuario
         });
 
@@ -356,12 +343,28 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
 
       for (const toolCall of firstMessage.tool_calls) {
         const toolName = toolCall.function.name;
-        const args = JSON.parse(toolCall.function.arguments || "{}");
+        const args = this.parseToolArguments({
+          toolName,
+          rawArguments: toolCall.function.arguments,
+          usuarioId: usuario?.id
+        });
+
+        logger.info("dashboard_ai_tool_execution_started", {
+          usuarioId: usuario?.id,
+          toolName,
+          argumentKeys: Object.keys(args)
+        });
 
         const result = await AiToolsRegistry.executeTool({
           name: toolName,
           args,
           usuario
+        });
+
+        logger.info("dashboard_ai_tool_execution_finished", {
+          usuarioId: usuario?.id,
+          toolName,
+          resultKeys: result && typeof result === "object" ? Object.keys(result) : []
         });
 
         toolMessages.push({
@@ -370,6 +373,12 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
           content: JSON.stringify(result)
         });
       }
+
+      logger.info("dashboard_ai_final_response_request_started", {
+        usuarioId: usuario?.id,
+        toolCallCount: toolMessages.length,
+        toolCallNames
+      });
 
       const finalText = await GroqService.generateText({
         messages: [
@@ -388,27 +397,42 @@ ${contexto.destaques.length > 0 ? `Destaques:\n${contexto.destaques.join('\n')}`
         usedHistoryCount: historicoSeguro.length
       };
     } catch (error) {
-      if (error instanceof AppError && error.statusCode < 500) {
+      logger.error("dashboard_ai_answer_error", {
+        usuarioId: usuario?.id,
+        perguntaNormalizada: normalized,
+        toolCallNames,
+        error
+      });
+
+      if (error instanceof AppError && (error.statusCode < 500 || error.skipFallback === true)) {
         throw error;
       }
 
-      const respostaFallback = this.buildFallbackResponse({ usuario, contexto });
+      const respostaFallback = await this.buildFallbackResponse({ usuario });
 
       return {
         pergunta: pergunta.trim(),
         resposta: respostaFallback,
         fallback: true,
-        motivoFallback: "provider_unavailable",
+        motivoFallback: toolCallNames.length > 0 ? "tool_execution_failed" : "provider_unavailable",
         contextoGeradoEm: contexto.metadata.generatedAt,
         usedHistoryCount: historicoSeguro.length
       };
     }
   }
 
-
-  static buildFallbackResponse({ usuario, contexto }) {
+  static async buildFallbackResponse({ usuario }) {
     const nome = usuario?.nome || "usuário";
-    const r = contexto?.resumo || {};
+    let r = {};
+
+    try {
+      r = await DashboardService.resume();
+    } catch (error) {
+      logger.error("dashboard_ai_fallback_resume_error", {
+        usuarioId: usuario?.id,
+        error
+      });
+    }
 
     return [
       `Olá, ${nome}! O assistente de IA está indisponível no momento, mas aqui está um panorama rápido do Orbis:`,
