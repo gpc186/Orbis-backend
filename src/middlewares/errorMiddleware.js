@@ -36,7 +36,7 @@ function errorMiddleware(err, req, res, next) {
 
     if (err.code === "LIMIT_FILE_SIZE") {
       return res.status(400).json({
-        mensagem: "A imagem excede o tamanho maximo permitido de 15MB.",
+        mensagem: "O arquivo excede o tamanho maximo permitido.",
         requestId
       });
     }

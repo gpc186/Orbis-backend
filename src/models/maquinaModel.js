@@ -3,7 +3,10 @@ const prisma = require('../prisma/prisma');
 class MaquinaModel {
     static async create(data) {
         return await prisma.$transaction(async (tx) => {
-            const maquina = await tx.maquina.create({ data });
+            const maquina = await tx.maquina.create({
+                data,
+                include: { manual: true }
+            });
 
             await tx.historicoIntegridade.create({
                 data: {
@@ -22,7 +25,7 @@ class MaquinaModel {
     static async findAll() {
         return await prisma.maquina.findMany({
             where: { ativo: true },
-            include: { sensores: true }
+            include: { sensores: true, manual: true }
         });
     }
 
@@ -79,6 +82,19 @@ class MaquinaModel {
             }
 
             return maquina;
+        });
+    }
+
+    static async upsertManual(maquinaId, data) {
+        return prisma.maquinaManual.upsert({
+            where: { maquinaId: parseInt(maquinaId) },
+            create: {
+                ...data,
+                maquina: {
+                    connect: { id: parseInt(maquinaId) }
+                }
+            },
+            update: data
         });
     }
 

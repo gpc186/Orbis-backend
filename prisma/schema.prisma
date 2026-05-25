@@ -109,11 +109,11 @@ model Usuario {
   atualizadoEm  DateTime @updatedAt
   criadoEm      DateTime @default(now())
 
-  alertas       Alerta[]
-  alertaEventos AlertaEvento[]
-  manutencoes   Manutencao[]
-  refreshTokens RefreshToken[]
-  passwordResetCode PasswordResetCode?
+  alertas             Alerta[]
+  alertaEventos       AlertaEvento[]
+  manutencoes         Manutencao[]
+  refreshTokens       RefreshToken[]
+  passwordResetCode   PasswordResetCode?
   relatoriosAgendados RelatorioAgendamento[]
   aiActionConfirmations AiActionConfirmation[]
 }
@@ -134,19 +134,42 @@ model Maquina {
   caminhoImagem      String?
   criadoEm           DateTime    @default(now())
 
-  sensores Sensor[]
-  alertas  Alerta[]
+  sensores             Sensor[]
+  alertas              Alerta[]
   historicoIntegridade HistoricoIntegridade[]
+  manual               MaquinaManual?
+}
+
+model MaquinaManual {
+  id              Int      @id @default(autoincrement())
+  maquinaId       Int      @unique
+  nomeArquivo     String
+  mimeType        String
+  tamanhoBytes    Int
+  url             String
+  caminho         String
+  textoExtraido   String   @db.Text
+  embedding       Json?
+  chunks          Json?
+  especificacoes  Json?
+  modeloEmbedding String?
+  modeloAnalise   String?
+  criadoEm        DateTime @default(now())
+  atualizadoEm    DateTime @updatedAt
+
+  maquina Maquina @relation(fields: [maquinaId], references: [id], onDelete: Cascade)
+
+  @@index([criadoEm])
 }
 
 model HistoricoIntegridade {
-  id                 Int      @id @default(autoincrement())
-  maquinaId          Int
-  integridade        Float
-  scoreEstabilidade  Float?
-  origem             String?
-  observacao         String?  @db.Text
-  criadoEm           DateTime @default(now())
+  id                Int      @id @default(autoincrement())
+  maquinaId         Int
+  integridade       Float
+  scoreEstabilidade Float?
+  origem            String?
+  observacao        String?  @db.Text
+  criadoEm          DateTime @default(now())
 
   maquina Maquina @relation(fields: [maquinaId], references: [id], onDelete: Cascade)
 
@@ -264,13 +287,13 @@ model PasswordResetCode {
 }
 
 model RelatorioAgendamento {
-  id              Int      @id @default(autoincrement())
+  id              Int                        @id @default(autoincrement())
   nome            String
   criadoPorId     Int
   status          StatusAgendamentoRelatorio @default(ATIVO)
   frequencia      FrequenciaRelatorio
   hora            Int
-  minuto          Int      @default(0)
+  minuto          Int                        @default(0)
   diaSemana       Int?
   diaMes          Int?
   assunto         String?
@@ -281,12 +304,12 @@ model RelatorioAgendamento {
   proximoEnvioEm  DateTime
   ultimoEnvioEm   DateTime?
   ultimoSucessoEm DateTime?
-  ultimoErroEm    String?  @db.Text
+  ultimoErroEm    String?                    @db.Text
   lockedAt        DateTime?
-  criadoEm        DateTime @default(now())
-  atualizadoEm    DateTime @updatedAt
+  criadoEm        DateTime                   @default(now())
+  atualizadoEm    DateTime                   @updatedAt
 
-  criadoPor     Usuario                  @relation(fields: [criadoPorId], references: [id])
+  criadoPor     Usuario                 @relation(fields: [criadoPorId], references: [id])
   destinatarios RelatorioDestinatario[]
   execucoes     RelatorioExecucao[]
 
@@ -307,7 +330,7 @@ model RelatorioDestinatario {
 }
 
 model RelatorioExecucao {
-  id              Int      @id @default(autoincrement())
+  id              Int                     @id @default(autoincrement())
   agendamentoId   Int?
   tipoExecucao    TipoExecucaoRelatorio
   status          StatusExecucaoRelatorio @default(PROCESSANDO)
@@ -318,8 +341,8 @@ model RelatorioExecucao {
   secoes          Json?
   provider        String?
   messageId       String?
-  erro            String?  @db.Text
-  iniciadoEm      DateTime @default(now())
+  erro            String?                 @db.Text
+  iniciadoEm      DateTime                @default(now())
   finalizadoEm    DateTime?
 
   agendamento RelatorioAgendamento? @relation(fields: [agendamentoId], references: [id], onDelete: SetNull)
