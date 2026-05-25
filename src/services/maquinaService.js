@@ -29,7 +29,7 @@ class MaquinaService {
 
   static async create(dados, manualFile = null) {
     if (!dados.nome || !dados.setor) {
-      throw new AppError("Nome e setor sao obrigatorios para cadastrar uma maquina.", 400);
+      throw new AppError("Nome e setor são obrigatórios para cadastrar uma máquina.", 400);
     }
 
     const maquinaData = this.formatCreateData(dados);
@@ -53,6 +53,7 @@ class MaquinaService {
           caminho: manualData.caminho
         }).catch(() => {});
       }
+
       throw error;
     }
   }
@@ -65,12 +66,14 @@ class MaquinaService {
     };
 
     if (!data.tipo) {
-      throw new AppError("Tipo e obrigatorio para cadastrar uma maquina.", 400);
+      throw new AppError("Tipo é obrigatório para cadastrar uma máquina.", 400);
     }
 
     if (dados.criticidade !== undefined) data.criticidade = dados.criticidade;
     if (dados.ativo !== undefined) data.ativo = dados.ativo === true || dados.ativo === "true";
-    if (dados.integridade !== undefined) data.integridade = this.parseOptionalNumber(dados.integridade, "integridade");
+    if (dados.integridade !== undefined) {
+      data.integridade = this.parseOptionalNumber(dados.integridade, "integridade");
+    }
     if (dados.scoreEstabilidade !== undefined) {
       data.scoreEstabilidade = this.parseOptionalNumber(dados.scoreEstabilidade, "scoreEstabilidade");
     }
@@ -83,9 +86,11 @@ class MaquinaService {
 
   static parseOptionalNumber(value, campo) {
     const parsed = parseFloat(value);
+
     if (!Number.isFinite(parsed)) {
-      throw new AppError(`${campo} deve ser um numero valido.`, 400);
+      throw new AppError(`${campo} deve ser um número válido.`, 400);
     }
+
     return parsed;
   }
 
@@ -93,14 +98,117 @@ class MaquinaService {
     return await MaquinaModel.findAll();
   }
 
+  static async findByNome({ nome, limit = 10, somenteAtivas }) {
+    const nomeNormalizado = String(nome || "").trim();
+
+    if (nomeNormalizado.length < 2) {
+      throw new AppError("Nome inválido para busca de máquina.", 400);
+    }
+
+    const take = Math.min(Math.max(Number(limit || 10), 1), 20);
+
+    try {
+      const dados = await MaquinaModel.findByNome({
+        nome: nomeNormalizado,
+        take,
+        ativo: typeof somenteAtivas === "boolean" ? somenteAtivas : undefined
+      });
+
+      return {
+        total: dados.length,
+        dados
+      };
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError("Erro ao buscar máquinas por nome.", 500);
+    }
+  }
+
   static async findById(id) {
     try {
-      const maquina = await MaquinaModel.findById(id, { include: { manual: true, sensores: true } });
-      if (!maquina) throw new AppError("Maquina nao encontrada.", 404);
+      const maquina = await MaquinaModel.findById(id, {
+        include: {
+          manual: true,
+          sensores: true
+        }
+      });
+
+      if (!maquina) {
+        throw new AppError("Máquina não encontrada.", 404);
+      }
+
       return maquina;
     } catch (error) {
       if (error instanceof AppError) throw error;
-      throw new AppError("Erro ao buscar maquina.", 500);
+      throw new AppError("Erro ao buscar máquina.", 500);
+    }
+  }
+
+  static async findDetalhadaById(id) {
+    try {
+      const maquina = await MaquinaModel.findById(id, {
+        include: {
+          manual: true,
+          sensores: {
+            include: {
+              maquina: {
+                select: {
+                  id: true,
+                  nome: true,
+                  setor: true,
+                  criticidade: true,
+                  ativo: true
+                }
+              }
+            }
+          },
+          alertas: {
+            where: {
+              status: "ATIVO"
+            },
+            include: {
+              sensor: {
+                select: {
+                  id: true,
+                  tipo: true,
+                  status: true
+                }
+              },
+              maquina: {
+                select: {
+                  id: true,
+                  nome: true,
+                  setor: true,
+                  criticidade: true,
+                  ativo: true,
+                  integridade: true
+                }
+              },
+              tecnico: {
+                select: {
+                  id: true,
+                  nome: true,
+                  email: true,
+                  role: true,
+                  ativo: true
+                }
+              }
+            },
+            orderBy: {
+              criadoEm: "desc"
+            }
+          }
+        }
+      });
+
+      if (!maquina) {
+        throw new AppError("Máquina não encontrada.", 404);
+      }
+
+      return maquina;
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError("Erro ao buscar máquina detalhada.", 500);
     }
   }
 
@@ -109,7 +217,7 @@ class MaquinaService {
       return await AlertaPreditivoService.preverPorMaquina(id);
     } catch (error) {
       if (error instanceof AppError) throw error;
-      throw new AppError("Erro ao calcular predicao de alertas.", 500);
+      throw new AppError("Erro ao calcular predição de alertas.", 500);
     }
   }
 
@@ -118,7 +226,7 @@ class MaquinaService {
       return await PredicaoRiscoService.preverPorMaquina(id);
     } catch (error) {
       if (error instanceof AppError) throw error;
-      throw new AppError("Erro ao calcular predicao de risco.", 500);
+      throw new AppError("Erro ao calcular predição de risco.", 500);
     }
   }
 
@@ -139,21 +247,21 @@ class MaquinaService {
         await StorageService.deleteFoto({
           bucket: "machine-images",
           caminho: maquina.caminhoImagem
-        }).catch((error) => console.error("Falha ao remover imagem antiga:", error));
+        }).catch(() => {});
       }
 
       return maquinaAtualizada;
     } catch (error) {
       if (error instanceof AppError) throw error;
-      throw new AppError("Erro ao atualizar maquina.", 500);
+      throw new AppError("Erro ao atualizar máquina.", 500);
     }
   }
 
   static async updateFotoMaquina({ maquinaId, buffer }) {
     const maquina = await this.findById(maquinaId);
 
-    if (!maquina || maquina.ativo == false) {
-      throw new AppError("Maquina nao encontrada ou desativada!", 404);
+    if (!maquina || maquina.ativo === false) {
+      throw new AppError("Máquina não encontrada ou desativada!", 404);
     }
 
     let uploadResult = null;
@@ -171,7 +279,7 @@ class MaquinaService {
         await StorageService.deleteFoto({
           bucket: "machine-images",
           caminho: maquina.caminhoImagem
-        }).catch((error) => console.error("Nao foi possivel deletar a imagem antiga!", error));
+        }).catch(() => {});
       }
 
       return maquinaAtualizada;
@@ -180,21 +288,22 @@ class MaquinaService {
         await StorageService.deleteFoto({
           bucket: "machine-images",
           caminho: uploadResult.caminhoImagem
-        }).catch((errorDelete) => console.error("Nao foi possivel deletar a imagem antiga!", errorDelete));
+        }).catch(() => {});
       }
+
       throw error;
     }
   }
 
   static async updateManualMaquina({ maquinaId, file }) {
     if (!file) {
-      throw new AppError("Manual nao enviado!", 400);
+      throw new AppError("Manual não enviado!", 400);
     }
 
     const maquina = await this.findById(maquinaId);
 
-    if (!maquina || maquina.ativo == false) {
-      throw new AppError("Maquina nao encontrada ou desativada!", 404);
+    if (!maquina || maquina.ativo === false) {
+      throw new AppError("Máquina não encontrada ou desativada!", 404);
     }
 
     const manualData = await MaquinaManualService.buildManualData({
@@ -227,6 +336,7 @@ class MaquinaService {
           caminho: manualData.caminho
         }).catch(() => {});
       }
+
       throw error;
     }
   }
@@ -260,9 +370,30 @@ class MaquinaService {
     return await MaquinaModel.calculateAverageIntegrity();
   }
 
+  static async listCriticas({ limit = 10 } = {}) {
+    const take = Math.min(Math.max(Number(limit || 10), 1), 20);
+
+    try {
+      return await MaquinaModel.listPioresIntegridade({ limit: take });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError("Erro ao listar máquinas críticas.", 500);
+    }
+  }
+
+  static async findComAlertaAtivo({ limit = 10 } = {}) {
+    const take = Math.min(Math.max(Number(limit || 10), 1), 20);
+
+    try {
+      return await MaquinaModel.findComAlertaAtivo({ limit: take });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError("Erro ao listar máquinas em alerta.", 500);
+    }
+  }
+
   static async delete(id) {
     const maquina = await this.findById(id);
-    if (!maquina) throw new AppError("Maquina nao encontrada.", 404);
 
     await MaquinaModel.delete(id);
 
@@ -270,10 +401,10 @@ class MaquinaService {
       await StorageService.deleteFoto({
         bucket: "machine-images",
         caminho: maquina.caminhoImagem
-      }).catch((error) => console.error("Falha ao remover arquivo orfao:", error));
+      }).catch(() => {});
     }
 
-    return { mensagem: "Maquina deletada com sucesso!" };
+    return { mensagem: "Máquina deletada com sucesso!" };
   }
 }
 

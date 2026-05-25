@@ -1,0 +1,359 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-05-22T00:00:00.000Z",
+  "__export_source": "codex:orbis-ai-confirmacoes",
+  "resources": [
+    {
+      "_id": "wrk_orbis_ai_confirmacoes",
+      "_type": "workspace",
+      "name": "Orbis IA Confirmacoes",
+      "description": "Colecao para validar tools novas da IA do Orbis, incluindo confirmacoes de acoes de escrita e consultas read-only adicionais.",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_orbis_ai_confirmacoes_base",
+      "_type": "environment",
+      "parentId": "wrk_orbis_ai_confirmacoes",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:3333",
+        "token": "",
+        "maquina_id": 1,
+        "sensor_id": 1,
+        "alerta_id": 1,
+        "agendamento_id": 1,
+        "confirmation_id": "",
+        "destino_email": "admin@orbis.local"
+      }
+    },
+    {
+      "_id": "fld_orbis_ai_confirmacoes_health",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_ai_confirmacoes",
+      "name": "Health"
+    },
+    {
+      "_id": "req_orbis_ai_confirmacoes_ready",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_confirmacoes_health",
+      "name": "Ready",
+      "method": "GET",
+      "url": "{{ _.base_url }}/ready",
+      "headers": [],
+      "body": {},
+      "description": "Valida se a API esta disponivel antes dos testes da IA com confirmacao."
+    },
+    {
+      "_id": "fld_orbis_ai_confirmacoes_readonly",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_ai_confirmacoes",
+      "name": "Consultas Read-Only"
+    },
+    {
+      "_id": "req_orbis_ai_eventos_alerta",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_confirmacoes_readonly",
+      "name": "Buscar Eventos por Alerta",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Mostre a linha do tempo de eventos do alerta {{ _.alerta_id }}.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_eventos_por_alerta."
+    },
+    {
+      "_id": "req_orbis_ai_sensores_maquina",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_confirmacoes_readonly",
+      "name": "Listar Sensores por Maquina",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Liste os sensores da maquina {{ _.maquina_id }} e me diga o status de cada um.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool listar_sensores_por_maquina."
+    },
+    {
+      "_id": "req_orbis_ai_maquina_detalhada",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_confirmacoes_readonly",
+      "name": "Buscar Maquina Detalhada",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Mostre a maquina {{ _.maquina_id }} com sensores e alertas ativos relacionados.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_maquina_detalhada_por_id."
+    },
+    {
+      "_id": "req_orbis_ai_relatorio_agendamentos",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_confirmacoes_readonly",
+      "name": "Listar Agendamentos de Relatorio",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Liste os agendamentos de relatorio do sistema.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool listar_agendamentos_relatorio."
+    },
+    {
+      "_id": "req_orbis_ai_relatorio_agendamento_id",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_confirmacoes_readonly",
+      "name": "Buscar Agendamento de Relatorio",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Mostre os detalhes do agendamento de relatorio {{ _.agendamento_id }}.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_agendamento_relatorio_por_id."
+    },
+    {
+      "_id": "req_orbis_ai_relatorio_execucoes",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_confirmacoes_readonly",
+      "name": "Listar Execucoes de Relatorio",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Liste as execucoes do agendamento de relatorio {{ _.agendamento_id }}.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool listar_execucoes_relatorio."
+    },
+    {
+      "_id": "fld_orbis_ai_confirmacoes_write",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_ai_confirmacoes",
+      "name": "Acoes com Confirmacao"
+    },
+    {
+      "_id": "req_orbis_ai_pausar_agendamento",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_confirmacoes_write",
+      "name": "Solicitar Pausa de Agendamento",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Pause o agendamento de relatorio {{ _.agendamento_id }}.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve retornar requiresConfirmation=true e um confirmation.id."
+    },
+    {
+      "_id": "req_orbis_ai_deletar_agendamento",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_confirmacoes_write",
+      "name": "Solicitar Exclusao de Agendamento",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Delete o agendamento de relatorio {{ _.agendamento_id }}.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve retornar requiresConfirmation=true e um confirmation.id."
+    },
+    {
+      "_id": "req_orbis_ai_executar_agendamento_agora",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_confirmacoes_write",
+      "name": "Solicitar Execucao de Agendamento Agora",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Execute agora o agendamento de relatorio {{ _.agendamento_id }}.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve retornar requiresConfirmation=true e um confirmation.id."
+    },
+    {
+      "_id": "req_orbis_ai_enviar_relatorio_agora",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_confirmacoes_write",
+      "name": "Solicitar Envio de Relatorio Agora",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Envie um relatorio agora para {{ _.destino_email }} dos ultimos 7 dias com resumo, desempenho, sensores, chamados e historico de tendencia.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve retornar requiresConfirmation=true e um confirmation.id para o envio manual."
+    },
+    {
+      "_id": "req_orbis_ai_atualizar_sensor",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_confirmacoes_write",
+      "name": "Solicitar Atualizacao de Limites do Sensor",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Atualize o sensor {{ _.sensor_id }} com temperatura ideal 60, limite 85, vibracao ideal 6 e limite 20.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve retornar requiresConfirmation=true e um confirmation.id para a alteracao do sensor."
+    },
+    {
+      "_id": "req_orbis_ai_confirmar_acao",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_confirmacoes_write",
+      "name": "Confirmar Acao Pendente",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"confirmar acao pendente\",\n  \"confirmationResponse\": {\n    \"id\": \"{{ _.confirmation_id }}\",\n    \"decision\": \"confirm\"\n  }\n}"
+      },
+      "description": "Executa a acao pendente associada ao confirmation_id salvo no ambiente."
+    },
+    {
+      "_id": "req_orbis_ai_cancelar_acao",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_confirmacoes_write",
+      "name": "Cancelar Acao Pendente",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"cancelar acao pendente\",\n  \"confirmationResponse\": {\n    \"id\": \"{{ _.confirmation_id }}\",\n    \"decision\": \"cancel\"\n  }\n}"
+      },
+      "description": "Cancela a acao pendente associada ao confirmation_id salvo no ambiente."
+    }
+  ]
+}

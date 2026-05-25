@@ -4,7 +4,7 @@
   "description": "",
   "main": "src/server.js",
   "scripts": {
-    "test": "node --test --test-isolation=none",
+    "test": "node --test --experimental-test-isolation=none src/services/*.test.js src/services/aiTools/*.test.js src/templates/*.test.js",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "simulador": "node src/simulador.js"

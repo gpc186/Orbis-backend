@@ -1,0 +1,518 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-05-20T00:00:00.000Z",
+  "__export_source": "codex:orbis-ai",
+  "resources": [
+    {
+      "_id": "wrk_orbis_ai",
+      "_type": "workspace",
+      "name": "Orbis IA",
+      "description": "Colecao para validar perguntas gerais e tool calling da IA do Orbis.",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_orbis_ai_base",
+      "_type": "environment",
+      "parentId": "wrk_orbis_ai",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:3333",
+        "token": "",
+        "usuario_id": 1,
+        "usuario_nome": "Carlos",
+        "tecnico_id": 1,
+        "tecnico_nome": "Carlos",
+        "maquina_id": 1,
+        "maquina_nome": "Prensa",
+        "sensor_id": 1,
+        "sensor_tipo": "Vibracao",
+        "alerta_id": 1,
+        "manutencao_id": 1
+      }
+    },
+    {
+      "_id": "fld_orbis_ai_health",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_ai",
+      "name": "Health"
+    },
+    {
+      "_id": "req_orbis_ai_ready",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_health",
+      "name": "Ready",
+      "method": "GET",
+      "url": "{{ _.base_url }}/ready",
+      "headers": [],
+      "body": {},
+      "description": "Valida se a API esta no ar antes dos testes da IA."
+    },
+    {
+      "_id": "fld_orbis_ai_chat",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_ai",
+      "name": "Perguntas IA"
+    },
+    {
+      "_id": "req_orbis_ai_contexto",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Panorama Geral",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Me de um panorama rapido do estado atual do sistema Orbis.\",\n  \"historico\": []\n}"
+      },
+      "description": "Pergunta sem tool calling, para validar resposta textual normal."
+    },
+    {
+      "_id": "req_orbis_ai_busca_usuario_id",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Buscar Usuario por ID",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Me mostre os dados principais do usuario {{ _.usuario_id }}, incluindo role e se ele esta ativo.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_usuario_por_id. Requer usuario ADMIN."
+    },
+    {
+      "_id": "req_orbis_ai_busca_usuario_nome",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Buscar Usuario por Nome",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Procure usuarios com nome {{ _.usuario_nome }} e me diga role, email e se estao ativos.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_usuario_por_nome. Requer usuario ADMIN."
+    },
+    {
+      "_id": "req_orbis_ai_listar_tecnicos",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Listar Tecnicos Ativos",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Mostre todos os tecnicos ativos do sistema.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool listar_tecnicos. Requer usuario ADMIN."
+    },
+    {
+      "_id": "req_orbis_ai_busca_tecnico_id",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Buscar Tecnico por ID",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"O tecnico {{ _.tecnico_id }} esta ativo? Se puder, me diga tambem a especialidade dele e se esta com alerta em andamento.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_tecnico_por_id. Requer usuario ADMIN."
+    },
+    {
+      "_id": "req_orbis_ai_busca_tecnico_nome",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Buscar Tecnico por Nome",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Procure tecnicos com nome {{ _.tecnico_nome }} e me diga quais estao ativos, a especialidade e se tem alerta em andamento.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_tecnico_por_nome. Requer usuario ADMIN."
+    },
+    {
+      "_id": "req_orbis_ai_historico",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Pergunta com Historico",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"E entre esses tecnicos, qual parece mais adequado para atender um caso de vibracao?\",\n  \"historico\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Mostre todos os tecnicos ativos do sistema.\"\n    },\n    {\n      \"role\": \"assistant\",\n      \"content\": \"Consultei os tecnicos ativos e posso te ajudar a comparar os perfis.\"\n    }\n  ]\n}"
+      },
+      "description": "Valida historico simples com follow-up depois de uma consulta."
+    },
+    {
+      "_id": "req_orbis_ai_busca_sensor_id",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Buscar Sensor por ID",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Me traga os detalhes do sensor {{ _.sensor_id }}, incluindo tipo, status e maquina vinculada.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_sensor_por_id. Requer usuario ADMIN."
+    },
+    {
+      "_id": "req_orbis_ai_busca_sensor_tipo",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Buscar Sensor por Tipo",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Procure sensores do tipo {{ _.sensor_tipo }} e me diga o status e a maquina de cada um.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_sensor_por_tipo. Requer usuario ADMIN."
+    },
+    {
+      "_id": "req_orbis_ai_alerta_id",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Buscar Alerta por ID",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Me explique o alerta {{ _.alerta_id }}, com a maquina, sensor, tecnico e eventos recentes.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_alerta_por_id. Requer usuario ADMIN."
+    },
+    {
+      "_id": "req_orbis_ai_alertas_ativos",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Buscar Alertas Ativos",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Quais sao os alertas ativos mais recentes do sistema?\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_alertas_ativos. Requer usuario ADMIN."
+    },
+    {
+      "_id": "req_orbis_ai_alertas_maquina",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Buscar Alertas por Maquina",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Quais alertas a maquina {{ _.maquina_id }} tem agora? Mostre so os ativos.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_alertas_por_maquina. Requer usuario ADMIN."
+    },
+    {
+      "_id": "req_orbis_ai_alertas_tecnico",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Buscar Alertas por Tecnico",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Quais alertas estao com o tecnico {{ _.tecnico_id }}? Mostre apenas os ativos.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_alertas_por_tecnico. Requer usuario ADMIN."
+    },
+    {
+      "_id": "req_orbis_ai_manutencao_id",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Buscar Manutencao por ID",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Quero os detalhes da manutencao {{ _.manutencao_id }}, com alerta e tecnico vinculados.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_manutencao_por_id. Requer usuario ADMIN."
+    },
+    {
+      "_id": "req_orbis_ai_manutencoes_alerta",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Buscar Manutencoes por Alerta",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Quais manutencoes estao ligadas ao alerta {{ _.alerta_id }}?\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_manutencoes_por_alerta. Requer usuario ADMIN."
+    },
+    {
+      "_id": "req_orbis_ai_busca_maquina_id",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Buscar Maquina por ID",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Quero detalhes da maquina {{ _.maquina_id }}. Me diga se ela esta ativa, a integridade, criticidade e setor.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_maquina_por_id. Requer usuario ADMIN."
+    },
+    {
+      "_id": "req_orbis_ai_busca_maquina_nome",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Buscar Maquina por Nome",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Procure maquinas com nome {{ _.maquina_nome }} e me diga quais estao ativas, a integridade, criticidade e setor.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_maquina_por_nome. Requer usuario ADMIN."
+    },
+    {
+      "_id": "req_orbis_ai_maquinas_criticas",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Buscar Maquinas Criticas",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Quais sao as maquinas mais criticas agora?\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_maquinas_criticas. Requer usuario ADMIN."
+    },
+    {
+      "_id": "req_orbis_ai_sensores_offline",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Buscar Sensores Offline",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Tem sensores offline recentes? Me diga o tipo e a maquina de cada um.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_sensores_offline. Requer usuario ADMIN."
+    },
+    {
+      "_id": "req_orbis_ai_maquinas_alerta",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_chat",
+      "name": "Buscar Maquinas em Alerta",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Quais maquinas possuem alerta ativo agora?\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve acionar a tool buscar_maquinas_em_alerta. Requer usuario ADMIN."
+    }
+  ]
+}

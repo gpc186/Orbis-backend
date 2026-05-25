@@ -85,6 +85,13 @@ enum StatusExecucaoRelatorio {
   FALHOU
 }
 
+enum StatusAiActionConfirmation {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  EXPIRED
+}
+
 // ─── MODELS ───────────────────────────────────────────────────────────────────
 
 model Usuario {
@@ -108,6 +115,7 @@ model Usuario {
   refreshTokens       RefreshToken[]
   passwordResetCode   PasswordResetCode?
   relatoriosAgendados RelatorioAgendamento[]
+  aiActionConfirmations AiActionConfirmation[]
 }
 
 model Maquina {
@@ -341,4 +349,22 @@ model RelatorioExecucao {
 
   @@index([agendamentoId, iniciadoEm])
   @@index([status, iniciadoEm])
+}
+
+model AiActionConfirmation {
+  id          String   @id @default(uuid())
+  usuarioId   Int
+  actionName  String
+  actionData  Json
+  actionLabel String
+  summary     Json?
+  status      StatusAiActionConfirmation @default(PENDING)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  resolvedAt  DateTime?
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, status, expiresAt])
+  @@index([status, expiresAt])
 }

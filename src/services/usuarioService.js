@@ -8,6 +8,55 @@ const StorageService = require("./storageService");
 const logger = require("../utils/logger");
 
 class UsuarioService {
+  static normalizeRoleFilter(role) {
+    if (role == null) return undefined;
+
+    const normalized = String(role)
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+    if (!normalized) {
+      return undefined;
+    }
+
+    const adminAliases = new Set([
+      "admin",
+      "admins",
+      "administrador",
+      "administradores"
+    ]);
+
+    const tecnicoAliases = new Set([
+      "tecnico",
+      "tecnicos",
+      "tecnica",
+      "tecnicas"
+    ]);
+
+    const genericUserAliases = new Set([
+      "usuario",
+      "usuarios",
+      "user",
+      "users"
+    ]);
+
+    if (adminAliases.has(normalized)) {
+      return "ADMIN";
+    }
+
+    if (tecnicoAliases.has(normalized)) {
+      return "TECNICO";
+    }
+
+    if (genericUserAliases.has(normalized)) {
+      return undefined;
+    }
+
+    throw new AppError("Role invalida para busca de usuario.", 400);
+  }
+
   static async login({ email, senha }) {
     const usuario = await UsuarioModel.findByEmail(email);
 
@@ -152,6 +201,60 @@ class UsuarioService {
     return { dados, total, page: pageNum, totalPages };
   }
 
+  static async findTecnicosByNome({ nome, limit = 10, somenteAtivos }) {
+    const nomeNormalizado = String(nome || "").trim();
+
+    if (nomeNormalizado.length < 2) {
+      throw new AppError("Nome invalido para busca de tecnico.", 400);
+    }
+
+    const take = Math.min(Math.max(Number(limit || 10), 1), 20);
+    const tecnicos = await UsuarioModel.findTecnicosByNome({
+      nome: nomeNormalizado,
+      take,
+      ativo: typeof somenteAtivos === "boolean" ? somenteAtivos : undefined
+    });
+
+    const dados = await Promise.all(
+      tecnicos.map(async (tecnico) => {
+        const status = await AlertaModel.findAlertaStatusOfTecnicoById(tecnico.id);
+
+        return {
+          ...tecnico,
+          alertaEmAndamento: Boolean(status)
+        };
+      })
+    );
+
+    return {
+      total: dados.length,
+      dados
+    };
+  }
+
+  static async findByNome({ nome, limit = 10, somenteAtivos, role }) {
+    const nomeNormalizado = String(nome || "").trim();
+
+    if (nomeNormalizado.length < 2) {
+      throw new AppError("Nome invalido para busca de usuario.", 400);
+    }
+
+    const roleNormalizado = this.normalizeRoleFilter(role);
+
+    const take = Math.min(Math.max(Number(limit || 10), 1), 20);
+    const dados = await UsuarioModel.findByNome({
+      nome: nomeNormalizado,
+      take,
+      ativo: typeof somenteAtivos === "boolean" ? somenteAtivos : undefined,
+      role: roleNormalizado
+    });
+
+    return {
+      total: dados.length,
+      dados
+    };
+  }
+
   static async findAlertasByTecnicoId(id, { page, limit }) {
     if (!page || !limit) {
       throw new AppError("Paginacao nao usada corretamente!", 400);
@@ -165,7 +268,7 @@ class UsuarioService {
     }
 
     if (tecnico.role !== "TECNICO") {
-      throw new AppError("Usuario nao e tecnico!", 401);
+      throw new AppError("Usuario nao e tecnico!", 403);
     }
 
     const pageNum = parseInt(page);

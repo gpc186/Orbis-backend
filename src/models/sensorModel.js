@@ -31,8 +31,68 @@ class SensorModel {
     static async delete(id) {
         return await prisma.sensor.delete({ where: { id: parseInt(id) } })
     }
-    static async findById(id) {
-        return await prisma.sensor.findUnique({ where: { id: parseInt(id) } })
+    static async findById(id, options = {}) {
+        return await prisma.sensor.findUnique({
+            where: { id: parseInt(id) },
+            include: {
+                maquina: {
+                    select: {
+                        id: true,
+                        nome: true,
+                        setor: true,
+                        criticidade: true,
+                        ativo: true
+                    }
+                }
+            },
+            ...options
+        })
+    }
+    static async findByTipo({ tipo, maquinaId, status, take = 10 }) {
+        return await prisma.sensor.findMany({
+            where: {
+                tipo: {
+                    contains: tipo,
+                    mode: "insensitive"
+                },
+                ...(maquinaId != null ? { maquinaId: parseInt(maquinaId) } : {}),
+                ...(status ? { status } : {})
+            },
+            take,
+            orderBy: { tipo: "asc" },
+            include: {
+                maquina: {
+                    select: {
+                        id: true,
+                        nome: true,
+                        setor: true,
+                        criticidade: true,
+                        ativo: true
+                    }
+                }
+            }
+        });
+    }
+    static async findByMaquinaId({ maquinaId, status, take = 10 }) {
+        return await prisma.sensor.findMany({
+            where: {
+                maquinaId: parseInt(maquinaId),
+                ...(status ? { status } : {})
+            },
+            take,
+            orderBy: { tipo: "asc" },
+            include: {
+                maquina: {
+                    select: {
+                        id: true,
+                        nome: true,
+                        setor: true,
+                        criticidade: true,
+                        ativo: true
+                    }
+                }
+            }
+        });
     }
     static async update(id, data) {
         return await prisma.sensor.update({
@@ -101,9 +161,18 @@ class SensorModel {
             take: safeLimit,
             select: {
                 id: true,
+                tipo: true,
                 maquinaId: true,
                 status: true,
                 ultimaLeituraEm: true,
+                maquina: {
+                    select: {
+                        id: true,
+                        nome: true,
+                        setor: true,
+                        criticidade: true
+                    }
+                }
             }
         });
     }
