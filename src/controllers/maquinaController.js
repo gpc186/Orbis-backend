@@ -4,7 +4,7 @@ class MaquinaController {
     static async store(req, res, next) {
         try {
             const nova = await MaquinaService.create(req.body, req.file);
-            return res.status(201).json(nova);
+            return res.status(201).json(MaquinaService.sanitizeForResponse(nova));
         } catch (error) {
             next(error)
         }
@@ -12,7 +12,7 @@ class MaquinaController {
     static async index(req, res, next) {
         try {
             const todas = await MaquinaService.list();
-            return res.json(todas);
+            return res.json(MaquinaService.sanitizeForResponse(todas));
         } catch (error) {
             next(error)
         }
@@ -28,7 +28,7 @@ class MaquinaController {
     static async show(req, res, next) {
         try {
             const maquina = await MaquinaService.findById(req.params.id)
-            return res.status(200).json(maquina);
+            return res.status(200).json(MaquinaService.sanitizeForResponse(maquina));
         } catch (error) {
             next(error)
         }
@@ -61,6 +61,20 @@ class MaquinaController {
         try {
             const maquinaId = req.params.id;
             const response = await MaquinaService.updateManualMaquina({ maquinaId, file: req.file });
+            return res.status(200).json(MaquinaService.sanitizeManualForResponse(response));
+        } catch (error) {
+            next(error);
+        };
+    };
+    static async previewManual(req, res, next){
+        if(!req.file){
+            return next(new AppError("Manual nao enviado!", 400));
+        };
+        try {
+            const response = await MaquinaService.previewManualSpecs({
+                maquinaId: req.body.maquinaId,
+                file: req.file
+            });
             return res.status(200).json(response);
         } catch (error) {
             next(error);

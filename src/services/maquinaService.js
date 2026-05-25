@@ -4,6 +4,33 @@ const StorageService = require("./storageService");
 const MaquinaManualService = require("./maquinaManualService");
 
 class MaquinaService {
+  static sanitizeManualForResponse(manual) {
+    if (!manual) return manual;
+
+    const {
+      textoExtraido,
+      embedding,
+      chunks,
+      caminho,
+      ...manualPublico
+    } = manual;
+
+    return manualPublico;
+  }
+
+  static sanitizeForResponse(maquina) {
+    if (!maquina) return maquina;
+
+    if (Array.isArray(maquina)) {
+      return maquina.map((item) => this.sanitizeForResponse(item));
+    }
+
+    return {
+      ...maquina,
+      manual: this.sanitizeManualForResponse(maquina.manual)
+    };
+  }
+
   static async create(dados, manualFile = null) {
     if (!dados.nome || !dados.setor) {
       throw new AppError("Nome e setor sao obrigatorios para cadastrar uma maquina.", 400);
@@ -188,6 +215,27 @@ class MaquinaService {
       }
       throw error;
     }
+  }
+
+  static async previewManualSpecs({ maquinaId = null, file }) {
+    let maquina = null;
+
+    if (maquinaId !== null && maquinaId !== undefined && String(maquinaId).trim() !== "") {
+      maquina = await this.findById(maquinaId);
+    }
+
+    return MaquinaManualService.previewSpecs({
+      file,
+      maquina: maquina
+        ? {
+            id: maquina.id,
+            nome: maquina.nome,
+            setor: maquina.setor,
+            tipo: maquina.tipo,
+            criticidade: maquina.criticidade
+          }
+        : null
+    });
   }
 
   static async count() {

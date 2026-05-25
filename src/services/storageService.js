@@ -1,5 +1,6 @@
 const { createClient } = require("@supabase/supabase-js");
 const AppError = require("../utils/appErrorUtils");
+const logger = require("../utils/logger");
 
 class StorageService {
   static imageBuckets = ["profile-images", "machine-images"];
@@ -64,6 +65,14 @@ class StorageService {
     });
 
     if (error) {
+      logger.error("storage_file_upload_error", {
+        bucket,
+        caminho,
+        contentType,
+        statusCode: error.statusCode || error.status,
+        error
+      });
+
       throw new AppError("Erro ao tentar fazer upload do arquivo!", 500);
     }
 
@@ -104,6 +113,13 @@ class StorageService {
     const { error } = await supabase.storage.from(bucket).remove([caminho]);
 
     if (error) {
+      logger.error("storage_file_delete_error", {
+        bucket,
+        caminho,
+        statusCode: error.statusCode || error.status,
+        error
+      });
+
       throw new AppError("Nao foi possivel deletar o arquivo, por favor, tente novamente depois!", 500);
     }
 

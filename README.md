@@ -61,6 +61,7 @@ JWT_SECRET="sua_chave_jwt"
 SUPABASE_URL="sua_url_do_supabase"
 SUPABASE_SERVICE_ROLE="sua_service_role"
 GROQ_API_KEY="sua_chave_groq"
+GEMINI_API_KEY="sua_chave_gemini"
 ```
 
 ### Utilizadas pela aplicação
@@ -69,17 +70,22 @@ GROQ_API_KEY="sua_chave_groq"
 JWT_EXPIRES_IN="30m"
 REFRESH_TOKEN_EXPIRES_IN_DAYS="7"
 ESP32_API_KEY="chave_do_esp32"
+SENSOR_OFFLINE_JOB_ENABLED=true
 REPORT_JOB_ENABLED=false
 REPORT_JOB_CRON="* * * * *"
 PORT=3333
 NODE_ENV="DEVELOPMENT"
 GROQ_MODEL="llama-3.3-70b-versatile"
+EMBEDDING_PROVIDER="gemini"
+GEMINI_EMBEDDING_MODEL="gemini-embedding-001"
+GEMINI_EMBEDDING_BATCH_SIZE=10
+GEMINI_EMBEDDING_DIMENSIONS=768
 GROQ_EMBEDDING_MODEL="nomic-embed-text-v1_5"
 MANUAL_MAX_TEXT_CHARS=100000
 MANUAL_CHUNK_SIZE=1800
 MANUAL_CHUNK_OVERLAP=250
-MANUAL_MAX_CHUNKS=40
-MANUAL_ANALYSIS_CHUNKS=8
+MANUAL_MAX_CHUNKS=80
+MANUAL_ANALYSIS_CHUNKS=14
 ```
 
 O fluxo de relatorios usa timezone fixo `America/Sao_Paulo`.
@@ -245,10 +251,12 @@ src/
 ### Manual tecnico da maquina
 
 - `POST /maquinas` pode receber um PDF no campo multipart `manual` junto com os dados da maquina;
+- `POST /maquinas/manual/preview` recebe um PDF no campo `manual`, extrai especificacoes e nao salva arquivo nem altera o banco;
 - `PUT /maquinas/:id/manual` cria ou substitui o manual de uma maquina existente;
 - o PDF e armazenado no bucket `machine-manuals`, e o banco guarda metadados, texto extraido, chunks, embeddings e especificacoes extraidas;
-- o retorno inclui as especificacoes extraidas em `manual.especificacoes`;
-- a extracao usa embeddings para selecionar trechos do manual antes de pedir ao Groq um JSON com limites e valores ideais.
+- o retorno inclui as especificacoes extraidas em `manual.especificacoes`, sem devolver texto extraido, chunks ou embeddings;
+- a extracao usa embeddings para selecionar trechos do manual antes de pedir ao Groq um JSON com limites e valores ideais;
+- `EMBEDDING_PROVIDER="gemini"` usa Gemini para gerar os vetores e mantem Groq apenas na analise final das especificacoes.
 
 ## Rotas
 
@@ -300,6 +308,7 @@ src/
 | Método | Rota | Acesso |
 |---|---|---|
 | POST | `/maquinas` | Autenticado |
+| POST | `/maquinas/manual/preview` | Autenticado |
 | GET | `/maquinas` | Autenticado |
 | GET | `/maquinas/:id` | Autenticado |
 | PUT | `/maquinas/:id` | Autenticado |

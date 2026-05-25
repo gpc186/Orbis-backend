@@ -5,6 +5,7 @@ const HistoricoIntegridadeController = require('../controllers/historicoIntegrid
 const authMiddleware = require('../middlewares/authMiddleware')
 const { uploadImagemUnica, uploadManualUnico, imagemProcessada } = require('../middlewares/uploadMiddleware')
 
+router.post('/manual/preview', authMiddleware, uploadManualUnico, MaquinaController.previewManual)
 router.post('/', authMiddleware, uploadManualUnico, MaquinaController.store)
 router.get('/', authMiddleware, MaquinaController.index)
 router.get('/:id/historico-integridade', authMiddleware, HistoricoIntegridadeController.listByMaquina)
