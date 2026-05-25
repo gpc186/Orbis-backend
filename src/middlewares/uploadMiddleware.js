@@ -3,6 +3,7 @@ const sharp = require('sharp');
 const AppError = require('../utils/appErrorUtils');
 
 const allowedMimeTypes = ["image/png", "image/jpg", "image/jpeg", "image/webp"]
+const allowedManualMimeTypes = ["application/pdf"];
 
 const upload = multer({
     storage: multer.memoryStorage(),
@@ -15,6 +16,20 @@ const upload = multer({
     },
     limits: {
         fileSize: 15 * 1024 * 1024
+    }
+});
+
+const uploadManual = multer({
+    storage: multer.memoryStorage(),
+    fileFilter: (req, file, cb) => {
+        if (!allowedManualMimeTypes.includes(file.mimetype)) {
+            return cb(new AppError("Tipo de manual nao suportado. Envie um PDF.", 400), false);
+        }
+
+        return cb(null, true);
+    },
+    limits: {
+        fileSize: 25 * 1024 * 1024
     }
 });
 
@@ -47,4 +62,8 @@ async function imagemProcessada(req, res, next) {
     };
 };
 
-module.exports = { uploadImagemUnica: upload.single("imagem"), imagemProcessada };
+module.exports = {
+    uploadImagemUnica: upload.single("imagem"),
+    uploadManualUnico: uploadManual.single("manual"),
+    imagemProcessada
+};
