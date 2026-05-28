@@ -6,7 +6,10 @@ const ManutecaoService = require("../manutencaoService");
 const DashboardService = require("../dashboardService");
 const RelatorioAgendamentoService = require("../relatorioAgendamentoService");
 const RelatorioExecucaoService = require("../relatorioExecucaoService");
-const { validatePreviewPayload } = require("../../utils/reportValidation");
+const {
+  validatePreviewPayload,
+  validateSchedulePayload
+} = require("../../utils/reportValidation");
 const AppError = require("../../utils/appErrorUtils");
 
 const tools = [
@@ -588,6 +591,111 @@ const tools = [
   {
     type: "function",
     function: {
+      name: "criar_agendamento_relatorio",
+      description: "Cria um novo agendamento de relatorio",
+      parameters: {
+        type: "object",
+        properties: {
+          nome: {
+            type: "string",
+            description: "Nome do relatório"
+          },
+          emailsDestino: {
+            type: "array",
+            items: { type: "string" },
+            description: "Lista de e-mails destinatários"
+          },
+          assunto: {
+            type: "string",
+            description: "Assunto opcional do e-mail"
+          },
+          periodo: {
+            type: "object",
+            description: "Período do relatório"
+          },
+          filtros: {
+            type: "object",
+            description: "Filtros e seções do relatório"
+          },
+          agendamento: {
+            type: "object",
+            description: "Configuração de frequência e horário"
+          }
+        },
+        required: ["nome", "emailsDestino", "periodo", "filtros", "agendamento"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "atualizar_agendamento_relatorio",
+      description: "Atualiza um agendamento de relatorio existente",
+      parameters: {
+        type: "object",
+        properties: {
+          id: {
+            type: "integer",
+            description: "ID do agendamento de relatório"
+          },
+          email: {
+            type: "string",
+            description: "E-mail destinatário para localizar o agendamento quando o ID não for informado"
+          },
+          nome: {
+            type: "string",
+            description: "Nome do relatório"
+          },
+          emailsDestino: {
+            type: "array",
+            items: { type: "string" },
+            description: "Lista de e-mails destinatários"
+          },
+          assunto: {
+            type: "string",
+            description: "Assunto opcional do e-mail"
+          },
+          periodo: {
+            type: "object",
+            description: "Período do relatório"
+          },
+          filtros: {
+            type: "object",
+            description: "Filtros e seções do relatório"
+          },
+          agendamento: {
+            type: "object",
+            description: "Configuração de frequência e horário"
+          }
+        },
+        required: ["nome", "emailsDestino", "periodo", "filtros", "agendamento"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "reativar_agendamento_relatorio",
+      description: "Reativa um agendamento de relatorio pausado",
+      parameters: {
+        type: "object",
+        properties: {
+          id: {
+            type: "integer",
+            description: "ID do agendamento de relatório"
+          },
+          email: {
+            type: "string",
+            description: "E-mail destinatário do agendamento para localizar o registro quando o ID não for informado"
+          }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "pausar_agendamento_relatorio",
       description: "Pausa um agendamento de relatorio especifico",
       parameters: {
@@ -596,9 +704,13 @@ const tools = [
           id: {
             type: "integer",
             description: "ID do agendamento de relatorio"
+          },
+          email: {
+            type: "string",
+            description: "E-mail destinatario do agendamento para localizar o registro quando o ID nao for informado"
           }
         },
-        required: ["id"]
+        required: []
       }
     }
   },
@@ -613,9 +725,13 @@ const tools = [
           id: {
             type: "integer",
             description: "ID do agendamento de relatorio"
+          },
+          email: {
+            type: "string",
+            description: "E-mail destinatario do agendamento para localizar o registro quando o ID nao for informado"
           }
         },
-        required: ["id"]
+        required: []
       }
     }
   },
@@ -630,9 +746,13 @@ const tools = [
           id: {
             type: "integer",
             description: "ID do agendamento de relatorio"
+          },
+          email: {
+            type: "string",
+            description: "E-mail destinatario do agendamento para localizar o registro quando o ID nao for informado"
           }
         },
-        required: ["id"]
+        required: []
       }
     }
   },
@@ -673,6 +793,52 @@ const tools = [
   {
     type: "function",
     function: {
+      name: "criar_manutencao_por_alerta",
+      description: "Cria uma manutenção para um alerta específico",
+      parameters: {
+        type: "object",
+        properties: {
+          alertaId: {
+            type: "integer",
+            description: "ID do alerta"
+          },
+          observacao: {
+            type: "string",
+            description: "Observação da manutenção"
+          }
+        },
+        required: ["alertaId", "observacao"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "atualizar_status_manutencao",
+      description: "Atualiza o status e a observação de uma manutenção em andamento",
+      parameters: {
+        type: "object",
+        properties: {
+          id: {
+            type: "integer",
+            description: "ID da manutenção"
+          },
+          status: {
+            type: "string",
+            description: "Novo status da manutenção"
+          },
+          observacao: {
+            type: "string",
+            description: "Nova observação da manutenção"
+          }
+        },
+        required: ["id", "status"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "atualizar_limites_sensor",
       description: "Atualiza limites ideais e maximos de um sensor",
       parameters: {
@@ -681,6 +847,10 @@ const tools = [
           id: {
             type: "integer",
             description: "ID do sensor"
+          },
+          tipo: {
+            type: "string",
+            description: "Tipo do sensor para localizar o registro quando o ID nao for informado"
           },
           limiteTemperatura: {
             type: "number",
@@ -707,7 +877,7 @@ const tools = [
             description: "Novo desvio maximo de vibracao"
           }
         },
-        required: ["id"]
+        required: []
       }
     }
   }
@@ -918,11 +1088,121 @@ function mapRelatorioExecucao(item) {
   };
 }
 
+function mapDisambiguationAgendamento(item) {
+  return {
+    id: item.id,
+    nome: item.nome,
+    status: item.status,
+    descricaoAgendamento: item.descricaoAgendamento,
+    destinatarios: Array.isArray(item.destinatarios)
+      ? item.destinatarios.map((destinatario) => destinatario.email)
+      : []
+  };
+}
+
+function mapDisambiguationSensor(item) {
+  return {
+    id: item.id,
+    tipo: item.tipo,
+    status: item.status,
+    maquina: item.maquina
+      ? {
+          id: item.maquina.id,
+          nome: item.maquina.nome,
+          setor: item.maquina.setor
+        }
+      : null
+  };
+}
+
+function buildDisambiguationResult({ entity, actionName, actionLabel, message, options }) {
+  return {
+    kind: "disambiguation",
+    entity,
+    actionName,
+    actionLabel,
+    message,
+    options
+  };
+}
+
+async function resolveAgendamentoTarget({ usuario, args, actionName, actionLabel }) {
+  if (args?.id !== undefined && args?.id !== null && String(args.id).trim() !== "") {
+    return await RelatorioAgendamentoService.findById({ usuario, id: args.id });
+  }
+
+  const email = String(args?.email || "").trim();
+
+  if (!email) {
+    throw new AppError("Informe o id ou o e-mail destinatário do agendamento.", 400);
+  }
+
+  const items = await RelatorioAgendamentoService.findByDestinatarioEmail({
+    usuario,
+    email,
+    limit: 10
+  });
+
+  if (items.length === 0) {
+    throw new AppError("Nenhum agendamento de relatório encontrado para o e-mail informado.", 404);
+  }
+
+  if (items.length > 1) {
+    return buildDisambiguationResult({
+      entity: "relatorio_agendamento",
+      actionName,
+      actionLabel,
+      message: `Encontrei mais de um agendamento de relatório com o e-mail ${email}. Escolha qual deles você quer usar.`,
+      options: items.map(mapDisambiguationAgendamento)
+    });
+  }
+
+  return items[0];
+}
+
+async function resolveSensorTarget({ args, actionName, actionLabel }) {
+  if (args?.id !== undefined && args?.id !== null && String(args.id).trim() !== "") {
+    return await SensorService.findById(args.id);
+  }
+
+  const tipo = String(args?.tipo || "").trim();
+
+  if (!tipo) {
+    throw new AppError("Informe o id ou o tipo do sensor.", 400);
+  }
+
+  const result = await SensorService.findByTipo({
+    tipo,
+    limit: 10
+  });
+
+  if (result.total === 0) {
+    throw new AppError("Nenhum sensor encontrado para o tipo informado.", 404);
+  }
+
+  if (result.total > 1) {
+    return buildDisambiguationResult({
+      entity: "sensor",
+      actionName,
+      actionLabel,
+      message: `Encontrei mais de um sensor com o tipo ${tipo}. Escolha qual deles você quer usar.`,
+      options: result.dados.map(mapDisambiguationSensor)
+    });
+  }
+
+  return result.dados[0];
+}
+
 const WRITE_TOOL_NAMES = new Set([
+  "criar_agendamento_relatorio",
+  "atualizar_agendamento_relatorio",
+  "reativar_agendamento_relatorio",
   "pausar_agendamento_relatorio",
   "deletar_agendamento_relatorio",
   "executar_agendamento_relatorio_agora",
   "enviar_relatorio_agora",
+  "criar_manutencao_por_alerta",
+  "atualizar_status_manutencao",
   "atualizar_limites_sensor"
 ]);
 
@@ -930,17 +1210,149 @@ function isWriteTool(name) {
   return WRITE_TOOL_NAMES.has(name);
 }
 
-async function prepareWriteToolAction({ name, args, usuario }) {
-  if (!usuario || usuario.role !== "ADMIN") {
-    throw new AppError("Usuario sem permissao para usar tools administrativas.", 403);
+function assertWriteToolPermission({ name, usuario }) {
+  if (!usuario) {
+    throw new AppError("Usuário sem permissão para usar tools administrativas.", 403);
   }
 
-  if (name === "pausar_agendamento_relatorio") {
-    const agendamento = await RelatorioAgendamentoService.findById({ usuario, id: args.id });
+  const reportWriteTools = new Set([
+    "criar_agendamento_relatorio",
+    "atualizar_agendamento_relatorio",
+    "reativar_agendamento_relatorio",
+    "pausar_agendamento_relatorio",
+    "deletar_agendamento_relatorio",
+    "executar_agendamento_relatorio_agora",
+    "enviar_relatorio_agora",
+    "atualizar_limites_sensor"
+  ]);
+
+  if (reportWriteTools.has(name) && usuario.role !== "ADMIN") {
+    throw new AppError("Usuário sem permissão para usar tools administrativas.", 403);
+  }
+
+  if (name === "criar_manutencao_por_alerta") {
+    if (usuario.role !== "ADMIN" && usuario.role !== "TECNICO") {
+      throw new AppError("Usuário sem permissão para criar manutenção.", 403);
+    }
+
+    return;
+  }
+
+  if (name === "atualizar_status_manutencao") {
+    if (usuario.role !== "TECNICO") {
+      throw new AppError("Apenas o técnico responsável pode atualizar a manutenção.", 403);
+    }
+  }
+}
+
+async function prepareWriteToolAction({ name, args, usuario }) {
+  assertWriteToolPermission({ name, usuario });
+
+  if (name === "criar_agendamento_relatorio") {
+    const normalized = validateSchedulePayload(args);
 
     return {
       name,
-      args: { id: Number(args.id) },
+      args: normalized,
+      actionLabel: "Criar agendamento",
+      summary: {
+        nome: normalized.nome,
+        assunto: normalized.assunto,
+        emailsDestino: normalized.emailsDestino,
+        periodo: normalized.periodo,
+        secoes: normalized.filtros.secoes,
+        agendamento: normalized.agendamento
+      }
+    };
+  }
+
+  if (name === "atualizar_agendamento_relatorio") {
+    const agendamento = await resolveAgendamentoTarget({
+      usuario,
+      args,
+      actionName: name,
+      actionLabel: "Atualizar agendamento"
+    });
+
+    if (agendamento.kind === "disambiguation") {
+      return agendamento;
+    }
+
+    const normalized = validateSchedulePayload(args);
+    const alteracoes = [];
+
+    if (agendamento.nome !== normalized.nome) alteracoes.push("nome");
+    if ((agendamento.assunto || null) !== normalized.assunto) alteracoes.push("assunto");
+    if (agendamento.frequencia !== normalized.agendamento.frequencia) alteracoes.push("frequência");
+    if (agendamento.hora !== normalized.agendamento.hora || agendamento.minuto !== normalized.agendamento.minuto) {
+      alteracoes.push("horário");
+    }
+    if (agendamento.diaSemana !== normalized.agendamento.diaSemana) alteracoes.push("diaSemana");
+    if (agendamento.diaMes !== normalized.agendamento.diaMes) alteracoes.push("diaMes");
+    if (JSON.stringify(agendamento.periodo) !== JSON.stringify(normalized.periodo)) alteracoes.push("período");
+    if (JSON.stringify(agendamento.filtros) !== JSON.stringify(normalized.filtros)) alteracoes.push("filtros");
+    if (JSON.stringify(agendamento.secoes) !== JSON.stringify(normalized.filtros.secoes)) alteracoes.push("seções");
+    if (JSON.stringify((agendamento.destinatarios || []).map((item) => item.email)) !== JSON.stringify(normalized.emailsDestino)) {
+      alteracoes.push("destinatários");
+    }
+
+    return {
+      name,
+      args: {
+        id: Number(agendamento.id),
+        payload: normalized
+      },
+      actionLabel: "Atualizar agendamento",
+      summary: {
+        id: agendamento.id,
+        nome: agendamento.nome,
+        statusAtual: agendamento.status,
+        descricaoAgendamento: agendamento.descricaoAgendamento,
+        alteracoes
+      }
+    };
+  }
+
+  if (name === "reativar_agendamento_relatorio") {
+    const agendamento = await resolveAgendamentoTarget({
+      usuario,
+      args,
+      actionName: name,
+      actionLabel: "Reativar agendamento"
+    });
+
+    if (agendamento.kind === "disambiguation") {
+      return agendamento;
+    }
+
+    return {
+      name,
+      args: { id: Number(agendamento.id) },
+      actionLabel: "Reativar agendamento",
+      summary: {
+        id: agendamento.id,
+        nome: agendamento.nome,
+        statusAtual: agendamento.status,
+        proximoEnvioEm: agendamento.proximoEnvioEm
+      }
+    };
+  }
+
+  if (name === "pausar_agendamento_relatorio") {
+    const agendamento = await resolveAgendamentoTarget({
+      usuario,
+      args,
+      actionName: name,
+      actionLabel: "Pausar agendamento"
+    });
+
+    if (agendamento.kind === "disambiguation") {
+      return agendamento;
+    }
+
+    return {
+      name,
+      args: { id: Number(agendamento.id) },
       actionLabel: "Pausar agendamento",
       summary: {
         id: agendamento.id,
@@ -953,11 +1365,20 @@ async function prepareWriteToolAction({ name, args, usuario }) {
   }
 
   if (name === "deletar_agendamento_relatorio") {
-    const agendamento = await RelatorioAgendamentoService.findById({ usuario, id: args.id });
+    const agendamento = await resolveAgendamentoTarget({
+      usuario,
+      args,
+      actionName: name,
+      actionLabel: "Deletar agendamento"
+    });
+
+    if (agendamento.kind === "disambiguation") {
+      return agendamento;
+    }
 
     return {
       name,
-      args: { id: Number(args.id) },
+      args: { id: Number(agendamento.id) },
       actionLabel: "Deletar agendamento",
       summary: {
         id: agendamento.id,
@@ -972,11 +1393,20 @@ async function prepareWriteToolAction({ name, args, usuario }) {
   }
 
   if (name === "executar_agendamento_relatorio_agora") {
-    const agendamento = await RelatorioAgendamentoService.findById({ usuario, id: args.id });
+    const agendamento = await resolveAgendamentoTarget({
+      usuario,
+      args,
+      actionName: name,
+      actionLabel: "Executar agendamento agora"
+    });
+
+    if (agendamento.kind === "disambiguation") {
+      return agendamento;
+    }
 
     return {
       name,
-      args: { id: Number(args.id) },
+      args: { id: Number(agendamento.id) },
       actionLabel: "Executar agendamento agora",
       summary: {
         id: agendamento.id,
@@ -1011,8 +1441,94 @@ async function prepareWriteToolAction({ name, args, usuario }) {
     };
   }
 
+  if (name === "criar_manutencao_por_alerta") {
+    const alerta = await AlertaService.findById(args.alertaId);
+    const observacao = String(args.observacao || "").trim();
+
+    if (observacao.length < 3) {
+      throw new AppError("Observação não é válida.", 400);
+    }
+
+    if (alerta.status === "RESOLVIDO" || alerta.status === "CANCELADO") {
+      throw new AppError("Não é possível criar uma manutenção para um alerta encerrado.", 400);
+    }
+
+    const manutencaoEmAndamento = Array.isArray(alerta.manutencoes)
+      && alerta.manutencoes.some((manutencao) => manutencao.status === "EM_ANDAMENTO");
+
+    if (manutencaoEmAndamento) {
+      throw new AppError("Já existe uma manutenção em aberto para este alerta.", 400);
+    }
+
+    return {
+      name,
+      args: {
+        alertaId: Number(args.alertaId),
+        observacao
+      },
+      actionLabel: "Criar manutenção",
+      summary: {
+        alertaId: alerta.id,
+        alertaTipo: alerta.tipo,
+        maquinaNome: alerta.maquina?.nome || null,
+        observacao,
+        tecnicoExecutor: usuario.id
+      }
+    };
+  }
+
+  if (name === "atualizar_status_manutencao") {
+    const manutencao = await ManutecaoService.findById(args.id);
+    const observacao = args.observacao == null ? undefined : String(args.observacao).trim();
+    const status = String(args.status || "").trim().toUpperCase();
+
+    if (!ManutecaoService.STATUS_VALIDOS.includes(status)) {
+      throw new AppError("Status de manutenção inválido.", 400);
+    }
+
+    if (manutencao.usuarioId !== usuario.id) {
+      throw new AppError("Você não pode atualizar a manutenção de outro técnico.", 403);
+    }
+
+    if (manutencao.status !== "EM_ANDAMENTO") {
+      throw new AppError("Manutenção encerrada não pode mais ser alterada.", 409);
+    }
+
+    if (observacao !== undefined && observacao.length > 0 && observacao.length < 3) {
+      throw new AppError("Observação não é válida.", 400);
+    }
+
+    return {
+      name,
+      args: {
+        id: Number(manutencao.id),
+        dados: {
+          status,
+          ...(observacao ? { observacao } : {})
+        }
+      },
+      actionLabel: "Atualizar manutenção",
+      summary: {
+        id: manutencao.id,
+        alertaId: manutencao.alertaId,
+        statusAtual: manutencao.status,
+        novoStatus: status,
+        observacaoNova: observacao || null
+      }
+    };
+  }
+
   if (name === "atualizar_limites_sensor") {
-    const sensor = await SensorService.findById(args.id);
+    const sensor = await resolveSensorTarget({
+      args,
+      actionName: name,
+      actionLabel: "Atualizar limites do sensor"
+    });
+
+    if (sensor.kind === "disambiguation") {
+      return sensor;
+    }
+
     const changedFields = {};
 
     const supportedFields = [
@@ -1043,7 +1559,7 @@ async function prepareWriteToolAction({ name, args, usuario }) {
     return {
       name,
       args: {
-        id: Number(args.id),
+        id: Number(sensor.id),
         data: {
           tipo: sensor.tipo,
           status: sensor.status,
@@ -1075,8 +1591,44 @@ async function prepareWriteToolAction({ name, args, usuario }) {
 }
 
 async function executeWriteTool({ action, usuario }) {
-  if (!usuario || usuario.role !== "ADMIN") {
-    throw new AppError("Usuario sem permissao para usar tools administrativas.", 403);
+  assertWriteToolPermission({ name: action.name, usuario });
+
+  if (action.name === "criar_agendamento_relatorio") {
+    const result = await RelatorioAgendamentoService.create({
+      usuario,
+      payload: action.args
+    });
+
+    return {
+      message: "Agendamento criado com sucesso.",
+      agendamento: mapRelatorioAgendamento(result)
+    };
+  }
+
+  if (action.name === "atualizar_agendamento_relatorio") {
+    const result = await RelatorioAgendamentoService.update({
+      usuario,
+      id: action.args.id,
+      payload: action.args.payload
+    });
+
+    return {
+      message: "Agendamento atualizado com sucesso.",
+      agendamento: mapRelatorioAgendamento(result)
+    };
+  }
+
+  if (action.name === "reativar_agendamento_relatorio") {
+    const result = await RelatorioAgendamentoService.updateStatus({
+      usuario,
+      id: action.args.id,
+      payload: { status: "ATIVO" }
+    });
+
+    return {
+      message: "Agendamento reativado com sucesso.",
+      agendamento: mapRelatorioAgendamento(result)
+    };
   }
 
   if (action.name === "pausar_agendamento_relatorio") {
@@ -1125,6 +1677,30 @@ async function executeWriteTool({ action, usuario }) {
     return {
       message: "Relatorio enviado com sucesso.",
       ...result
+    };
+  }
+
+  if (action.name === "criar_manutencao_por_alerta") {
+    const result = await ManutecaoService.create({
+      alertaId: action.args.alertaId,
+      usuarioId: usuario.id,
+      observacao: action.args.observacao
+    });
+
+    return {
+      message: "Manutenção criada com sucesso.",
+      manutencao: mapManutencao(result)
+    };
+  }
+
+  if (action.name === "atualizar_status_manutencao") {
+    const result = await ManutecaoService.update(action.args.id, usuario.id, {
+      dados: action.args.dados
+    });
+
+    return {
+      message: "Manutenção atualizada com sucesso.",
+      manutencao: mapManutencao(result)
     };
   }
 

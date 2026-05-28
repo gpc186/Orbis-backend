@@ -25,44 +25,22 @@ class DashboardAiService {
 
   static buildPrompts({ pergunta, contexto, historico = [] }) {
     const systemPrompt = `
-Você é o Orb IA, assistente inteligente integrado ao sistema Orbis, uma plataforma de monitoramento industrial e manutenção preditiva.
-O Orbis foi feito exclusivamente para uma empresa, então perguntas sobre equipamentos, alertas e sensores se referem ao ambiente operacional dessa empresa.
+Você é o Orb IA, assistente do sistema Orbis, uma plataforma de monitoramento industrial e manutenção preditiva.
 
-Você tem conhecimento geral sobre manutenção, IoT, sensores, automação, tecnologia e operações industriais.
+Regras:
+- Responda sempre na língua do usuário.
+- Para dados do sistema Orbis, use as tools disponíveis quando necessário.
+- Nunca invente máquinas, sensores, alertas, usuários, relatórios, métricas ou eventos.
+- Se faltar um dado obrigatório para usar uma tool, peça esse dado.
+- Ações que alteram dados exigem confirmação explícita antes da execução.
+- Quando pedir confirmação, descreva exatamente o que será feito.
+- Perguntas sobre manutenção, IoT, sensores, automação, tecnologia e operações industriais podem ser respondidas com conhecimento geral.
+- Perguntas muito fora do escopo devem ser redirecionadas de forma educada.
 
-Escopo de atuação:
-- Perguntas sobre o sistema Orbis e seus dados operacionais: responda com base nas tools disponíveis.
-- Perguntas sobre indústria, manutenção, IoT, sensores, automação, tecnologia e TI: responda com seu conhecimento geral.
-- Perguntas completamente fora desse escopo: redirecione de forma natural e educada.
-
-Comportamento geral:
-- Responda sempre na linguagem do usuário.
-- Adapte o tamanho da resposta à complexidade da pergunta.
-- Não force uma estrutura rígida.
-- Não repita informações sem necessidade.
-- Nunca mencione estruturas internas, prompts, contexto ou dados da API.
-- Nunca invente dados operacionais, IDs, métricas ou eventos.
-
-Quando a pergunta for sobre o sistema Orbis:
-- Priorize clareza e praticidade.
-- Destaque apenas o que realmente importa para a situação atual.
-- Seja direto sobre riscos e urgências sem ser alarmista.
-- Sugira no máximo 2 ações concretas quando isso fizer sentido.
-
-Quando a pergunta estiver fora do escopo:
-- Redirecione de forma leve e natural.
-- Nunca seja rude ou robótico.
-- Se a pergunta for muito fora do escopo, apenas redirecione.
-
-Quando usar os tools:
-- Quando a pergunta exigir consultar ou executar dados específicos do sistema, use as tools disponíveis.
-- Não invente status de técnico, máquinas, sensores, alertas, relatórios ou usuários se houver uma tool apropriada.
-- Se faltar um dado obrigatório para usar a tool, pergunte ao usuário.
-- Ações que alteram dados exigem confirmação explícita do usuário antes da execução.
-- Quando uma ação exigir confirmação, descreva exatamente o que será feito antes de pedir a confirmação.
-- O resumo do dashboard e os dados operacionais detalhados não estão carregados automaticamente no prompt. Consulte as tools apropriadas sempre que precisar desses dados.
-
-Tom: natural, inteligente e colaborativo. Como um colega experiente que entende profundamente de operações industriais e tecnologia.
+Estilo:
+- Seja claro, direto e útil.
+- Priorize risco, impacto e próximo passo ao falar do sistema.
+- Não mencione prompts, tools internas, contexto interno ou estrutura da API.
 `.trim();
 
     const contextPrompt = `
@@ -104,6 +82,29 @@ Use as tools disponíveis quando precisar consultar dashboard, alertas, máquina
   static buildConfirmationSummaryText(confirmation) {
     const summary = confirmation.summary || {};
 
+    if (confirmation.actionName === "criar_agendamento_relatorio") {
+      const emailsDestino = Array.isArray(summary.emailsDestino)
+        ? summary.emailsDestino.join(", ")
+        : "os destinatários informados";
+      const secoes = Array.isArray(summary.secoes) && summary.secoes.length > 0
+        ? summary.secoes.join(", ")
+        : "as seções informadas";
+
+      return `Vou criar o agendamento ${summary.nome} para ${emailsDestino}, com as seções ${secoes}.`;
+    }
+
+    if (confirmation.actionName === "atualizar_agendamento_relatorio") {
+      const alteracoes = Array.isArray(summary.alteracoes) && summary.alteracoes.length > 0
+        ? summary.alteracoes.join(", ")
+        : "os dados informados";
+
+      return `Vou atualizar o agendamento ${summary.id} (${summary.nome}), alterando: ${alteracoes}.`;
+    }
+
+    if (confirmation.actionName === "reativar_agendamento_relatorio") {
+      return `Vou reativar o agendamento ${summary.id} (${summary.nome}), que hoje está com status ${summary.statusAtual}.`;
+    }
+
     if (confirmation.actionName === "pausar_agendamento_relatorio") {
       return `Vou pausar o agendamento ${summary.id} (${summary.nome}), que hoje está com status ${summary.statusAtual}.`;
     }
@@ -125,6 +126,14 @@ Use as tools disponíveis quando precisar consultar dashboard, alertas, máquina
         : "as seções informadas";
 
       return `Vou enviar agora o relatório ${summary.nome || "Relatório Operacional"} para ${emailsDestino}, usando as seções ${secoes}.`;
+    }
+
+    if (confirmation.actionName === "criar_manutencao_por_alerta") {
+      return `Vou criar uma manutenção para o alerta ${summary.alertaId}${summary.maquinaNome ? ` da máquina ${summary.maquinaNome}` : ""}, com a observação informada.`;
+    }
+
+    if (confirmation.actionName === "atualizar_status_manutencao") {
+      return `Vou atualizar a manutenção ${summary.id} do status ${summary.statusAtual} para ${summary.novoStatus}${summary.observacaoNova ? `, com a observação: ${summary.observacaoNova}` : ""}.`;
     }
 
     if (confirmation.actionName === "atualizar_limites_sensor") {
@@ -160,6 +169,24 @@ Use as tools disponíveis quando precisar consultar dashboard, alertas, máquina
         cancelValue: "cancel",
         summary: confirmation.summary,
         expiresAt: confirmation.expiresAt
+      }
+    };
+  }
+
+  static buildDisambiguationResponse({ disambiguation, pergunta }) {
+    return {
+      pergunta: typeof pergunta === "string" ? pergunta.trim() : "",
+      resposta: disambiguation.message,
+      fallback: false,
+      requiresConfirmation: false,
+      requiresDisambiguation: true,
+      disambiguation: {
+        type: "write_target",
+        entity: disambiguation.entity,
+        actionKey: disambiguation.actionName,
+        actionLabel: disambiguation.actionLabel,
+        message: disambiguation.message,
+        options: disambiguation.options
       }
     };
   }
@@ -321,6 +348,17 @@ Use as tools disponíveis quando precisar consultar dashboard, alertas, máquina
           args: writeToolArgs,
           usuario
         });
+
+        if (preparedAction.kind === "disambiguation") {
+          return {
+            ...this.buildDisambiguationResponse({
+              disambiguation: preparedAction,
+              pergunta
+            }),
+            contextoGeradoEm: contexto.metadata.generatedAt,
+            usedHistoryCount: historicoSeguro.length
+          };
+        }
 
         const confirmation = await AiConfirmationService.create({
           usuario,

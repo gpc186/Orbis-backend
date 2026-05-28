@@ -10,7 +10,7 @@ const DashboardService = require("../dashboardService");
 const RelatorioAgendamentoService = require("../relatorioAgendamentoService");
 const RelatorioExecucaoService = require("../relatorioExecucaoService");
 const AppError = require("../../utils/appErrorUtils");
-const { executeTool } = require("./registry");
+const { executeTool, prepareWriteToolAction, executeWriteTool } = require("./registry");
 
 const admin = { id: 1, role: "ADMIN" };
 
@@ -581,5 +581,473 @@ test("executeTool lista execucoes de relatorio", async () => {
     assert.equal(result.execucoes[0].status, "ENVIADO");
   } finally {
     RelatorioExecucaoService.listExecutions = originalListExecutions;
+  }
+});
+
+test("prepareWriteToolAction resolve agendamento por e-mail com resultado único", async () => {
+  const originalFindByDestinatarioEmail = RelatorioAgendamentoService.findByDestinatarioEmail;
+
+  RelatorioAgendamentoService.findByDestinatarioEmail = async () => ([
+    {
+      id: 9,
+      nome: "Relatório Semanal Operacional",
+      status: "ATIVO",
+      descricaoAgendamento: "Toda segunda às 08:00",
+      proximoEnvioEm: "2026-05-26 08:00",
+      destinatarios: [
+        { id: 1, email: "gestao@orbis.com" }
+      ]
+    }
+  ]);
+
+  try {
+    const result = await prepareWriteToolAction({
+      name: "pausar_agendamento_relatorio",
+      args: { email: "gestao@orbis.com" },
+      usuario: admin
+    });
+
+    assert.equal(result.name, "pausar_agendamento_relatorio");
+    assert.equal(result.args.id, 9);
+    assert.equal(result.summary.nome, "Relatório Semanal Operacional");
+  } finally {
+    RelatorioAgendamentoService.findByDestinatarioEmail = originalFindByDestinatarioEmail;
+  }
+});
+
+test("prepareWriteToolAction retorna desambiguação de agendamento por e-mail", async () => {
+  const originalFindByDestinatarioEmail = RelatorioAgendamentoService.findByDestinatarioEmail;
+
+  RelatorioAgendamentoService.findByDestinatarioEmail = async () => ([
+    {
+      id: 9,
+      nome: "Relatório Semanal Operacional",
+      status: "ATIVO",
+      descricaoAgendamento: "Toda segunda às 08:00",
+      destinatarios: [{ id: 1, email: "gestao@orbis.com" }]
+    },
+    {
+      id: 12,
+      nome: "Relatório Diretoria",
+      status: "PAUSADO",
+      descricaoAgendamento: "Todo dia 01 às 09:30",
+      destinatarios: [{ id: 2, email: "gestao@orbis.com" }]
+    }
+  ]);
+
+  try {
+    const result = await prepareWriteToolAction({
+      name: "deletar_agendamento_relatorio",
+      args: { email: "gestao@orbis.com" },
+      usuario: admin
+    });
+
+    assert.equal(result.kind, "disambiguation");
+    assert.equal(result.entity, "relatorio_agendamento");
+    assert.equal(result.options.length, 2);
+    assert.equal(result.options[0].id, 9);
+  } finally {
+    RelatorioAgendamentoService.findByDestinatarioEmail = originalFindByDestinatarioEmail;
+  }
+});
+
+test("prepareWriteToolAction resolve sensor por tipo com resultado único", async () => {
+  const originalFindByTipo = SensorService.findByTipo;
+
+  SensorService.findByTipo = async () => ({
+    total: 1,
+    dados: [
+      {
+        id: 14,
+        tipo: "Temperatura",
+        status: "ONLINE",
+        maquinaId: 4,
+        maquina: {
+          id: 4,
+          nome: "Prensa 02",
+          setor: "Usinagem"
+        },
+        limiteTemperatura: 90,
+        idealTemperatura: 60,
+        limiteVibracao: 20,
+        idealVibracao: 6,
+        desvioMaximoTemp: 8,
+        desvioMaximoVibra: 4
+      }
+    ]
+  });
+
+  try {
+    const result = await prepareWriteToolAction({
+      name: "atualizar_limites_sensor",
+      args: { tipo: "Temperatura", limiteTemperatura: 95 },
+      usuario: admin
+    });
+
+    assert.equal(result.name, "atualizar_limites_sensor");
+    assert.equal(result.args.id, 14);
+    assert.equal(result.summary.tipo, "Temperatura");
+  } finally {
+    SensorService.findByTipo = originalFindByTipo;
+  }
+});
+
+test("prepareWriteToolAction retorna desambiguação de sensor por tipo", async () => {
+  const originalFindByTipo = SensorService.findByTipo;
+
+  SensorService.findByTipo = async () => ({
+    total: 2,
+    dados: [
+      {
+        id: 14,
+        tipo: "Temperatura",
+        status: "ONLINE",
+        maquinaId: 4,
+        maquina: {
+          id: 4,
+          nome: "Prensa 02",
+          setor: "Usinagem"
+        }
+      },
+      {
+        id: 21,
+        tipo: "Temperatura",
+        status: "OFFLINE",
+        maquinaId: 7,
+        maquina: {
+          id: 7,
+          nome: "Prensa 07",
+          setor: "Corte"
+        }
+      }
+    ]
+  });
+
+  try {
+    const result = await prepareWriteToolAction({
+      name: "atualizar_limites_sensor",
+      args: { tipo: "Temperatura", limiteTemperatura: 95 },
+      usuario: admin
+    });
+
+    assert.equal(result.kind, "disambiguation");
+    assert.equal(result.entity, "sensor");
+    assert.equal(result.options.length, 2);
+    assert.equal(result.options[1].id, 21);
+  } finally {
+    SensorService.findByTipo = originalFindByTipo;
+  }
+});
+
+test("prepareWriteToolAction cria agendamento de relatório", async () => {
+  const result = await prepareWriteToolAction({
+    name: "criar_agendamento_relatorio",
+    args: {
+      nome: "Relatório Semanal",
+      emailsDestino: ["gestao@orbis.com"],
+      assunto: "Resumo semanal",
+      periodo: { tipo: "RELATIVE_DAYS", valor: 7 },
+      filtros: { secoes: ["resumo", "chamados"] },
+      agendamento: { frequencia: "SEMANAL", diaSemana: 1, hora: 8, minuto: 0 }
+    },
+    usuario: admin
+  });
+
+  assert.equal(result.name, "criar_agendamento_relatorio");
+  assert.equal(result.summary.nome, "Relatório Semanal");
+  assert.equal(result.summary.emailsDestino[0], "gestao@orbis.com");
+});
+
+test("prepareWriteToolAction atualiza agendamento por e-mail com resultado único", async () => {
+  const originalFindByDestinatarioEmail = RelatorioAgendamentoService.findByDestinatarioEmail;
+
+  RelatorioAgendamentoService.findByDestinatarioEmail = async () => ([
+    {
+      id: 9,
+      nome: "Relatório Semanal Operacional",
+      status: "ATIVO",
+      frequencia: "SEMANAL",
+      hora: 8,
+      minuto: 0,
+      diaSemana: 1,
+      diaMes: null,
+      assunto: "Relatório atual",
+      periodo: { tipo: "RELATIVE_DAYS", valor: 7 },
+      filtros: { secoes: ["resumo"] },
+      secoes: ["resumo"],
+      descricaoAgendamento: "Toda segunda às 08:00",
+      destinatarios: [{ email: "gestao@orbis.com" }]
+    }
+  ]);
+
+  try {
+    const result = await prepareWriteToolAction({
+      name: "atualizar_agendamento_relatorio",
+      args: {
+        email: "gestao@orbis.com",
+        nome: "Relatório Semanal Operacional",
+        emailsDestino: ["gestao@orbis.com", "diretoria@orbis.com"],
+        assunto: "Relatório novo",
+        periodo: { tipo: "RELATIVE_DAYS", valor: 15 },
+        filtros: { secoes: ["resumo", "chamados"] },
+        agendamento: { frequencia: "SEMANAL", diaSemana: 3, hora: 9, minuto: 30 }
+      },
+      usuario: admin
+    });
+
+    assert.equal(result.name, "atualizar_agendamento_relatorio");
+    assert.equal(result.args.id, 9);
+    assert.ok(result.summary.alteracoes.length > 0);
+  } finally {
+    RelatorioAgendamentoService.findByDestinatarioEmail = originalFindByDestinatarioEmail;
+  }
+});
+
+test("prepareWriteToolAction reativa agendamento por e-mail com resultado único", async () => {
+  const originalFindByDestinatarioEmail = RelatorioAgendamentoService.findByDestinatarioEmail;
+
+  RelatorioAgendamentoService.findByDestinatarioEmail = async () => ([
+    {
+      id: 12,
+      nome: "Relatório Diretoria",
+      status: "PAUSADO",
+      proximoEnvioEm: "2026-05-29 09:00",
+      descricaoAgendamento: "Todo dia 01 às 09:00",
+      destinatarios: [{ email: "diretoria@orbis.com" }]
+    }
+  ]);
+
+  try {
+    const result = await prepareWriteToolAction({
+      name: "reativar_agendamento_relatorio",
+      args: { email: "diretoria@orbis.com" },
+      usuario: admin
+    });
+
+    assert.equal(result.name, "reativar_agendamento_relatorio");
+    assert.equal(result.args.id, 12);
+  } finally {
+    RelatorioAgendamentoService.findByDestinatarioEmail = originalFindByDestinatarioEmail;
+  }
+});
+
+test("prepareWriteToolAction cria manutenção por alerta", async () => {
+  const originalFindById = AlertaService.findById;
+
+  AlertaService.findById = async () => ({
+    id: 7,
+    tipo: "INSTABILIDADE",
+    status: "ATIVO",
+    manutencoes: [],
+    maquina: {
+      id: 3,
+      nome: "Prensa 03"
+    }
+  });
+
+  try {
+    const result = await prepareWriteToolAction({
+      name: "criar_manutencao_por_alerta",
+      args: {
+        alertaId: 7,
+        observacao: "Verificar vibração fora do padrão"
+      },
+      usuario: admin
+    });
+
+    assert.equal(result.name, "criar_manutencao_por_alerta");
+    assert.equal(result.args.alertaId, 7);
+    assert.equal(result.summary.maquinaNome, "Prensa 03");
+  } finally {
+    AlertaService.findById = originalFindById;
+  }
+});
+
+test("prepareWriteToolAction bloqueia criação de manutenção quando já existe uma em andamento", async () => {
+  const originalFindById = AlertaService.findById;
+
+  AlertaService.findById = async () => ({
+    id: 7,
+    tipo: "INSTABILIDADE",
+    status: "ATIVO",
+    manutencoes: [{ id: 99, status: "EM_ANDAMENTO" }]
+  });
+
+  try {
+    await assert.rejects(
+      () => prepareWriteToolAction({
+        name: "criar_manutencao_por_alerta",
+        args: {
+          alertaId: 7,
+          observacao: "Verificar vibração fora do padrão"
+        },
+        usuario: admin
+      }),
+      (error) => error instanceof AppError && error.statusCode === 400
+    );
+  } finally {
+    AlertaService.findById = originalFindById;
+  }
+});
+
+test("prepareWriteToolAction atualiza manutenção com técnico responsável", async () => {
+  const originalFindById = ManutecaoService.findById;
+
+  ManutecaoService.findById = async () => ({
+    id: 15,
+    alertaId: 7,
+    usuarioId: 44,
+    status: "EM_ANDAMENTO"
+  });
+
+  try {
+    const result = await prepareWriteToolAction({
+      name: "atualizar_status_manutencao",
+      args: {
+        id: 15,
+        status: "RESOLVIDO",
+        observacao: "Troca realizada"
+      },
+      usuario: { id: 44, role: "TECNICO" }
+    });
+
+    assert.equal(result.name, "atualizar_status_manutencao");
+    assert.equal(result.args.id, 15);
+    assert.equal(result.args.dados.status, "RESOLVIDO");
+  } finally {
+    ManutecaoService.findById = originalFindById;
+  }
+});
+
+test("prepareWriteToolAction bloqueia atualização de manutenção por usuário não responsável", async () => {
+  const originalFindById = ManutecaoService.findById;
+
+  ManutecaoService.findById = async () => ({
+    id: 15,
+    alertaId: 7,
+    usuarioId: 44,
+    status: "EM_ANDAMENTO"
+  });
+
+  try {
+    await assert.rejects(
+      () => prepareWriteToolAction({
+        name: "atualizar_status_manutencao",
+        args: {
+          id: 15,
+          status: "RESOLVIDO"
+        },
+        usuario: { id: 1, role: "ADMIN" }
+      }),
+      (error) => error instanceof AppError && error.statusCode === 403
+    );
+  } finally {
+    ManutecaoService.findById = originalFindById;
+  }
+});
+
+test("prepareWriteToolAction bloqueia atualização de manutenção encerrada", async () => {
+  const originalFindById = ManutecaoService.findById;
+
+  ManutecaoService.findById = async () => ({
+    id: 15,
+    alertaId: 7,
+    usuarioId: 44,
+    status: "RESOLVIDO"
+  });
+
+  try {
+    await assert.rejects(
+      () => prepareWriteToolAction({
+        name: "atualizar_status_manutencao",
+        args: {
+          id: 15,
+          status: "ENCERRADO_SEM_SOLUCAO"
+        },
+        usuario: { id: 44, role: "TECNICO" }
+      }),
+      (error) => error instanceof AppError && error.statusCode === 409
+    );
+  } finally {
+    ManutecaoService.findById = originalFindById;
+  }
+});
+
+test("executeWriteTool cria agendamento de relatório", async () => {
+  const originalCreate = RelatorioAgendamentoService.create;
+
+  RelatorioAgendamentoService.create = async ({ payload }) => ({
+    id: 20,
+    nome: payload.nome,
+    status: "ATIVO",
+    frequencia: payload.agendamento.frequencia,
+    hora: payload.agendamento.hora,
+    minuto: payload.agendamento.minuto,
+    diaSemana: payload.agendamento.diaSemana,
+    diaMes: payload.agendamento.diaMes,
+    assunto: payload.assunto,
+    tipoPeriodo: payload.periodo.tipo,
+    periodo: payload.periodo,
+    filtros: payload.filtros,
+    secoes: payload.filtros.secoes,
+    proximoEnvioEm: "2026-05-29 08:00",
+    ultimoEnvioEm: null,
+    ultimoSucessoEm: null,
+    ultimoErroEm: null,
+    descricaoAgendamento: "Toda segunda às 08:00",
+    criadoPor: { id: 1, nome: "Admin", email: "admin@orbis.com", role: "ADMIN" },
+    destinatarios: [{ id: 1, email: "gestao@orbis.com", nome: null, criadoEm: "2026-05-20T12:00:00.000Z" }]
+  });
+
+  try {
+    const result = await executeWriteTool({
+      action: {
+        name: "criar_agendamento_relatorio",
+        args: {
+          nome: "Relatório Semanal",
+          emailsDestino: ["gestao@orbis.com"],
+          assunto: "Resumo semanal",
+          periodo: { tipo: "RELATIVE_DAYS", valor: 7 },
+          filtros: { secoes: ["resumo"] },
+          agendamento: { frequencia: "SEMANAL", diaSemana: 1, hora: 8, minuto: 0 }
+        }
+      },
+      usuario: admin
+    });
+
+    assert.equal(result.message, "Agendamento criado com sucesso.");
+    assert.equal(result.agendamento.id, 20);
+  } finally {
+    RelatorioAgendamentoService.create = originalCreate;
+  }
+});
+
+test("executeWriteTool cria manutenção por alerta", async () => {
+  const originalCreate = ManutecaoService.create;
+
+  ManutecaoService.create = async () => ({
+    id: 31,
+    alertaId: 7,
+    usuarioId: 1,
+    observacao: "Verificar vibração fora do padrão",
+    status: "EM_ANDAMENTO"
+  });
+
+  try {
+    const result = await executeWriteTool({
+      action: {
+        name: "criar_manutencao_por_alerta",
+        args: {
+          alertaId: 7,
+          observacao: "Verificar vibração fora do padrão"
+        }
+      },
+      usuario: admin
+    });
+
+    assert.equal(result.message, "Manutenção criada com sucesso.");
+    assert.equal(result.manutencao.id, 31);
+  } finally {
+    ManutecaoService.create = originalCreate;
   }
 });

@@ -98,6 +98,24 @@ class RelatorioAgendamentoService {
     return this.mapResponse(agendamento);
   }
 
+  static async findByDestinatarioEmail({ usuario, email, limit = 10 }) {
+    this.assertAdmin(usuario);
+
+    const emailNormalizado = String(email || "").trim();
+
+    if (emailNormalizado.length < 3) {
+      throw new AppError("E-mail inválido para busca de agendamento.", 400);
+    }
+
+    const take = Math.min(Math.max(Number(limit || 10), 1), 10);
+    const items = await RelatorioAgendamentoModel.findByDestinatarioEmail({
+      email: emailNormalizado,
+      limit: take
+    });
+
+    return items.map((item) => this.mapResponse(item));
+  }
+
   static async update({ usuario, id, payload }) {
     this.assertAdmin(usuario);
 

@@ -43,6 +43,24 @@ class RelatorioAgendamentoModel {
     });
   }
 
+  static async findByDestinatarioEmail({ email, limit = 10 }) {
+    return prisma.relatorioAgendamento.findMany({
+      where: {
+        destinatarios: {
+          some: {
+            email: {
+              contains: email,
+              mode: "insensitive"
+            }
+          }
+        }
+      },
+      take: limit,
+      orderBy: { criadoEm: "desc" },
+      include: this.baseInclude()
+    });
+  }
+
   static async update({ id, data, emailsDestino }) {
     const agendamentoId = Number(id);
 
