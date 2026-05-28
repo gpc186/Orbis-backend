@@ -31,6 +31,17 @@ class UsuarioController {
         };
     };
 
+    static async updateAtivo(req, res, next){
+        try {
+            const id = req.usuario.id;
+            const { ativo } = req.body;
+            const resultado = await UsuarioService.updateAtivo({ id, ativo });
+            return res.status(200).json(resultado);
+        } catch (error) {
+            next(error);
+        };
+    };
+
     static async register(req, res, next){
         try {
             const { nome, email, senha, role } = req.body

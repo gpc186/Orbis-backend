@@ -369,6 +369,23 @@ class UsuarioService {
     return await UsuarioModel.update({ id: parseInt(id), dados: dadosParaAtualizar });
   }
 
+  static async updateAtivo({ id, ativo }) {
+    const usuario = await UsuarioModel.findById(parseInt(id));
+
+    if (!usuario) {
+      throw new AppError("Usuario nao encontrado!", 404);
+    }
+
+    if (typeof ativo !== "boolean") {
+      throw new AppError("Ativo nao e valido!", 400);
+    }
+
+    return await UsuarioModel.update({
+      id: parseInt(id),
+      dados: { ativo }
+    });
+  }
+
   static async logoutAll(id) {
     const usuario = await UsuarioModel.findById(id);
 
