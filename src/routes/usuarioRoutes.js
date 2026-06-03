@@ -6,7 +6,7 @@ const roleMiddleware = require('../middlewares/roleMiddleware');
 
 
 router.get('/', authMiddleware, UsuarioController.list);
-router.put('/alterar-ativo', authMiddleware, roleMiddleware("TECNICO"), UsuarioController.updateAtivo);
+router.put('/alterar-ativo', authMiddleware, UsuarioController.updateAtivo);
 router.get('/:id', authMiddleware, UsuarioController.findById);
 router.post('/', authMiddleware, roleMiddleware("ADMIN"), UsuarioController.register);
 router.put('/:id', authMiddleware, roleMiddleware("ADMIN"), UsuarioController.update);
