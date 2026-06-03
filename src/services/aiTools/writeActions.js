@@ -457,7 +457,7 @@ async function executeWriteTool({ action, usuario }) {
     });
 
     return {
-      message: "Manutencao criada com sucesso.",
+      message: "Manutenção criada com sucesso.",
       manutencao: mapManutencao(result)
     };
   }
@@ -468,7 +468,7 @@ async function executeWriteTool({ action, usuario }) {
     });
 
     return {
-      message: "Manutencao atualizada com sucesso.",
+      message: "Manutenção atualizada com sucesso.",
       manutencao: mapManutencao(result)
     };
   }
