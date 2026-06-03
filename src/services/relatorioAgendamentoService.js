@@ -7,35 +7,22 @@ const {
   validateSchedulePayload,
   validateStatusPayload
 } = require("../utils/reportValidation");
-const {
-  buildScheduleDescription,
-  computeNextRun,
-  formatReportDateTime
-} = require("../utils/reportScheduleUtils");
+const { computeNextRun } = require("../utils/reportScheduleUtils");
+const { assertRole } = require("../utils/authorization");
+const { normalizeLimit } = require("../utils/requestParsers");
+const { mapRelatorioAgendamentoResponse } = require("./reportPresenter");
 
 class RelatorioAgendamentoService {
   static assertAdmin(usuario) {
-    if (!usuario || usuario.role !== "ADMIN") {
-      throw new AppError("Apenas ADMIN pode gerenciar relatorios.", 403);
-    }
+    assertRole({
+      usuario,
+      roles: ["ADMIN"],
+      message: "Apenas ADMIN pode gerenciar relatorios."
+    });
   }
 
   static mapResponse(agendamento) {
-    return {
-      ...agendamento,
-      proximoEnvioEm: formatReportDateTime(agendamento.proximoEnvioEm),
-      ultimoEnvioEm: formatReportDateTime(agendamento.ultimoEnvioEm),
-      ultimoSucessoEm: formatReportDateTime(agendamento.ultimoSucessoEm),
-      criadoEm: formatReportDateTime(agendamento.criadoEm),
-      atualizadoEm: formatReportDateTime(agendamento.atualizadoEm),
-      descricaoAgendamento: buildScheduleDescription({
-        frequencia: agendamento.frequencia,
-        hora: agendamento.hora,
-        minuto: agendamento.minuto,
-        diaSemana: agendamento.diaSemana,
-        diaMes: agendamento.diaMes
-      })
-    };
+    return mapRelatorioAgendamentoResponse(agendamento);
   }
 
   static async preview({ usuario, payload }) {
@@ -107,7 +94,7 @@ class RelatorioAgendamentoService {
       throw new AppError("E-mail inválido para busca de agendamento.", 400);
     }
 
-    const take = Math.min(Math.max(Number(limit || 10), 1), 10);
+    const take = normalizeLimit(limit, 10, { min: 1, max: 10 });
     const items = await RelatorioAgendamentoModel.findByDestinatarioEmail({
       email: emailNormalizado,
       limit: take

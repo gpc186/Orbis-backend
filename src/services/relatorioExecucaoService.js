@@ -3,42 +3,29 @@ const RelatorioAgendamentoModel = require("../models/relatorioAgendamentoModel")
 const RelatorioExecucaoModel = require("../models/relatorioExecucaoModel");
 const RelatorioRendererService = require("./relatorioRendererService");
 const { computeNextRun, formatReportDateTime } = require("../utils/reportScheduleUtils");
-const { validatePreviewPayload } = require("../utils/reportValidation");
-const { normalizeEmails, isValidEmail } = require("../utils/emailValidation");
+const {
+  validatePreviewPayload,
+  validateDestinatarios
+} = require("../utils/reportValidation");
+const { assertRole } = require("../utils/authorization");
 const EmailService = require("./emailService");
+const { mapRelatorioExecucaoResponse } = require("./reportPresenter");
 
 class RelatorioExecucaoService {
   static mapExecutionResponse(execucao) {
-    return {
-      ...execucao,
-      iniciadoEm: formatReportDateTime(execucao.iniciadoEm),
-      finalizadoEm: formatReportDateTime(execucao.finalizadoEm)
-    };
+    return mapRelatorioExecucaoResponse(execucao);
   }
 
   static assertAdmin(usuario) {
-    if (!usuario || usuario.role !== "ADMIN") {
-      throw new AppError("Apenas ADMIN pode executar relatorios.", 403);
-    }
+    assertRole({
+      usuario,
+      roles: ["ADMIN"],
+      message: "Apenas ADMIN pode executar relatorios."
+    });
   }
 
   static validateDestinatarios(emailsDestino) {
-    const destinatarios = normalizeEmails(emailsDestino);
-
-    if (!destinatarios.length) {
-      throw new AppError("Informe os emails de destino para envio manual.", 400);
-    }
-
-    if (destinatarios.length > 10) {
-      throw new AppError("Maximo de 10 destinatarios por envio.", 400);
-    }
-
-    const emailInvalido = destinatarios.find((email) => !isValidEmail(email));
-    if (emailInvalido) {
-      throw new AppError(`Email invalido: ${emailInvalido}`, 400);
-    }
-
-    return destinatarios;
+    return validateDestinatarios(emailsDestino, { max: 10 });
   }
 
   static async executarManual({ usuario, payload }) {
@@ -212,9 +199,7 @@ class RelatorioExecucaoService {
   }
 
   static async listExecutions({ id, usuario }) {
-    if (!usuario || usuario.role !== "ADMIN") {
-      throw new AppError("Apenas ADMIN pode executar relatorios.", 403);
-    }
+    this.assertAdmin(usuario);
     const execucoes = await RelatorioExecucaoModel.findByAgendamentoId(id);
     return execucoes.map((execucao) => this.mapExecutionResponse(execucao));
   }

@@ -4,6 +4,11 @@ const StorageService = require("./storageService");
 const MaquinaManualService = require("./maquinaManualService");
 const AlertaPreditivoService = require("./alertaPreditivoService");
 const PredicaoRiscoService = require("./predicaoRiscoService");
+const {
+  normalizeLimit,
+  parseBooleanLike,
+  parseFiniteNumber
+} = require("../utils/requestParsers");
 
 class MaquinaService {
   static sanitizeManualForResponse(manual) {
@@ -70,7 +75,7 @@ class MaquinaService {
     }
 
     if (dados.criticidade !== undefined) data.criticidade = dados.criticidade;
-    if (dados.ativo !== undefined) data.ativo = dados.ativo === true || dados.ativo === "true";
+    if (dados.ativo !== undefined) data.ativo = parseBooleanLike(dados.ativo, false);
     if (dados.integridade !== undefined) {
       data.integridade = this.parseOptionalNumber(dados.integridade, "integridade");
     }
@@ -105,7 +110,7 @@ class MaquinaService {
       throw new AppError("Nome inválido para busca de máquina.", 400);
     }
 
-    const take = Math.min(Math.max(Number(limit || 10), 1), 20);
+    const take = normalizeLimit(limit);
 
     try {
       const dados = await MaquinaModel.findByNome({
@@ -371,7 +376,7 @@ class MaquinaService {
   }
 
   static async listCriticas({ limit = 10 } = {}) {
-    const take = Math.min(Math.max(Number(limit || 10), 1), 20);
+    const take = normalizeLimit(limit);
 
     try {
       return await MaquinaModel.listPioresIntegridade({ limit: take });
@@ -382,7 +387,7 @@ class MaquinaService {
   }
 
   static async findComAlertaAtivo({ limit = 10 } = {}) {
-    const take = Math.min(Math.max(Number(limit || 10), 1), 20);
+    const take = normalizeLimit(limit);
 
     try {
       return await MaquinaModel.findComAlertaAtivo({ limit: take });

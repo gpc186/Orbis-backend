@@ -1,4 +1,5 @@
 const AppError = require("./appErrorUtils");
+const { cleanText, isValidEmail } = require("./emailValidation");
 
 const FREQUENCIAS = ["DIARIO", "SEMANAL", "MENSAL"];
 const STATUS_AGENDAMENTO = ["ATIVO", "PAUSADO"];
@@ -14,21 +15,31 @@ function normalizeEmails(emailsDestino) {
         .split(",")
         .map((value) => value.trim());
 
-  const unique = [...new Set(rawList.map((value) => String(value || "").trim().toLowerCase()))];
+  const unique = [...new Set(rawList.map((value) => cleanText(value).toLowerCase()))];
   return unique.filter(Boolean);
 }
 
 function assertValidEmails(emails) {
-  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
   if (!emails.length) {
     throw new AppError("Informe ao menos um email de destino.", 400);
   }
 
-  const invalid = emails.find((email) => !regex.test(email));
+  const invalid = emails.find((email) => !isValidEmail(email));
   if (invalid) {
     throw new AppError(`Email invalido: ${invalid}`, 400);
   }
+}
+
+function validateDestinatarios(emailsDestino, { max = 10 } = {}) {
+  const emails = normalizeEmails(emailsDestino);
+
+  assertValidEmails(emails);
+
+  if (emails.length > max) {
+    throw new AppError(`Maximo de ${max} destinatarios por envio.`, 400);
+  }
+
+  return emails;
 }
 
 function normalizeIdList(values) {
@@ -196,5 +207,6 @@ module.exports = {
   validatePeriodo,
   validatePreviewPayload,
   validateSchedulePayload,
-  validateStatusPayload
+  validateStatusPayload,
+  validateDestinatarios
 };

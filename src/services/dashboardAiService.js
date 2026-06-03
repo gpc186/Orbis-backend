@@ -6,6 +6,7 @@ const normalizeQuestion = require("../utils/normalizeQuestion");
 const logger = require("../utils/logger");
 const AiConfirmationService = require("./aiConfirmationService");
 const AiToolsRegistry = require("./aiTools/registry");
+const { buildConfirmationSummaryText } = require("./dashboardAiConfirmationPresenter");
 
 class DashboardAiService {
   static async buildContext({ usuario }) {
@@ -150,7 +151,7 @@ Use as tools disponíveis quando precisar consultar dashboard, alertas, máquina
   }
 
   static buildConfirmationResponse({ confirmation, pergunta }) {
-    const summaryText = this.buildConfirmationSummaryText(confirmation);
+    const summaryText = buildConfirmationSummaryText(confirmation);
 
     return {
       pergunta: typeof pergunta === "string" ? pergunta.trim() : "",

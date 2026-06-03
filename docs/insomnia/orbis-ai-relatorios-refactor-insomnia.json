@@ -1,0 +1,246 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-06-02T00:00:00.000Z",
+  "__export_source": "codex:orbis-ai-relatorios-refactor",
+  "resources": [
+    {
+      "_id": "wrk_orbis_ai_relatorios_refactor",
+      "_type": "workspace",
+      "name": "Orbis IA + Relatorios Refactor",
+      "description": "Colecao para validar a IA e os fluxos de relatorios apos a refatoracao dos services compartilhados.",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_orbis_ai_relatorios_refactor_base",
+      "_type": "environment",
+      "parentId": "wrk_orbis_ai_relatorios_refactor",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:3333",
+        "token": "",
+        "agendamento_id": "",
+        "destino_email": "admin@orbis.local",
+        "report_name": "Refactor Diario",
+        "report_subject": "Validacao de relatorio",
+        "report_period_days": 7,
+        "report_hour": 14,
+        "report_minute": 35
+      }
+    },
+    {
+      "_id": "fld_orbis_ai_relatorios_refactor_health",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_ai_relatorios_refactor",
+      "name": "Health"
+    },
+    {
+      "_id": "req_orbis_ai_relatorios_refactor_ready",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_relatorios_refactor_health",
+      "name": "Ready",
+      "method": "GET",
+      "url": "{{ _.base_url }}/ready",
+      "headers": [],
+      "body": {},
+      "description": "Confere se a API esta ativa antes de validar IA e relatorios."
+    },
+    {
+      "_id": "fld_orbis_ai_relatorios_refactor_ia",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_ai_relatorios_refactor",
+      "name": "Dashboard IA"
+    },
+    {
+      "_id": "req_orbis_ai_relatorios_refactor_perguntar",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_relatorios_refactor_ia",
+      "name": "Perguntar IA",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Me de um panorama do sistema e depois liste os agendamentos de relatorio existentes.\",\n  \"historico\": []\n}"
+      },
+      "description": "Valida o endpoint principal da IA e o caminho de leitura das tools administrativas."
+    },
+    {
+      "_id": "fld_orbis_ai_relatorios_refactor_relatorios",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_ai_relatorios_refactor",
+      "name": "Relatorios"
+    },
+    {
+      "_id": "req_orbis_ai_relatorios_refactor_preview",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_relatorios_refactor_relatorios",
+      "name": "Preview Relatorio",
+      "method": "POST",
+      "url": "{{ _.base_url }}/relatorios/preview",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"{{ _.report_name }}\",\n  \"assunto\": \"{{ _.report_subject }}\",\n  \"periodo\": {\n    \"tipo\": \"RELATIVE_DAYS\",\n    \"valor\": {{ _.report_period_days }}\n  },\n  \"filtros\": {\n    \"secoes\": [\"resumo\", \"sensores\"]\n  }\n}"
+      },
+      "description": "Gera um preview sem envio para validar payload e renderizacao."
+    },
+    {
+      "_id": "req_orbis_ai_relatorios_refactor_enviar_agora",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_relatorios_refactor_relatorios",
+      "name": "Enviar Relatorio Agora",
+      "method": "POST",
+      "url": "{{ _.base_url }}/relatorios/enviar-agora",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"{{ _.report_name }}\",\n  \"assunto\": \"{{ _.report_subject }}\",\n  \"emailsDestino\": [\"{{ _.destino_email }}\"],\n  \"periodo\": {\n    \"tipo\": \"RELATIVE_DAYS\",\n    \"valor\": {{ _.report_period_days }}\n  },\n  \"filtros\": {\n    \"secoes\": [\"resumo\", \"desempenho\", \"sensores\"]\n  }\n}"
+      },
+      "description": "Executa envio manual avulso para validar o fluxo de execucao."
+    },
+    {
+      "_id": "fld_orbis_ai_relatorios_refactor_agendamentos",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_ai_relatorios_refactor",
+      "name": "Agendamentos"
+    },
+    {
+      "_id": "req_orbis_ai_relatorios_refactor_create",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_relatorios_refactor_agendamentos",
+      "name": "Criar Agendamento",
+      "method": "POST",
+      "url": "{{ _.base_url }}/relatorios/agendamentos",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"{{ _.report_name }}\",\n  \"emailsDestino\": [\"{{ _.destino_email }}\"],\n  \"assunto\": \"{{ _.report_subject }}\",\n  \"periodo\": {\n    \"tipo\": \"RELATIVE_DAYS\",\n    \"valor\": {{ _.report_period_days }}\n  },\n  \"filtros\": {\n    \"secoes\": [\"resumo\", \"desempenho\", \"sensores\"]\n  },\n  \"agendamento\": {\n    \"frequencia\": \"DIARIO\",\n    \"hora\": {{ _.report_hour }},\n    \"minuto\": {{ _.report_minute }}\n  }\n}"
+      },
+      "description": "Cria um novo agendamento diario e retorna o id para preencher em agendamento_id."
+    },
+    {
+      "_id": "req_orbis_ai_relatorios_refactor_list",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_relatorios_refactor_agendamentos",
+      "name": "Listar Agendamentos",
+      "method": "GET",
+      "url": "{{ _.base_url }}/relatorios/agendamentos",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Lista os agendamentos existentes."
+    },
+    {
+      "_id": "req_orbis_ai_relatorios_refactor_find",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_relatorios_refactor_agendamentos",
+      "name": "Buscar Agendamento por ID",
+      "method": "GET",
+      "url": "{{ _.base_url }}/relatorios/agendamentos/{{ _.agendamento_id }}",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Consulta um agendamento especifico."
+    },
+    {
+      "_id": "req_orbis_ai_relatorios_refactor_status",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_relatorios_refactor_agendamentos",
+      "name": "Alterar Status do Agendamento",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/relatorios/agendamentos/{{ _.agendamento_id }}/status",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"PAUSADO\"\n}"
+      },
+      "description": "Pausa o agendamento usando a rota dedicada de status."
+    },
+    {
+      "_id": "req_orbis_ai_relatorios_refactor_execute_now",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_relatorios_refactor_agendamentos",
+      "name": "Executar Agendamento Agora",
+      "method": "POST",
+      "url": "{{ _.base_url }}/relatorios/agendamentos/{{ _.agendamento_id }}/executar-agora",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Dispara uma execucao imediata para o agendamento escolhido."
+    },
+    {
+      "_id": "req_orbis_ai_relatorios_refactor_executions",
+      "_type": "request",
+      "parentId": "fld_orbis_ai_relatorios_refactor_agendamentos",
+      "name": "Listar Execucoes do Agendamento",
+      "method": "GET",
+      "url": "{{ _.base_url }}/relatorios/agendamentos/{{ _.agendamento_id }}/execucoes",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Lista o historico de execucoes do agendamento informado."
+    }
+  ]
+}
