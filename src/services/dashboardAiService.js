@@ -337,7 +337,7 @@ Use as tools disponíveis quando precisar consultar dashboard, alertas, máquina
           toolName: writeToolCall.function.name,
           rawArguments: writeToolCall.function.arguments,
           usuarioId: usuario?.id
-        });
+        }) || {};
 
         logger.info("dashboard_ai_write_tool_preparing", {
           usuarioId: usuario?.id,
@@ -388,7 +388,7 @@ Use as tools disponíveis quando precisar consultar dashboard, alertas, máquina
           toolName,
           rawArguments: toolCall.function.arguments,
           usuarioId: usuario?.id
-        });
+        }) || {};
 
         logger.info("dashboard_ai_tool_execution_started", {
           usuarioId: usuario?.id,
@@ -411,7 +411,7 @@ Use as tools disponíveis quando precisar consultar dashboard, alertas, máquina
         toolMessages.push({
           role: "tool",
           tool_call_id: toolCall.id,
-          content: JSON.stringify(result)
+          content: JSON.stringify(result ?? null)
         });
       }
 

@@ -1,0 +1,359 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-06-04T00:00:00.000Z",
+  "__export_source": "codex:orbis-smoke-final",
+  "resources": [
+    {
+      "_id": "wrk_orbis_smoke_final",
+      "_type": "workspace",
+      "name": "Orbis Smoke Final",
+      "description": "Colecao complementar para validar os contratos novos antes do merge na main.",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_orbis_smoke_final_base",
+      "_type": "environment",
+      "parentId": "wrk_orbis_smoke_final",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:3333",
+        "token": "",
+        "refresh_token": "",
+        "login_email": "admin@orbis.local",
+        "login_senha": "Senha123",
+        "maquina_id": "1",
+        "maquina_id_sem_dados": "9",
+        "maquina_id_critica": "1",
+        "sensor_id": "1",
+        "sensor_tipo": "TEMPERATURA",
+        "usuario_ativo": true,
+        "agendamento_id": "1"
+      }
+    },
+    {
+      "_id": "fld_smoke_auth",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_smoke_final",
+      "name": "Auth"
+    },
+    {
+      "_id": "req_smoke_login",
+      "_type": "request",
+      "parentId": "fld_smoke_auth",
+      "name": "Login",
+      "method": "POST",
+      "url": "{{ _.base_url }}/auth/login",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"{{ _.login_email }}\",\n  \"senha\": \"{{ _.login_senha }}\"\n}"
+      },
+      "description": "Use accessToken e refreshToken da resposta para preencher token e refresh_token no environment."
+    },
+    {
+      "_id": "req_smoke_refresh",
+      "_type": "request",
+      "parentId": "fld_smoke_auth",
+      "name": "Refresh Token",
+      "method": "POST",
+      "url": "{{ _.base_url }}/auth/refresh",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"token\": \"{{ _.refresh_token }}\"\n}"
+      },
+      "description": "Confirma que o refresh token continua funcionando antes do merge."
+    },
+    {
+      "_id": "fld_smoke_predicao",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_smoke_final",
+      "name": "Predicao Contrato Novo"
+    },
+    {
+      "_id": "req_smoke_predicao_valida",
+      "_type": "request",
+      "parentId": "fld_smoke_predicao",
+      "name": "Predicao Alertas - Maquina Principal",
+      "method": "GET",
+      "url": "{{ _.base_url }}/maquinas/{{ _.maquina_id }}/predicao-alertas",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Valide os campos novos: estadoPredicao, fonteDecisao, urgencia, motivo e modeloIntegridade."
+    },
+    {
+      "_id": "req_smoke_predicao_sem_dados",
+      "_type": "request",
+      "parentId": "fld_smoke_predicao",
+      "name": "Predicao Alertas - Sem Dados/Janelamento",
+      "method": "GET",
+      "url": "{{ _.base_url }}/maquinas/{{ _.maquina_id_sem_dados }}/predicao-alertas",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Cenario esperado para SEM_DADOS ou SEM_MODELO quando a janela temporal ainda nao sustenta regressao confiavel."
+    },
+    {
+      "_id": "req_smoke_predicao_critica",
+      "_type": "request",
+      "parentId": "fld_smoke_predicao",
+      "name": "Predicao Alertas - Maquina Critica",
+      "method": "GET",
+      "url": "{{ _.base_url }}/maquinas/{{ _.maquina_id_critica }}/predicao-alertas",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Use uma maquina critica para validar MANUTENCAO_IMEDIATA, FALHA_JA_CRUZADA ou MODELO_INVALIDO_COM_RISCO."
+    },
+    {
+      "_id": "req_smoke_predicao_risco",
+      "_type": "request",
+      "parentId": "fld_smoke_predicao",
+      "name": "Predicao Risco",
+      "method": "GET",
+      "url": "{{ _.base_url }}/maquinas/{{ _.maquina_id }}/predicao-risco",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Confirma que o endpoint de risco segue respondendo durante a integracao."
+    },
+    {
+      "_id": "fld_smoke_sensores",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_smoke_final",
+      "name": "Sensores Validacao"
+    },
+    {
+      "_id": "req_smoke_sensor_show",
+      "_type": "request",
+      "parentId": "fld_smoke_sensores",
+      "name": "Buscar Sensor",
+      "method": "GET",
+      "url": "{{ _.base_url }}/sensores/{{ _.sensor_id }}",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Use para conferir os valores atuais antes de testar update invalido."
+    },
+    {
+      "_id": "req_smoke_sensor_update_valido",
+      "_type": "request",
+      "parentId": "fld_smoke_sensores",
+      "name": "Atualizar Sensor - Valido",
+      "method": "PUT",
+      "url": "{{ _.base_url }}/sensores/{{ _.sensor_id }}",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"maquinaId\": {{ _.maquina_id }},\n  \"tipo\": \"{{ _.sensor_tipo }}\",\n  \"idealTemperatura\": 60,\n  \"limiteTemperatura\": 85,\n  \"idealVibracao\": 6,\n  \"limiteVibracao\": 20,\n  \"desvioMaximoTemp\": 25,\n  \"desvioMaximoVibra\": 14\n}"
+      },
+      "description": "Deve retornar 200 quando ideal < limite e desvios sao positivos."
+    },
+    {
+      "_id": "req_smoke_sensor_update_invalido_temperatura",
+      "_type": "request",
+      "parentId": "fld_smoke_sensores",
+      "name": "Atualizar Sensor - Ideal Temperatura Invalida",
+      "method": "PUT",
+      "url": "{{ _.base_url }}/sensores/{{ _.sensor_id }}",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"maquinaId\": {{ _.maquina_id }},\n  \"tipo\": \"{{ _.sensor_tipo }}\",\n  \"idealTemperatura\": 90,\n  \"limiteTemperatura\": 85,\n  \"idealVibracao\": 6,\n  \"limiteVibracao\": 20,\n  \"desvioMaximoTemp\": 25,\n  \"desvioMaximoVibra\": 14\n}"
+      },
+      "description": "Deve retornar 400: idealTemperatura deve ser menor que limiteTemperatura."
+    },
+    {
+      "_id": "req_smoke_sensor_update_invalido_desvio",
+      "_type": "request",
+      "parentId": "fld_smoke_sensores",
+      "name": "Atualizar Sensor - Desvio Invalido",
+      "method": "PUT",
+      "url": "{{ _.base_url }}/sensores/{{ _.sensor_id }}",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"maquinaId\": {{ _.maquina_id }},\n  \"tipo\": \"{{ _.sensor_tipo }}\",\n  \"idealTemperatura\": 60,\n  \"limiteTemperatura\": 85,\n  \"idealVibracao\": 6,\n  \"limiteVibracao\": 20,\n  \"desvioMaximoTemp\": 0,\n  \"desvioMaximoVibra\": 14\n}"
+      },
+      "description": "Deve retornar 400: desvioMaximoTemp deve ser maior que zero."
+    },
+    {
+      "_id": "fld_smoke_usuarios",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_smoke_final",
+      "name": "Usuarios"
+    },
+    {
+      "_id": "req_smoke_usuario_alterar_ativo",
+      "_type": "request",
+      "parentId": "fld_smoke_usuarios",
+      "name": "Alterar Meu Ativo",
+      "method": "PUT",
+      "url": "{{ _.base_url }}/usuarios/alterar-ativo",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"ativo\": {{ _.usuario_ativo }}\n}"
+      },
+      "description": "Confirma o contrato da rota de alterar status ativo do usuario autenticado."
+    },
+    {
+      "_id": "fld_smoke_ia",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_smoke_final",
+      "name": "Dashboard IA"
+    },
+    {
+      "_id": "req_smoke_ia_leitura_agendamentos",
+      "_type": "request",
+      "parentId": "fld_smoke_ia",
+      "name": "IA - Panorama e Agendamentos",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Me de um panorama do sistema e depois liste os agendamentos de relatorio existentes.\",\n  \"historico\": []\n}"
+      },
+      "description": "Valida leitura combinada com tools de dashboard e relatorios."
+    },
+    {
+      "_id": "req_smoke_ia_confirmacao_sensor",
+      "_type": "request",
+      "parentId": "fld_smoke_ia",
+      "name": "IA - Confirmacao Atualizar Sensor",
+      "method": "POST",
+      "url": "{{ _.base_url }}/dashboard/ia/perguntar",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pergunta\": \"Atualize o sensor {{ _.sensor_id }} com temperatura ideal 60, limite 85, vibracao ideal 6 e limite 20.\",\n  \"historico\": []\n}"
+      },
+      "description": "Deve retornar requiresConfirmation=true antes de alterar dados."
+    },
+    {
+      "_id": "fld_smoke_relatorios",
+      "_type": "request_group",
+      "parentId": "wrk_orbis_smoke_final",
+      "name": "Relatorios Basico"
+    },
+    {
+      "_id": "req_smoke_relatorios_agendamentos_list",
+      "_type": "request",
+      "parentId": "fld_smoke_relatorios",
+      "name": "Listar Agendamentos",
+      "method": "GET",
+      "url": "{{ _.base_url }}/relatorios/agendamentos",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Confirma shape de agendamento, datas formatadas e descricaoAgendamento."
+    },
+    {
+      "_id": "req_smoke_relatorios_execucoes_list",
+      "_type": "request",
+      "parentId": "fld_smoke_relatorios",
+      "name": "Listar Execucoes do Agendamento",
+      "method": "GET",
+      "url": "{{ _.base_url }}/relatorios/agendamentos/{{ _.agendamento_id }}/execucoes",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.token }}"
+        }
+      ],
+      "body": {},
+      "description": "Confirma shape das execucoes e formatacao de datas."
+    }
+  ]
+}

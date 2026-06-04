@@ -100,6 +100,64 @@ test("DashboardAiService faz fallback quando a resposta final da tool volta sem 
   }
 });
 
+test("DashboardAiService trata tool call sem argumentos como objeto vazio", async () => {
+  const originalBuildContext = DashboardAiService.buildContext;
+  const originalBuildPrompts = DashboardAiService.buildPrompts;
+  const originalGenerateWithTools = GroqService.generateWithTools;
+  const originalGenerateText = GroqService.generateText;
+  const originalExecuteTool = AiToolsRegistry.executeTool;
+
+  DashboardAiService.buildContext = async () => ({
+    metadata: {
+      generatedAt: "2026-05-20T12:00:00.000Z",
+      usuario: { id: 1, nome: "Admin", role: "ADMIN" }
+    },
+    resumo: {}
+  });
+
+  DashboardAiService.buildPrompts = () => ({
+    messages: [
+      { role: "system", content: "Teste" },
+      { role: "user", content: "Liste agendamentos" }
+    ]
+  });
+
+  GroqService.generateWithTools = async () => ({
+    role: "assistant",
+    tool_calls: [{
+      id: "tool-call-1",
+      type: "function",
+      function: {
+        name: "listar_agendamentos_relatorio"
+      }
+    }]
+  });
+
+  AiToolsRegistry.executeTool = async ({ args }) => {
+    assert.deepEqual(args, {});
+    return { total: 0, agendamentos: [] };
+  };
+
+  GroqService.generateText = async () => "Nao ha agendamentos cadastrados.";
+
+  try {
+    const result = await DashboardAiService.answer({
+      pergunta: "Liste agendamentos",
+      usuario: { id: 1, nome: "Admin", role: "ADMIN" },
+      historico: []
+    });
+
+    assert.equal(result.fallback, false);
+    assert.equal(result.resposta, "Nao ha agendamentos cadastrados.");
+  } finally {
+    DashboardAiService.buildContext = originalBuildContext;
+    DashboardAiService.buildPrompts = originalBuildPrompts;
+    GroqService.generateWithTools = originalGenerateWithTools;
+    GroqService.generateText = originalGenerateText;
+    AiToolsRegistry.executeTool = originalExecuteTool;
+  }
+});
+
 test("DashboardAiService retorna confirmacao para tool de escrita", async () => {
   const originalBuildContext = DashboardAiService.buildContext;
   const originalBuildPrompts = DashboardAiService.buildPrompts;
