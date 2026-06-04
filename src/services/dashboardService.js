@@ -5,6 +5,7 @@ const UsuarioService = require("../services/usuarioService");
 const AlertaModel = require("../models/alertaModel");
 const MaquinaModel = require("../models/maquinaModel");
 const SensorModel = require("../models/sensorModel");
+const { normalizeLimit } = require("../utils/requestParsers");
 
 class DashboardService {
     static async resume() {
@@ -40,17 +41,17 @@ class DashboardService {
     }
 
     static async getTopAlertas({ limit = 5 } = {}) {
-        const safeLimit = Math.min(Math.max(Number(limit || 5), 1), 20);
+        const safeLimit = normalizeLimit(limit, 5);
         return AlertaModel.listTopAtivos({ limit: safeLimit });
     }
 
     static async getMaquinasCriticas({ limit = 5 } = {}) {
-        const safeLimit = Math.min(Math.max(Number(limit || 5), 1), 20);
+        const safeLimit = normalizeLimit(limit, 5);
         return MaquinaModel.listPioresIntegridade({ limit: safeLimit });
     }
 
     static async getSensoresOffline({ limit = 5 } = {}) {
-        const safeLimit = Math.min(Math.max(Number(limit || 5), 1), 20);
+        const safeLimit = normalizeLimit(limit, 5);
         return SensorModel.listOfflineRecentes({ limit: safeLimit });
     }
 

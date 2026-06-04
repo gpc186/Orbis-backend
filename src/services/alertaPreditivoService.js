@@ -12,10 +12,17 @@ class AlertaPreditivoService {
     HISTORICO_INSUFICIENTE: "historico_insuficiente",
     REGRESSAO_INDISPONIVEL: "modelo_nao_pode_ser_calculado",
     MODELO_INVALIDO: "tendencia_nao_confiavel",
+    JANELA_TEMPORAL_INSUFICIENTE: "janela_temporal_insuficiente",
+    SERIE_TEMPORAL_CONCENTRADA: "serie_temporal_concentrada",
+    SERIE_TEMPORAL_IRREGULAR: "serie_temporal_irregular",
     LIMIAR_INDISPONIVEL: "sem_historico_de_alertas_do_tipo",
     DATA_PASSADA: "evento_ja_ocorrido",
     FORA_JANELA: "previsao_fora_da_janela",
-    SEM_PREVISAO: "sem_alerta_previsivel"
+    SEM_PREVISAO: "sem_alerta_previsivel",
+    PREVISAO_LINEAR_VALIDA: "previsao_linear_valida",
+    LIMIAR_MANUTENCAO_JA_CRUZADO: "limiar_manutencao_ja_cruzado",
+    LIMIAR_FALHA_JA_CRUZADO: "limiar_falha_ja_cruzado",
+    RISCO_HEURISTICO_CRITICO: "risco_heuristico_critico"
   };
 
   static arredondar(valor, casas = 2) {
@@ -42,18 +49,7 @@ class AlertaPreditivoService {
   }
 
   static resumirModeloIntegridade(modeloResultado) {
-    if (!modeloResultado?.modeloIntegridade) {
-      return null;
-    }
-
-    const { score, slope, intercept, pontosUsados } = modeloResultado.modeloIntegridade;
-
-    return {
-      r2: this.arredondar(score.r2, 2),
-      slope: this.arredondar(slope, 4),
-      intercept: this.arredondar(intercept, 2),
-      pontosUsados
-    };
+    return PredicaoService.resumirModeloIntegridade(modeloResultado);
   }
 
   static async coletarAmostrasIntegridade(alertas) {
@@ -144,6 +140,17 @@ class AlertaPreditivoService {
     };
   }
 
+  static montarRespostaBase({ maquinaId, estadoPredicao, fonteDecisao, urgencia, motivo, modeloIntegridade }) {
+    return {
+      maquinaId,
+      estadoPredicao,
+      fonteDecisao,
+      urgencia,
+      motivo,
+      modeloIntegridade
+    };
+  }
+
   static async preverTipo(maquina, tipo, modeloResultado) {
     if (!modeloResultado?.valido || !modeloResultado?.modeloIntegridade) {
       return {
@@ -199,31 +206,33 @@ class AlertaPreditivoService {
   }
 
   static async preverPorMaquina(maquinaId) {
-    const maquina = await MaquinaModel.findById(maquinaId);
-    if (!maquina) {
+    const diagnostico = await PredicaoService.diagnosticarPredicao(maquinaId);
+    if (!diagnostico?.maquina) {
       throw new AppError("Maquina nao encontrada.", 404);
     }
 
-    const modeloResultado = await PredicaoService.obterModeloIntegridade(maquinaId);
-    const modeloIntegridade = this.resumirModeloIntegridade(modeloResultado);
+    const { maquina, avaliacaoModelo, estadoPredicao, fonteDecisao, urgencia, motivo } = diagnostico;
+    const modeloIntegridade = this.resumirModeloIntegridade(avaliacaoModelo);
 
-    if (!modeloResultado?.valido) {
+    if (estadoPredicao !== PredicaoService.ESTADOS.PREVISAO_VALIDA) {
       return {
-        maquinaId: maquina.id,
+        ...this.montarRespostaBase({
+          maquinaId: maquina.id,
+          estadoPredicao,
+          fonteDecisao,
+          urgencia,
+          motivo,
+          modeloIntegridade
+        }),
         proximoAlerta: null,
-        ausenciaProximoAlerta: this.criarAusenciaPrevisao(
-          modeloResultado?.motivo || this.MOTIVOS.MODELO_INVALIDO
-        ),
+        ausenciaProximoAlerta: this.criarAusenciaPrevisao(motivo),
         instabilidade: null,
-        ausenciaInstabilidade: this.criarAusenciaPrevisao(
-          modeloResultado?.motivo || this.MOTIVOS.MODELO_INVALIDO
-        ),
-        modeloIntegridade
+        ausenciaInstabilidade: this.criarAusenciaPrevisao(motivo)
       };
     }
 
     const resultadosPorTipo = await Promise.all(
-      this.TIPOS_SUPORTADOS.map((tipo) => this.preverTipo(maquina, tipo, modeloResultado))
+      this.TIPOS_SUPORTADOS.map((tipo) => this.preverTipo(maquina, tipo, avaliacaoModelo))
     );
 
     const previsoesValidas = resultadosPorTipo
@@ -251,12 +260,18 @@ class AlertaPreditivoService {
       : (resultadoInstabilidade.ausencia || this.criarAusenciaPrevisao(this.MOTIVOS.SEM_PREVISAO));
 
     return {
-      maquinaId: maquina.id,
+      ...this.montarRespostaBase({
+        maquinaId: maquina.id,
+        estadoPredicao,
+        fonteDecisao,
+        urgencia,
+        motivo,
+        modeloIntegridade
+      }),
       proximoAlerta,
       ausenciaProximoAlerta,
       instabilidade,
-      ausenciaInstabilidade,
-      modeloIntegridade
+      ausenciaInstabilidade
     };
   }
 }
