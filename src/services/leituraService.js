@@ -47,7 +47,18 @@ class leituraService {
 
       try {
         await PredicaoService.atualizarSaudeMaquina(sensor.maquinaId);
-        await PredicaoService.previsaoManutencao(sensor.maquinaId);
+        const resultadoPredicao = await PredicaoService.previsaoManutencao(sensor.maquinaId);
+
+        if (resultadoPredicao && resultadoPredicao.fonteDecisao !== PredicaoService.FONTES.REGRESSAO_LINEAR) {
+          logger.info("leitura_predictive_fallback_applied", {
+            sensorId: sensor.id,
+            maquinaId: sensor.maquinaId,
+            estadoPredicao: resultadoPredicao.estadoPredicao,
+            fonteDecisao: resultadoPredicao.fonteDecisao,
+            urgencia: resultadoPredicao.urgencia,
+            motivo: resultadoPredicao.motivo
+          });
+        }
       } catch (error) {
         logger.error("leitura_predictive_processing_failed", {
           sensorId: sensor.id,
