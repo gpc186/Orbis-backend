@@ -11,6 +11,12 @@ const {
   validateSchedulePayload
 } = require("../../utils/reportValidation");
 const AppError = require("../../utils/appErrorUtils");
+const { isWriteTool: isWriteToolHandler } = require("./guards");
+const {
+  prepareWriteToolAction: prepareWriteToolActionHandler,
+  executeWriteTool: executeWriteToolHandler
+} = require("./writeActions");
+const { executeTool: executeToolHandler } = require("./readActions");
 
 const tools = [
   {
@@ -2136,8 +2142,8 @@ async function executeTool({ name, args, usuario }) {
 
 module.exports = {
   tools,
-  executeTool,
-  isWriteTool,
-  prepareWriteToolAction,
-  executeWriteTool
+  executeTool: executeToolHandler,
+  isWriteTool: isWriteToolHandler,
+  prepareWriteToolAction: prepareWriteToolActionHandler,
+  executeWriteTool: executeWriteToolHandler
 };
