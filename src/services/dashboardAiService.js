@@ -300,6 +300,7 @@ Use as tools disponíveis quando precisar consultar dashboard, alertas, máquina
     });
 
     let toolCallNames = [];
+    let failureOrigin = "provider_unavailable";
 
     try {
       const firstMessage = await GroqService.generateWithTools({
@@ -380,6 +381,7 @@ Use as tools disponíveis quando precisar consultar dashboard, alertas, máquina
       const toolMessages = [];
 
       for (const toolCall of firstMessage.tool_calls) {
+        failureOrigin = "tool_execution_failed";
         const toolName = toolCall.function.name;
         const args = this.parseToolArguments({
           toolName,
@@ -418,6 +420,8 @@ Use as tools disponíveis quando precisar consultar dashboard, alertas, máquina
         toolCallNames
       });
 
+      failureOrigin = "provider_unavailable";
+
       const finalText = await GroqService.generateText({
         messages: [
           ...messages,
@@ -446,30 +450,35 @@ Use as tools disponíveis quando precisar consultar dashboard, alertas, máquina
         throw error;
       }
 
-      const respostaFallback = await this.buildFallbackResponse({ usuario });
+      const respostaFallback = await this.buildFallbackResponse({
+        usuario,
+        resumo: contexto?.resumo
+      });
 
       return {
         pergunta: pergunta.trim(),
         resposta: respostaFallback,
         fallback: true,
-        motivoFallback: toolCallNames.length > 0 ? "tool_execution_failed" : "provider_unavailable",
+        motivoFallback: failureOrigin,
         contextoGeradoEm: contexto.metadata.generatedAt,
         usedHistoryCount: historicoSeguro.length
       };
     }
   }
 
-  static async buildFallbackResponse({ usuario }) {
+  static async buildFallbackResponse({ usuario, resumo }) {
     const nome = usuario?.nome || "usuário";
-    let r = {};
+    let r = resumo && typeof resumo === "object" ? resumo : {};
 
-    try {
-      r = await DashboardService.resume();
-    } catch (error) {
-      logger.error("dashboard_ai_fallback_resume_error", {
-        usuarioId: usuario?.id,
-        error
-      });
+    if (Object.keys(r).length === 0) {
+      try {
+        r = await DashboardService.resume();
+      } catch (error) {
+        logger.error("dashboard_ai_fallback_resume_error", {
+          usuarioId: usuario?.id,
+          error
+        });
+      }
     }
 
     return [

@@ -3,6 +3,7 @@ const test = require("node:test");
 
 const MaquinaModel = require("../models/maquinaModel");
 const HistoricoIntegridadeModel = require("../models/historicoIntegridadeModel");
+const PredicaoRiscoService = require("./predicaoRiscoService");
 const PredicaoService = require("./predicaoService");
 
 const RealDate = Date;
@@ -44,23 +45,44 @@ function buildHistorico(valores, startIso = "2026-05-21T00:00:00.000Z", stepHour
     id: index + 1,
     maquinaId: 1,
     integridade,
+    scoreEstabilidade: integridade,
     criadoEm: new RealDate(inicio + (index * stepHours * 60 * 60 * 1000)).toISOString()
   }));
 }
 
-function mockPredicaoDependencies(historico) {
+function mockPredicaoDependencies({
+  historico,
+  machine = {
+    id: 1,
+    nome: "Maquina teste",
+    integridade: 82,
+    scoreEstabilidade: 76
+  },
+  riskResult = {
+    riscos: {
+      manutencao: {
+        "24h": 0.2,
+        "72h": 0.3,
+        classificacao: "BAIXO",
+        motivoAusencia: null
+      }
+    }
+  }
+}) {
   const originalFindById = MaquinaModel.findById;
   const originalUpdate = MaquinaModel.update;
   const originalFindSerieByMaquina = HistoricoIntegridadeModel.findSerieByMaquina;
+  const originalPreverPorMaquina = PredicaoRiscoService.preverPorMaquina;
 
   const updateCalls = [];
 
-  MaquinaModel.findById = async () => ({ id: 1, nome: "Maquina teste" });
+  MaquinaModel.findById = async () => machine;
   MaquinaModel.update = async (id, data) => {
     updateCalls.push({ id, data });
     return { id, ...data };
   };
   HistoricoIntegridadeModel.findSerieByMaquina = async () => historico;
+  PredicaoRiscoService.preverPorMaquina = async () => riskResult;
 
   return {
     updateCalls,
@@ -68,13 +90,22 @@ function mockPredicaoDependencies(historico) {
       MaquinaModel.findById = originalFindById;
       MaquinaModel.update = originalUpdate;
       HistoricoIntegridadeModel.findSerieByMaquina = originalFindSerieByMaquina;
+      PredicaoRiscoService.preverPorMaquina = originalPreverPorMaquina;
     }
   };
 }
 
-test("previsaoManutencao limpa a previsao quando nao ha pontos suficientes", async () => {
+test("calcularIntegridadeAgregada reduz a media quando existe sensor em estado critico", async () => {
+  const resultado = PredicaoService.calcularIntegridadeAgregada([92, 88, 22]);
+
+  assert.equal(resultado, 47.33);
+});
+
+test("previsaoManutencao retorna SEM_DADOS quando nao ha historico suficiente", async () => {
   const restoreDate = useFakeNow("2026-05-21T07:00:00.000Z");
-  const mocks = mockPredicaoDependencies(buildHistorico([100, 99, 98, 97, 96, 95, 94]));
+  const mocks = mockPredicaoDependencies({
+    historico: buildHistorico([100, 99, 98, 97, 96, 95, 94])
+  });
 
   try {
     const resultado = await PredicaoService.previsaoManutencao(1);
@@ -85,59 +116,108 @@ test("previsaoManutencao limpa a previsao quando nao ha pontos suficientes", asy
       janelaManuInicio: null,
       janelaManuFim: null
     });
-    assert.deepEqual(resultado, {
+    assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.SEM_DADOS);
+    assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.SEM_MODELO);
+    assert.equal(resultado.motivo, PredicaoService.MOTIVOS.HISTORICO_INSUFICIENTE);
+  } finally {
+    mocks.restore();
+    restoreDate();
+  }
+});
+
+test("previsaoManutencao marca MANUTENCAO_IMEDIATA quando a integridade atual ja cruzou o limiar", async () => {
+  const restoreDate = useFakeNow("2026-05-21T07:00:00.000Z");
+  const mocks = mockPredicaoDependencies({
+    historico: buildHistorico([100, 40, 95, 35, 90, 30, 85, 25]),
+    machine: {
       id: 1,
-      previsaoManutencao: null,
-      janelaManuInicio: null,
-      janelaManuFim: null
-    });
-  } finally {
-    mocks.restore();
-    restoreDate();
-  }
-});
-
-test("previsaoManutencao limpa a previsao quando o ajuste tem r2 baixo", async () => {
-  const restoreDate = useFakeNow("2026-05-21T07:00:00.000Z");
-  const mocks = mockPredicaoDependencies(buildHistorico([100, 40, 95, 35, 90, 30, 85, 25]));
+      nome: "Maquina critica",
+      integridade: 64,
+      scoreEstabilidade: 58
+    }
+  });
 
   try {
-    await PredicaoService.previsaoManutencao(1);
+    const resultado = await PredicaoService.previsaoManutencao(1);
 
-    assert.equal(mocks.updateCalls.length, 1);
     assert.deepEqual(mocks.updateCalls[0].data, {
       previsaoManutencao: null,
       janelaManuInicio: null,
       janelaManuFim: null
     });
+    assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.MANUTENCAO_IMEDIATA);
+    assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.HEURISTICA_CRITICA);
+    assert.equal(resultado.urgencia, PredicaoService.URGENCIAS.IMEDIATA);
+    assert.equal(resultado.motivo, PredicaoService.MOTIVOS.LIMIAR_MANUTENCAO_JA_CRUZADO);
   } finally {
     mocks.restore();
     restoreDate();
   }
 });
 
-test("previsaoManutencao limpa a previsao quando a falha projetada ja ficou no passado", async () => {
+test("previsaoManutencao marca FALHA_JA_CRUZADA quando a integridade atual ja cruzou o limiar de falha", async () => {
   const restoreDate = useFakeNow("2026-05-21T08:00:00.000Z");
-  const mocks = mockPredicaoDependencies(buildHistorico([100, 90, 80, 70, 60, 50, 40, 20]));
+  const mocks = mockPredicaoDependencies({
+    historico: buildHistorico([100, 90, 80, 70, 60, 50, 40, 20]),
+    machine: {
+      id: 1,
+      nome: "Maquina falhando",
+      integridade: 24,
+      scoreEstabilidade: 18
+    }
+  });
 
   try {
-    await PredicaoService.previsaoManutencao(1);
+    const resultado = await PredicaoService.previsaoManutencao(1);
 
-    assert.equal(mocks.updateCalls.length, 1);
-    assert.deepEqual(mocks.updateCalls[0].data, {
-      previsaoManutencao: null,
-      janelaManuInicio: null,
-      janelaManuFim: null
-    });
+    assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.FALHA_JA_CRUZADA);
+    assert.equal(resultado.motivo, PredicaoService.MOTIVOS.LIMIAR_FALHA_JA_CRUZADO);
+    assert.equal(resultado.urgencia, PredicaoService.URGENCIAS.IMEDIATA);
   } finally {
     mocks.restore();
     restoreDate();
   }
 });
 
-test("previsaoManutencao gera janela futura e mantem fim com antecedencia de dois dias", async () => {
+test("previsaoManutencao usa fallback heuristico quando o modelo e invalido mas o risco e alto", async () => {
   const restoreDate = useFakeNow("2026-05-21T07:00:00.000Z");
-  const mocks = mockPredicaoDependencies(buildHistorico([100, 99, 98, 97, 96, 95, 94, 93]));
+  const mocks = mockPredicaoDependencies({
+    historico: buildHistorico([100, 40, 95, 35, 90, 30, 85, 25]),
+    machine: {
+      id: 1,
+      nome: "Maquina instavel",
+      integridade: 76,
+      scoreEstabilidade: 58
+    },
+    riskResult: {
+      riscos: {
+        manutencao: {
+          "24h": 0.76,
+          "72h": 0.83,
+          classificacao: "ALTO",
+          motivoAusencia: null
+        }
+      }
+    }
+  });
+
+  try {
+    const resultado = await PredicaoService.previsaoManutencao(1);
+
+    assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.MODELO_INVALIDO_COM_RISCO);
+    assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.HEURISTICA_CRITICA);
+    assert.equal(resultado.motivo, PredicaoService.MOTIVOS.RISCO_HEURISTICO_CRITICO);
+  } finally {
+    mocks.restore();
+    restoreDate();
+  }
+});
+
+test("previsaoManutencao gera janela futura quando a regressao linear permanece valida", async () => {
+  const restoreDate = useFakeNow("2026-05-21T07:00:00.000Z");
+  const mocks = mockPredicaoDependencies({
+    historico: buildHistorico([100, 99, 98, 97, 96, 95, 94, 93])
+  });
 
   try {
     const resultado = await PredicaoService.previsaoManutencao(1);
@@ -145,27 +225,33 @@ test("previsaoManutencao gera janela futura e mantem fim com antecedencia de doi
     assert.equal(mocks.updateCalls.length, 1);
 
     const payload = mocks.updateCalls[0].data;
+    assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.PREVISAO_VALIDA);
     assert.equal(payload.previsaoManutencao.toISOString(), "2026-05-23T22:00:00.000Z");
     assert.equal(payload.janelaManuInicio.toISOString(), "2026-05-22T06:00:00.000Z");
     assert.equal(payload.janelaManuFim.toISOString(), "2026-05-22T06:00:00.000Z");
-    assert.deepEqual(resultado, { id: 1, ...payload });
+    assert.equal(resultado.modeloIntegridade.janelaHorasCoberta, 7);
+    assert.equal(resultado.modeloIntegridade.ultimoPontoEm.toISOString(), "2026-05-21T07:00:00.000Z");
   } finally {
     mocks.restore();
     restoreDate();
   }
 });
 
-test("previsaoManutencao inicia a janela imediatamente quando o limiar de manutencao ja foi cruzado", async () => {
+test("avaliarModeloIntegridade invalida series temporais concentradas demais", async () => {
   const restoreDate = useFakeNow("2026-05-21T07:00:00.000Z");
-  const mocks = mockPredicaoDependencies(buildHistorico([68, 67, 66, 65, 64, 63, 62, 61]));
+  const historicoConcentrado = buildHistorico(
+    [100, 99, 98, 97, 96, 95, 94, 93],
+    "2026-05-21T00:00:00.000Z",
+    0.01
+  );
+  const mocks = mockPredicaoDependencies({ historico: historicoConcentrado });
 
   try {
-    await PredicaoService.previsaoManutencao(1);
+    const resultado = await PredicaoService.avaliarModeloIntegridade(1);
 
-    const payload = mocks.updateCalls[0].data;
-    assert.equal(payload.previsaoManutencao.toISOString(), "2026-05-22T14:00:00.000Z");
-    assert.equal(payload.janelaManuInicio.toISOString(), "2026-05-21T07:00:00.000Z");
-    assert.equal(payload.janelaManuFim.toISOString(), "2026-05-21T07:00:00.000Z");
+    assert.equal(resultado.valido, false);
+    assert.equal(resultado.motivo, PredicaoService.MOTIVOS.JANELA_TEMPORAL_INSUFICIENTE);
+    assert.equal(PredicaoService.resumirModeloIntegridade(resultado).janelaHorasCoberta, 0.07);
   } finally {
     mocks.restore();
     restoreDate();
