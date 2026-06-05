@@ -1,19 +1,19 @@
 # Orbis API
 
-Back-end do **Orbis**, sistema de monitoramento industrial preditivo desenvolvido como TCC no SENAI. A API centraliza cadastro de maquinas e sensores, recebimento de leituras, alertas, manutencoes, relatorios, assistente de IA e predicao de risco operacional.
+Back-end do **Orbis**, sistema de monitoramento industrial preditivo desenvolvido como TCC no SENAI. A API centraliza cadastro de máquinas e sensores, recebimento de leituras, alertas, manutenções, relatórios, assistente de IA e predição de risco operacional.
 
-## Visao Geral
+## Visão Geral
 
-A API e responsavel por:
+A API é responsável por:
 
-- Autenticacao com JWT, refresh token e controle de roles `ADMIN` e `TECNICO`.
-- Gestao de usuarios, tecnicos, perfil, maquinas, sensores, leituras, alertas e manutencoes.
-- Monitoramento em tempo real com Socket.IO e integracao MQTT/ESP32.
-- Upload de imagens e manuais tecnicos em PDF via Supabase Storage.
-- Extracao de especificacoes de manuais usando embeddings e IA.
+- Autenticação com JWT, refresh token e controle de roles `ADMIN` e `TECNICO`.
+- Gestão de usuários, técnicos, perfil, máquinas, sensores, leituras, alertas e manutenções.
+- Monitoramento em tempo real com Socket.IO e integração MQTT/ESP32.
+- Upload de imagens e manuais técnicos em PDF via Supabase Storage.
+- Extração de especificações de manuais usando embeddings e IA.
 - Dashboard operacional e assistente de IA com tools de leitura/escrita.
-- Relatorios operacionais com preview, envio imediato, agendamento e historico de execucoes.
-- Predicao de manutencao e risco com regressao linear e fallback heuristico para maquinas criticas.
+- Relatórios operacionais com preview, envio imediato, agendamento e histórico de execuções.
+- Predição de manutenção e risco com regressão linear e fallback heurístico para máquinas críticas.
 
 ## Tecnologias
 
@@ -34,7 +34,7 @@ A API e responsavel por:
 ## Requisitos
 
 - Node.js 18 ou superior
-- Banco PostgreSQL acessivel pela `DATABASE_URL`
+- Banco PostgreSQL acessível pela `DATABASE_URL`
 - Buckets no Supabase Storage:
   - `profile-images`
   - `machine-images`
@@ -50,7 +50,7 @@ npx prisma migrate dev
 npm run dev
 ```
 
-Por padrao, se `PORT` nao estiver definido, a aplicacao sobe em:
+Por padrão, se `PORT` não estiver definido, a aplicação sobe em:
 
 ```txt
 http://localhost:3000
@@ -61,19 +61,19 @@ http://localhost:3000
 ```bash
 npm run dev        # inicia com nodemon
 npm start          # inicia em modo normal
-npm test           # roda a suite automatizada
+npm test           # roda a suíte automatizada
 npm run test:ci    # roda testes e cobertura, mesmo comando usado no CI
-npm run test:integration # roda integracao Prisma contra banco de teste
+npm run test:integration # roda integração Prisma contra banco de teste
 npm run smoke:health # valida /health e /ready de uma URL publicada
-npm run ci:local     # valida schema Prisma, testes, cobertura e integracao segura
+npm run ci:local     # valida schema Prisma, testes, cobertura e integração segura
 npm run simulador  # executa o simulador de leituras
 ```
 
-## Variaveis de Ambiente
+## Variáveis de Ambiente
 
 Crie um arquivo `.env` com base no `.env.example`.
 
-Principais variaveis:
+Principais variáveis:
 
 ```env
 DATABASE_URL="postgresql://..."
@@ -107,7 +107,7 @@ PORT=3000
 NODE_ENV="DEVELOPMENT"
 ```
 
-O fluxo de relatorios usa timezone fixo `America/Sao_Paulo`.
+O fluxo de relatórios usa timezone fixo `America/Sao_Paulo`.
 
 ## Estrutura do Projeto
 
@@ -118,81 +118,81 @@ src/
 |-- middlewares/        # Auth, roles, upload, erros e contexto
 |-- models/             # Acesso ao banco via Prisma
 |-- prisma/             # Cliente Prisma
-|-- routes/             # Definicao das rotas
-|-- services/           # Regras de negocio
-|   |-- aiTools/        # Tools, permissoes e acoes da IA
-|-- templates/          # Templates de email/relatorio
-|-- utils/              # Validacoes, parsing, logger e helpers
-|-- app.js              # App Express reutilizavel em testes e runtime
-|-- server.js           # Bootstrap da aplicacao
+|-- routes/             # Definição das rotas
+|-- services/           # Regras de negócio
+|   |-- aiTools/        # Tools, permissões e ações da IA
+|-- templates/          # Templates de email/relatório
+|-- utils/              # Validações, parsing, logger e helpers
+|-- app.js              # App Express reutilizável em testes e runtime
+|-- server.js           # Bootstrap da aplicação
 tests/
-|-- unit/               # Testes unitarios/contrato espelhando as areas de src
+|-- unit/               # Testes unitários/contrato espelhando as áreas de src
 |-- integration/        # Testes com Prisma/banco real seguro
 |-- ci/                 # Testes de contrato do workflow CI/CD
 ```
 
 ## Funcionalidades Principais
 
-### Autenticacao e Usuarios
+### Autenticação e Usuários
 
 - Rotas protegidas exigem `Authorization: Bearer <token>`.
 - O login retorna access token e refresh token.
-- `ADMIN` pode cadastrar, editar e remover usuarios.
-- Usuarios autenticados podem alterar o proprio status ativo pela rota `PUT /usuarios/alterar-ativo`.
+- `ADMIN` pode cadastrar, editar e remover usuários.
+- Usuários autenticados podem alterar o próprio status ativo pela rota `PUT /usuarios/alterar-ativo`.
 - O perfil permite atualizar dados, foto e token de dispositivo.
 
-### Maquinas, Sensores e Leituras
+### Máquinas, Sensores e Leituras
 
-- Maquinas possuem criticidade, integridade, score de estabilidade e campos de previsao de manutencao.
+- Máquinas possuem criticidade, integridade, score de estabilidade e campos de previsão de manutenção.
 - Sensores validam limites antes de salvar:
   - `idealTemperatura < limiteTemperatura`
   - `idealVibracao < limiteVibracao`
   - `desvioMaximoTemp > 0`
   - `desvioMaximoVibra > 0`
-- `POST /leituras` e usado por integracoes ESP32 e exige `x-api-key`.
-- `GET /leituras` exige autenticacao.
-- Leituras atualizam sensor, integridade da maquina, historico e podem gerar alertas.
+- `POST /leituras` é usado por integrações ESP32 e exige `x-api-key`.
+- `GET /leituras` exige autenticação.
+- Leituras atualizam sensor, integridade da máquina, histórico e podem gerar alertas.
 
-### Alertas e Manutencoes
+### Alertas e Manutenções
 
 - Alertas registram eventos de ciclo de vida.
-- Um alerta pode ter varias manutencoes, mas apenas uma manutencao `EM_ANDAMENTO`.
-- Quando a manutencao e `RESOLVIDO`, o alerta tambem e resolvido.
-- Quando a manutencao e `ENCERRADO_SEM_SOLUCAO`, o alerta volta para `ATIVO`.
+- Um alerta pode ter várias manutenções, mas apenas uma manutenção `EM_ANDAMENTO`.
+- Quando a manutenção é `RESOLVIDO`, o alerta também é resolvido.
+- Quando a manutenção é `ENCERRADO_SEM_SOLUCAO`, o alerta volta para `ATIVO`.
 
-### Predicao e Risco
+### Predição e Risco
 
-As rotas de predicao continuam as mesmas, mas o payload de `/maquinas/:id/predicao-alertas` agora inclui estado operacional explicito.
+As rotas de predição continuam as mesmas, mas o payload de `/maquinas/:id/predicao-alertas` agora inclui estado operacional explícito.
 
 Campos adicionados:
 
 - `estadoPredicao`: `PREVISAO_VALIDA`, `MANUTENCAO_IMEDIATA`, `FALHA_JA_CRUZADA`, `MODELO_INVALIDO_COM_RISCO` ou `SEM_DADOS`.
 - `fonteDecisao`: `REGRESSAO_LINEAR`, `HEURISTICA_CRITICA` ou `SEM_MODELO`.
 - `urgencia`: `BAIXA`, `MEDIA`, `ALTA` ou `IMEDIATA`.
-- `motivo`: codigo estavel explicando a decisao.
+- `motivo`: código estável explicando a decisão.
 - `modeloIntegridade`: inclui `pontosUsados`, `janelaHorasCoberta`, `ultimoPontoEm`, `r2` e `slope`.
 
-Campos antigos como `proximoAlerta`, `instabilidade`, `ausenciaProximoAlerta`, `ausenciaInstabilidade` e `modeloIntegridade` foram preservados. Quando a regressao nao e confiavel, o sistema nao inventa datas: ele retorna uma classificacao operacional com fallback heuristico.
+Campos antigos como `proximoAlerta`, `instabilidade`, `ausenciaProximoAlerta`, `ausenciaInstabilidade` e `modeloIntegridade` foram preservados. Quando a regressão não é confiável, o sistema não inventa datas: ele retorna uma classificação operacional com fallback heurístico.
 
 ### Dashboard e IA
 
 - `GET /dashboard/resumo` retorna indicadores operacionais para admins.
 - `POST /dashboard/ia/perguntar` permite perguntas em linguagem natural.
-- A IA usa tools internas para consultar contexto operacional, maquinas, alertas e relatorios.
-- Acoes de escrita passam por confirmacao/desambiguacao antes de executar.
-- Quando o provedor de IA ou alguma tool falha, o endpoint retorna fallback seguro com panorama basico.
+- A IA usa tools internas para consultar contexto operacional, máquinas, alertas e relatórios.
+- Ações de escrita passam por confirmação/desambiguação antes de executar.
+- Quando o provedor de IA ou alguma tool falha, o endpoint retorna fallback seguro com panorama básico.
 
-### Relatorios
+### Relatórios
 
-O dominio de relatorios suporta:
+O domínio de relatórios suporta:
 
-- Preview de relatorio.
+- Preview de relatório.
 - Envio imediato.
 - Agendamento.
-- Atualizacao de status.
-- Execucao manual de agendamento.
-- Consulta de execucoes.
-- Destinatarios por email e secoes configuraveis.
+- Atualização de status.
+- Execução manual de agendamento.
+- Consulta de execuções.
+- Destinatários por email e seções configuráveis.
 
 Principais rotas:
 
@@ -206,41 +206,41 @@ Principais rotas:
 - `POST /relatorios/agendamentos/:id/executar-agora`
 - `GET /relatorios/agendamentos/:id/execucoes`
 
-### Manual Tecnico da Maquina
+### Manual Técnico da Máquina
 
 - `POST /maquinas` pode receber um PDF no campo multipart `manual`.
-- `POST /maquinas/manual/preview` extrai especificacoes sem salvar arquivo nem alterar o banco.
-- `PUT /maquinas/:id/manual` cria ou substitui o manual de uma maquina existente.
-- O PDF e armazenado no bucket `machine-manuals`.
-- O retorno expoe `manual.especificacoes`, mas nao devolve texto extraido, chunks ou embeddings.
+- `POST /maquinas/manual/preview` extrai especificações sem salvar arquivo nem alterar o banco.
+- `PUT /maquinas/:id/manual` cria ou substitui o manual de uma máquina existente.
+- O PDF é armazenado no bucket `machine-manuals`.
+- O retorno expõe `manual.especificacoes`, mas não devolve texto extraído, chunks ou embeddings.
 
 ## Rotas
 
 ### Healthcheck
 
-| Metodo | Rota | Acesso |
+| Método | Rota | Acesso |
 |---|---|---|
-| GET | `/` | Publico |
-| GET | `/health` | Publico |
-| GET | `/ready` | Publico |
+| GET | `/` | Público |
+| GET | `/health` | Público |
+| GET | `/ready` | Público |
 
 ### Auth e Senha
 
-| Metodo | Rota | Acesso |
+| Método | Rota | Acesso |
 |---|---|---|
-| POST | `/auth/login` | Publico |
-| POST | `/auth/refresh` | Publico |
+| POST | `/auth/login` | Público |
+| POST | `/auth/refresh` | Público |
 | POST | `/auth/logout` | Autenticado |
 | DELETE | `/auth/logout-all` | Autenticado |
-| POST | `/senha/esqueci-senha` | Publico |
-| POST | `/senha/validar-codigo` | Publico |
-| POST | `/senha/redefinir-senha` | Publico |
+| POST | `/senha/esqueci-senha` | Público |
+| POST | `/senha/validar-codigo` | Público |
+| POST | `/senha/redefinir-senha` | Público |
 | POST | `/senha/solicitar-alteracao` | Autenticado |
 | POST | `/senha/confirmar-alteracao` | Autenticado |
 
-### Perfil e Usuarios
+### Perfil e Usuários
 
-| Metodo | Rota | Acesso |
+| Método | Rota | Acesso |
 |---|---|---|
 | GET | `/perfil` | Autenticado |
 | PUT | `/perfil` | Autenticado |
@@ -254,17 +254,17 @@ Principais rotas:
 | DELETE | `/usuarios/:id` | Admin |
 | PUT | `/usuarios/alterar-ativo` | Autenticado |
 
-### Tecnicos
+### Técnicos
 
-| Metodo | Rota | Acesso |
+| Método | Rota | Acesso |
 |---|---|---|
 | GET | `/tecnicos` | Autenticado |
 | GET | `/tecnicos/:id` | Autenticado |
 | GET | `/tecnicos/:id/alertas` | Autenticado |
 
-### Maquinas e Sensores
+### Máquinas e Sensores
 
-| Metodo | Rota | Acesso |
+| Método | Rota | Acesso |
 |---|---|---|
 | POST | `/maquinas` | Autenticado |
 | POST | `/maquinas/manual/preview` | Autenticado |
@@ -283,9 +283,9 @@ Principais rotas:
 | PUT | `/sensores/:id` | Autenticado |
 | DELETE | `/sensores/:id` | Autenticado |
 
-### Leituras, Historico, Alertas e Manutencoes
+### Leituras, Histórico, Alertas e Manutenções
 
-| Metodo | Rota | Acesso |
+| Método | Rota | Acesso |
 |---|---|---|
 | POST | `/leituras` | ESP32 API key |
 | GET | `/leituras` | Autenticado |
@@ -298,18 +298,18 @@ Principais rotas:
 | GET | `/alertas/:id` | Autenticado |
 | GET | `/alertas/:id/eventos` | Autenticado |
 | GET | `/manutencoes` | Admin |
-| POST | `/manutencoes` | Admin, Tecnico |
-| GET | `/manutencoes/alerta/:id` | Admin, Tecnico |
-| GET | `/manutencoes/:id` | Admin, Tecnico |
-| PUT | `/manutencoes/:id` | Tecnico |
+| POST | `/manutencoes` | Admin, Técnico |
+| GET | `/manutencoes/alerta/:id` | Admin, Técnico |
+| GET | `/manutencoes/:id` | Admin, Técnico |
+| PUT | `/manutencoes/:id` | Técnico |
 
-### Dashboard, IA, Email e Relatorios
+### Dashboard, IA, Email e Relatórios
 
-| Metodo | Rota | Acesso |
+| Método | Rota | Acesso |
 |---|---|---|
 | GET | `/dashboard/resumo` | Admin |
 | POST | `/dashboard/ia/perguntar` | Autenticado |
-| POST | `/email` | Publico com rate limit |
+| POST | `/email` | Público com rate limit |
 | POST | `/relatorios/preview` | Autenticado |
 | POST | `/relatorios/enviar-agora` | Autenticado |
 | POST | `/relatorios/agendamentos` | Autenticado |
@@ -327,30 +327,30 @@ Principais rotas:
 
 - Campo multipart esperado: `imagem`.
 - Formatos aceitos: `image/png`, `image/jpg`, `image/jpeg`, `image/webp`.
-- Tamanho maximo: `15 MB`.
-- A imagem e convertida para `webp`.
+- Tamanho máximo: `15 MB`.
+- A imagem é convertida para `webp`.
 
 ### Manuais
 
 - Campo multipart esperado: `manual`.
 - Formato aceito: `application/pdf`.
-- Tamanho maximo: `25 MB`.
-- No cadastro de maquina, envie os dados da maquina e o PDF no mesmo `multipart/form-data`.
+- Tamanho máximo: `25 MB`.
+- No cadastro de máquina, envie os dados da máquina e o PDF no mesmo `multipart/form-data`.
 
-## Jobs e Integracoes
+## Jobs e Integrações
 
-Ao iniciar o servidor, a aplicacao carrega:
+Ao iniciar o servidor, a aplicação carrega:
 
 - `tendenciaJob`
 - `relatorioJob`
 - `limpezaJob`
 - `sensorOfflineJob`
 - `simuladorJob`, quando habilitado por ambiente
-- Conexao MQTT, quando configurada
+- Conexão MQTT, quando configurada
 
 ## Testes
 
-A suite automatizada roda com:
+A suíte automatizada roda com:
 
 ```bash
 npm test
@@ -361,15 +361,15 @@ npm run smoke:health
 npm run ci:local
 ```
 
-Ela cobre controllers, middlewares, contratos HTTP de rotas principais, services, tools de IA, relatorios, templates, predicao, validacoes de sensores e fluxos criticos de dashboard/confirmacao.
+Ela cobre controllers, middlewares, contratos HTTP de rotas principais, services, tools de IA, relatórios, templates, predição, validações de sensores e fluxos críticos de dashboard/confirmação.
 
-Os testes ficam separados do codigo de producao em `tests/`:
+Os testes ficam separados do código de produção em `tests/`:
 
 - `tests/unit/<area>` espelha as principais pastas de `src/`, como `controllers`, `services`, `routes`, `models` e `utils`.
-- `tests/integration` concentra cenarios que podem usar banco real de teste.
-- `tests/ci` valida contratos do pipeline, como gatilhos, Postgres descartavel e smoke/deploy opcionais.
+- `tests/integration` concentra cenários que podem usar banco real de teste.
+- `tests/ci` valida contratos do pipeline, como gatilhos, Postgres descartável e smoke/deploy opcionais.
 
-Os testes de integracao rodam em uma suite separada e exigem `NODE_ENV=TEST` com `DATABASE_URL` apontando para banco seguro/de teste.
+Os testes de integração rodam em uma suíte separada e exigem `NODE_ENV=TEST` com `DATABASE_URL` apontando para banco seguro/de teste.
 
 O smoke test exige `SMOKE_BASE_URL` ou uma URL base como argumento:
 
@@ -379,32 +379,32 @@ npm run smoke:health -- https://sua-api.onrender.com
 
 ## CI/CD
 
-O reposititorio possui workflow em `.github/workflows/ci-cd.yml`.
+O repositório possui workflow em `.github/workflows/ci-cd.yml`.
 
-- Em pull requests para `main`, o pipeline instala dependencias, gera o Prisma Client e roda `npm run test:ci`.
-- O pipeline sobe um Postgres descartavel, aplica `npx prisma db push --skip-generate` e roda `npm run test:integration`.
-- O workflow tambem pode ser disparado manualmente pelo GitHub Actions.
-- Em push para `main`, apos os testes, o workflow tenta disparar deploy no Render via secret `RENDER_DEPLOY_HOOK_URL`.
-- Se o secret `SMOKE_BASE_URL` estiver configurado, o workflow aguarda brevemente e valida `/health` e `/ready` apos o deploy.
-- Se o secret nao estiver configurado, a etapa de deploy e pulada sem falhar o pipeline.
+- Em pull requests para `main`, o pipeline instala dependências, gera o Prisma Client e roda `npm run test:ci`.
+- O pipeline sobe um Postgres descartável, aplica `npx prisma db push --skip-generate` e roda `npm run test:integration`.
+- O workflow também pode ser disparado manualmente pelo GitHub Actions.
+- Em push para `main`, após os testes, o workflow tenta disparar deploy no Render via secret `RENDER_DEPLOY_HOOK_URL`.
+- Se o secret `SMOKE_BASE_URL` estiver configurado, o workflow aguarda brevemente e valida `/health` e `/ready` após o deploy.
+- Se o secret não estiver configurado, a etapa de deploy é pulada sem falhar o pipeline.
 
-Veja tambem [docs/ci-cd-runbook.md](docs/ci-cd-runbook.md).
+Veja também [docs/ci-cd-runbook.md](docs/ci-cd-runbook.md).
 
 ## Insomnia
 
-As colecoes e ambientes de teste ficam em `docs/insomnia`.
+As coleções e ambientes de teste ficam em `docs/insomnia`.
 
-Arquivos uteis:
+Arquivos úteis:
 
-- `orbis-unified-environment.json`: ambiente unificado com variaveis compartilhadas.
+- `orbis-unified-environment.json`: ambiente unificado com variáveis compartilhadas.
 - `orbis-smoke-final-insomnia.json`: smoke tests finais de rotas principais.
-- `orbis-predicao-alertas-insomnia.json`: testes focados em predicao.
+- `orbis-predicao-alertas-insomnia.json`: testes focados em predição.
 - `orbis-ai-insomnia.json` e `orbis-ai-confirmacoes-insomnia.json`: testes do assistente de IA.
-- `orbis-relatorios-insomnia.json`: testes de relatorios.
+- `orbis-relatorios-insomnia.json`: testes de relatórios.
 
-## Observacoes
+## Observações
 
 - O bootstrap executa `validarEnv()` para impedir subida com ambiente incompleto.
-- `GET /ready` valida dependencias importantes e pode retornar `503` quando o servico nao estiver pronto.
-- Mudancas recentes de contrato foram aditivas, principalmente em `/maquinas/:id/predicao-alertas`.
-- Estados heuristicos de predicao podem nao ter data de manutencao, mas sempre retornam motivo e urgencia operacional.
+- `GET /ready` valida dependências importantes e pode retornar `503` quando o serviço não estiver pronto.
+- Mudanças recentes de contrato foram aditivas, principalmente em `/maquinas/:id/predicao-alertas`.
+- Estados heurísticos de predição podem não ter data de manutenção, mas sempre retornam motivo e urgência operacional.
