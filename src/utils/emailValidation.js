@@ -17,9 +17,11 @@ function normalizeEmails(input) {
 }
 
 function validateContatoPayload({ nome, email, assunto, mensagem }) {
+  const rawEmail = String(email ?? "");
+  const rawAssunto = String(assunto ?? "");
   const nomeSan = cleanText(nome);
-  const emailSan = cleanText(email).toLowerCase();
-  const assuntoSan = cleanText(assunto);
+  const emailSan = cleanText(rawEmail).toLowerCase();
+  const assuntoSan = cleanText(rawAssunto);
   const mensagemSan = String(mensagem || "").trim();
 
   if (nomeSan.length < 2 || nomeSan.length > 80) throw new AppError("Nome invalido.", 400);
@@ -27,7 +29,7 @@ function validateContatoPayload({ nome, email, assunto, mensagem }) {
   if (assuntoSan.length < 3 || assuntoSan.length > 140) throw new AppError("Assunto invalido.", 400);
   if (mensagemSan.length < 10 || mensagemSan.length > 3000) throw new AppError("Mensagem invalida.", 400);
 
-  if (/[\r\n]/.test(emailSan) || /[\r\n]/.test(assuntoSan)) {
+  if (/[\r\n]/.test(rawEmail) || /[\r\n]/.test(rawAssunto)) {
     throw new AppError("Dados invalidos.", 400);
   }
 
