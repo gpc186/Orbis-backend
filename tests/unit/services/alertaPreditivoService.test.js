@@ -1,10 +1,10 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const AlertaModel = require("../models/alertaModel");
-const HistoricoIntegridadeModel = require("../models/historicoIntegridadeModel");
-const PredicaoService = require("./predicaoService");
-const AlertaPreditivoService = require("./alertaPreditivoService");
+const AlertaModel = require("../../../src/models/alertaModel");
+const HistoricoIntegridadeModel = require("../../../src/models/historicoIntegridadeModel");
+const PredicaoService = require("../../../src/services/predicaoService");
+const AlertaPreditivoService = require("../../../src/services/alertaPreditivoService");
 
 function createModelResult({
   r2 = 0.84,

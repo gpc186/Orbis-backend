@@ -1,0 +1,113 @@
+name: CI/CD
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: orbis
+          POSTGRES_PASSWORD: orbis
+          POSTGRES_DB: orbis_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orbis -d orbis_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://orbis:orbis@localhost:5432/orbis_test
+      JWT_SECRET: ci-test-secret
+      JWT_EXPIRES_IN: 30m
+      REFRESH_TOKEN_EXPIRES_IN_DAYS: 7
+      SUPABASE_URL: https://example.supabase.co
+      SUPABASE_SERVICE_ROLE: ci-test-service-role
+      GROQ_API_KEY: ci-test-groq-key
+      GROQ_MODEL: llama-3.3-70b-versatile
+      GEMINI_API_KEY: ci-test-gemini-key
+      EMBEDDING_PROVIDER: gemini
+      GEMINI_EMBEDDING_MODEL: gemini-embedding-001
+      GEMINI_EMBEDDING_BATCH_SIZE: 10
+      GEMINI_EMBEDDING_DIMENSIONS: 768
+      ESP32_API_KEY: ci-test-esp32-key
+      SENSOR_OFFLINE_JOB_ENABLED: false
+      SIMULADOR_JOB_ATIVO: false
+      REPORT_JOB_ENABLED: false
+      NODE_ENV: TEST
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Push Prisma schema
+        run: npx prisma db push --skip-generate
+
+      - name: Run tests and coverage
+        run: npm run test:ci
+
+      - name: Run integration tests
+        run: npm run test:integration
+
+  deploy-render:
+    name: Deploy Render
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Trigger Render deploy hook
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "RENDER_DEPLOY_HOOK_URL not configured. Skipping Render deploy."
+            exit 0
+          fi
+
+          curl --fail --request POST "$RENDER_DEPLOY_HOOK_URL"
+
+      - name: Run optional post-deploy smoke test
+        env:
+          SMOKE_BASE_URL: ${{ secrets.SMOKE_BASE_URL }}
+        run: |
+          if [ -z "$SMOKE_BASE_URL" ]; then
+            echo "SMOKE_BASE_URL not configured. Skipping smoke test."
+            exit 0
+          fi
+
+          sleep 60
+          npm run smoke:health

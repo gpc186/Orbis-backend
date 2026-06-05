@@ -1,10 +1,10 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const MaquinaModel = require("../models/maquinaModel");
-const HistoricoIntegridadeModel = require("../models/historicoIntegridadeModel");
-const PredicaoRiscoService = require("./predicaoRiscoService");
-const PredicaoService = require("./predicaoService");
+const MaquinaModel = require("../../../src/models/maquinaModel");
+const HistoricoIntegridadeModel = require("../../../src/models/historicoIntegridadeModel");
+const PredicaoRiscoService = require("../../../src/services/predicaoRiscoService");
+const PredicaoService = require("../../../src/services/predicaoService");
 
 const RealDate = Date;
 

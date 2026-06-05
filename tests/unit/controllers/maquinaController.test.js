@@ -1,8 +1,8 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const MaquinaController = require("./maquinaController");
-const MaquinaService = require("../services/maquinaService");
+const MaquinaController = require("../../../src/controllers/maquinaController");
+const MaquinaService = require("../../../src/services/maquinaService");
 
 test("predicaoAlertas responde com o payload retornado pelo servico", async () => {
   const originalGetPredicaoAlertas = MaquinaService.getPredicaoAlertas;

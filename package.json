@@ -4,7 +4,12 @@
   "description": "",
   "main": "src/server.js",
   "scripts": {
-    "test": "node --test --experimental-test-isolation=none src/services/*.test.js src/services/aiTools/*.test.js src/templates/*.test.js",
+    "test": "node --test --experimental-test-isolation=none \"tests/ci/*.test.js\" \"tests/unit/**/*.test.js\"",
+    "test:coverage": "node --test --experimental-test-isolation=none --experimental-test-coverage \"tests/ci/*.test.js\" \"tests/unit/**/*.test.js\"",
+    "test:ci": "npm test && npm run test:coverage",
+    "test:integration": "node --test --experimental-test-isolation=none \"tests/integration/*.integration.test.js\"",
+    "smoke:health": "node scripts/smoke-health.js",
+    "ci:local": "npx prisma validate && npm run test:ci && npm run test:integration",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "simulador": "node src/simulador.js"

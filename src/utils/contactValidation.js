@@ -6,9 +6,11 @@ function cleanText(v = "") {
 }
 
 function validateContactPayload(body = {}) {
+  const rawEmail = String(body.email ?? "");
+  const rawAssunto = String(body.assunto ?? "");
   const nome = cleanText(body.nome);
-  const email = cleanText(body.email).toLowerCase();
-  const assunto = cleanText(body.assunto);
+  const email = cleanText(rawEmail).toLowerCase();
+  const assunto = cleanText(rawAssunto);
   const mensagem = cleanText(body.mensagem);
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -21,7 +23,7 @@ function validateContactPayload(body = {}) {
     return { ok: false, status: 400, message: "Email inválido." };
   }
 
-  if (/[\r\n]/.test(email) || /[\r\n]/.test(assunto)) {
+  if (/[\r\n]/.test(rawEmail) || /[\r\n]/.test(rawAssunto)) {
     return { ok: false, status: 400, message: "Dados inválidos." };
   }
 

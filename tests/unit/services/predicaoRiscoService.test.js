@@ -1,8 +1,8 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const FeatureEngineeringService = require("./featureEngineeringService");
-const PredicaoRiscoService = require("./predicaoRiscoService");
+const FeatureEngineeringService = require("../../../src/services/featureEngineeringService");
+const PredicaoRiscoService = require("../../../src/services/predicaoRiscoService");
 
 function createContext(overrides = {}) {
   return {

@@ -1,16 +1,16 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const UsuarioService = require("../usuarioService");
-const SensorService = require("../sensorService");
-const AlertaService = require("../alertaService");
-const MaquinaService = require("../maquinaService");
-const ManutecaoService = require("../manutencaoService");
-const DashboardService = require("../dashboardService");
-const RelatorioAgendamentoService = require("../relatorioAgendamentoService");
-const RelatorioExecucaoService = require("../relatorioExecucaoService");
-const AppError = require("../../utils/appErrorUtils");
-const { executeTool, prepareWriteToolAction, executeWriteTool } = require("./registry");
+const UsuarioService = require("../../../../src/services/usuarioService");
+const SensorService = require("../../../../src/services/sensorService");
+const AlertaService = require("../../../../src/services/alertaService");
+const MaquinaService = require("../../../../src/services/maquinaService");
+const ManutecaoService = require("../../../../src/services/manutencaoService");
+const DashboardService = require("../../../../src/services/dashboardService");
+const RelatorioAgendamentoService = require("../../../../src/services/relatorioAgendamentoService");
+const RelatorioExecucaoService = require("../../../../src/services/relatorioExecucaoService");
+const AppError = require("../../../../src/utils/appErrorUtils");
+const { executeTool, prepareWriteToolAction, executeWriteTool } = require("../../../../src/services/aiTools/registry");
 
 const admin = { id: 1, role: "ADMIN" };
 

@@ -1,33 +1,125 @@
 const RelatorioReadModel = require("../models/relatorioReadModel");
 const RelatorioPayloadMapper = require("../mappers/relatorioPayloadMapper");
+const { REPORT_TIMEZONE } = require("../utils/reportScheduleUtils");
+
+function toNumberMap(parts) {
+  return parts.reduce((acc, part) => {
+    if (part.type !== "literal") {
+      acc[part.type] = Number(part.value);
+    }
+    return acc;
+  }, {});
+}
+
+const reportDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: REPORT_TIMEZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit"
+});
+
+const reportDateTimeFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: REPORT_TIMEZONE,
+  hourCycle: "h23",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit"
+});
+
+const publicDateFormatter = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: REPORT_TIMEZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit"
+});
+
+function toUtcDate(parts) {
+  return new Date(Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour || 0,
+    parts.minute || 0,
+    parts.second || 0,
+    0
+  ));
+}
+
+function getReportDateParts(date = new Date()) {
+  const value = date instanceof Date ? date : new Date(date);
+  return toNumberMap(reportDateFormatter.formatToParts(value));
+}
+
+function getReportDateTimeParts(date = new Date()) {
+  const value = date instanceof Date ? date : new Date(date);
+  return toNumberMap(reportDateTimeFormatter.formatToParts(value));
+}
+
+function zonedDateTimeToUtc(parts) {
+  let guess = toUtcDate(parts);
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const zoned = getReportDateTimeParts(guess);
+    const diffMs = toUtcDate(parts).getTime() - toUtcDate(zoned).getTime();
+
+    if (diffMs === 0) {
+      return new Date(guess.getTime() + (parts.millisecond || 0));
+    }
+
+    guess = new Date(guess.getTime() + diffMs);
+  }
+
+  return new Date(guess.getTime() + (parts.millisecond || 0));
+}
+
+function addDaysToReportDate(localDate, days) {
+  const date = new Date(Date.UTC(localDate.year, localDate.month - 1, localDate.day + days));
+
+  return {
+    year: date.getUTCFullYear(),
+    month: date.getUTCMonth() + 1,
+    day: date.getUTCDate()
+  };
+}
+
+function startOfReportDay(date) {
+  const parts = getReportDateParts(date);
+  return zonedDateTimeToUtc({ ...parts, hour: 0, minute: 0, second: 0, millisecond: 0 });
+}
+
+function endOfReportDay(date) {
+  const parts = getReportDateParts(date);
+  return zonedDateTimeToUtc({ ...parts, hour: 23, minute: 59, second: 59, millisecond: 999 });
+}
+
+function formatReportDateLabel(date) {
+  return publicDateFormatter.format(date);
+}
 
 class RelatorioDataService {
   static resolveDateRange(periodo) {
     if (periodo.tipo === "RELATIVE_DAYS") {
       const valor = Number(periodo.valor || 30);
-      const end = new Date();
-      end.setHours(23, 59, 59, 999);
-
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      start.setDate(start.getDate() - (valor - 1));
+      const endParts = getReportDateParts(new Date());
+      const startParts = addDaysToReportDate(endParts, -(valor - 1));
 
       return {
-        start,
-        end,
+        start: zonedDateTimeToUtc({ ...startParts, hour: 0, minute: 0, second: 0, millisecond: 0 }),
+        end: zonedDateTimeToUtc({ ...endParts, hour: 23, minute: 59, second: 59, millisecond: 999 }),
         label: `${valor} dias`
       };
     }
 
-    const start = new Date(periodo.inicio);
-    const end = new Date(periodo.fim);
-    start.setHours(0, 0, 0, 0);
-    end.setHours(23, 59, 59, 999);
+    const start = startOfReportDay(periodo.inicio);
+    const end = endOfReportDay(periodo.fim);
 
     return {
       start,
       end,
-      label: `${start.toLocaleDateString("pt-BR")} ate ${end.toLocaleDateString("pt-BR")}`
+      label: `${formatReportDateLabel(start)} ate ${formatReportDateLabel(end)}`
     };
   }
 
