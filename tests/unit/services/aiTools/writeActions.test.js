@@ -1,12 +1,12 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const AppError = require("../../utils/appErrorUtils");
-const RelatorioExecucaoService = require("../relatorioExecucaoService");
+const AppError = require("../../../../src/utils/appErrorUtils");
+const RelatorioExecucaoService = require("../../../../src/services/relatorioExecucaoService");
 const {
   prepareWriteToolAction,
   executeWriteTool
-} = require("./writeActions");
+} = require("../../../../src/services/aiTools/writeActions");
 
 test("prepareWriteToolAction valida payload e normaliza destinatarios para enviar_relatorio_agora", async () => {
   const action = await prepareWriteToolAction({

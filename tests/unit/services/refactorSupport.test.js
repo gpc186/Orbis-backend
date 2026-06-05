@@ -1,16 +1,16 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const AppError = require("../utils/appErrorUtils");
-const { assertRole } = require("../utils/authorization");
+const AppError = require("../../../src/utils/appErrorUtils");
+const { assertRole } = require("../../../src/utils/authorization");
 const {
   normalizeLimit,
   parseFiniteNumber,
   parseIntegerId,
   parseBooleanLike
-} = require("../utils/requestParsers");
-const { validateDestinatarios } = require("../utils/reportValidation");
-const { buildConfirmationSummaryText } = require("./dashboardAiConfirmationPresenter");
+} = require("../../../src/utils/requestParsers");
+const { validateDestinatarios } = require("../../../src/utils/reportValidation");
+const { buildConfirmationSummaryText } = require("../../../src/services/dashboardAiConfirmationPresenter");
 
 test("assertRole permite role valida e bloqueia role invalida com mensagem customizada", async () => {
   assert.doesNotThrow(() => {

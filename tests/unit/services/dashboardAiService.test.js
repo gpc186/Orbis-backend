@@ -1,12 +1,12 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const DashboardAiService = require("./dashboardAiService");
-const GroqService = require("./groqService");
-const UsuarioService = require("./usuarioService");
-const AiToolsRegistry = require("./aiTools/registry");
-const AiConfirmationService = require("./aiConfirmationService");
-const AppError = require("../utils/appErrorUtils");
+const DashboardAiService = require("../../../src/services/dashboardAiService");
+const GroqService = require("../../../src/services/groqService");
+const UsuarioService = require("../../../src/services/usuarioService");
+const AiToolsRegistry = require("../../../src/services/aiTools/registry");
+const AiConfirmationService = require("../../../src/services/aiConfirmationService");
+const AppError = require("../../../src/utils/appErrorUtils");
 
 test("DashboardAiService faz fallback quando a resposta final da tool volta sem texto", async () => {
   const originalBuildContext = DashboardAiService.buildContext;
