@@ -17,9 +17,12 @@ const CICLOS_ATE_DEGRADACAO_MAXIMA = Math.max(
   1,
   Math.ceil((DEGRADACAO_HORAS * 60 * 60 * 1000) / INTERVALO_MS)
 );
-const CICLOS_ESTAVEIS_INICIAIS = 5;
+const ruidoPercentualConfigurado = Number(process.env.SIMULADOR_RUIDO_PERCENTUAL);
+const RUIDO_PERCENTUAL = Number.isFinite(ruidoPercentualConfigurado) && ruidoPercentualConfigurado >= 0
+  ? ruidoPercentualConfigurado
+  : 0.01;
 
-const sensoresEmSimulacao = new Map();
+const maquinasEmSimulacao = new Map();
 let cicloEmAndamento = false;
 let ioServer = null;
 let jobAgendado = null;
@@ -53,79 +56,47 @@ function limitar(valor, minimo, maximo) {
   return Math.min(Math.max(valor, minimo), maximo);
 }
 
-function escolherItemAleatorio(itens) {
-  return itens[Math.floor(Math.random() * itens.length)];
-}
-
-function calcularFaixaSegura(sensor, campoIdeal, campoLimite, campoDesvio) {
+function calcularFaixaDegradacao(sensor, campoIdeal, campoLimite) {
   const ideal = Number(sensor[campoIdeal]);
   const limite = Number(sensor[campoLimite]);
-  const desvioMaximo = Number(sensor[campoDesvio]);
   const idealSeguro = Number.isFinite(ideal) ? ideal : 0;
-  const distanciaAteLimite = Number.isFinite(limite) && limite > idealSeguro
-    ? limite - idealSeguro
-    : Number.POSITIVE_INFINITY;
-  const distanciaAteDesvio = Number.isFinite(desvioMaximo) && desvioMaximo > 0
-    ? desvioMaximo
-    : distanciaAteLimite;
-  const margemSegura = Math.min(distanciaAteLimite, distanciaAteDesvio) * 0.7;
+  const limiteSeguro = Number.isFinite(limite) && limite > idealSeguro
+    ? limite
+    : idealSeguro;
 
   return {
     ideal: idealSeguro,
-    maximoSeguro: idealSeguro + (Number.isFinite(margemSegura) ? margemSegura : 0)
+    limite: limiteSeguro,
+    amplitude: Math.max(limiteSeguro - idealSeguro, 0)
   };
 }
 
-function gerarValorEstavelComDegradacao(sensor, estado, configuracao) {
-  const { ideal, maximoSeguro } = calcularFaixaSegura(
+function gerarValorLinearComDegradacao(sensor, estadoMaquina, configuracao) {
+  const { ideal, limite, amplitude } = calcularFaixaDegradacao(
     sensor,
     configuracao.campoIdeal,
-    configuracao.campoLimite,
-    configuracao.campoDesvio
+    configuracao.campoLimite
   );
-  const faixaSegura = Math.max(maximoSeguro - ideal, 0);
-  const ciclosDegradando = Math.max(0, estado.ciclos - CICLOS_ESTAVEIS_INICIAIS);
-  const progresso = limitar(ciclosDegradando / CICLOS_ATE_DEGRADACAO_MAXIMA, 0, 1);
-  const degradacao = faixaSegura * progresso;
-  const ruidoPercentual = estado.ciclos < CICLOS_ESTAVEIS_INICIAIS
-    ? configuracao.ruidoPercentualInicial
-    : configuracao.ruidoPercentual;
-  const ruidoMinimo = estado.ciclos < CICLOS_ESTAVEIS_INICIAIS
-    ? configuracao.ruidoMinimoInicial
-    : configuracao.ruidoMinimo;
-  const ruidoCalculado = Math.max(faixaSegura * ruidoPercentual, ruidoMinimo);
-  const ruidoMaximo = faixaSegura > 0
-    ? Math.min(ruidoCalculado, faixaSegura * 0.2)
-    : 0;
+  const progresso = limitar(estadoMaquina.ciclos / CICLOS_ATE_DEGRADACAO_MAXIMA, 0, 1);
+  const degradacao = amplitude * progresso;
+  const ruidoMaximo = amplitude * RUIDO_PERCENTUAL;
   const ruido = numeroAleatorioEntre(-ruidoMaximo, ruidoMaximo);
   const valor = ideal + degradacao + ruido;
-  const minimoSeguro = Math.max(0, ideal - ruidoMaximo);
 
-  return arredondar(limitar(valor, minimoSeguro, maximoSeguro));
+  return arredondar(limitar(valor, ideal, limite));
 }
 
-function gerarLeitura(estado) {
-  const sensor = estado.sensor;
+function gerarLeitura(sensor, estadoMaquina) {
 
   return {
     sensorId: sensor.id,
-    temperatura: gerarValorEstavelComDegradacao(sensor, estado, {
+    temperatura: gerarValorLinearComDegradacao(sensor, estadoMaquina, {
       campoIdeal: "idealTemperatura",
-      campoLimite: "limiteTemperatura",
-      campoDesvio: "desvioMaximoTemp",
-      ruidoPercentual: 0.04,
-      ruidoMinimo: 0.15,
-      ruidoPercentualInicial: 0.005,
-      ruidoMinimoInicial: 0
+      campoLimite: "limiteTemperatura"
     }),
-    vibracao: gerarValorEstavelComDegradacao(sensor, estado, {
+    vibracao: gerarValorLinearComDegradacao(sensor, estadoMaquina, {
       campoIdeal: "idealVibracao",
-      campoLimite: "limiteVibracao",
-      campoDesvio: "desvioMaximoVibra",
-      ruidoPercentual: 0.04,
-      ruidoMinimo: 0.03,
-      ruidoPercentualInicial: 0.005,
-      ruidoMinimoInicial: 0
+      campoLimite: "limiteVibracao"
     })
   };
 }
@@ -173,39 +144,42 @@ async function buscarSensoresDisponiveis() {
 
 async function atualizarSensoresEmSimulacao() {
   const sensoresDisponiveis = await buscarSensoresDisponiveis();
+  const maquinasAtualizadas = new Map();
 
   for (const sensor of sensoresDisponiveis) {
-    if (!sensoresEmSimulacao.has(sensor.id)) {
-      sensoresEmSimulacao.set(sensor.id, {
-        sensor,
-        ciclos: 0
+    if (!maquinasAtualizadas.has(sensor.maquinaId)) {
+      const estadoAnterior = maquinasEmSimulacao.get(sensor.maquinaId);
+      maquinasAtualizadas.set(sensor.maquinaId, {
+        maquina: sensor.maquina,
+        ciclos: estadoAnterior?.ciclos ?? 0,
+        sensores: []
       });
+    }
 
-      logger.info("simulador_sensor_added", {
-        sensorId: sensor.id,
-        maquinaId: sensor.maquinaId,
-        maquinaNome: sensor.maquina?.nome ?? null
+    maquinasAtualizadas.get(sensor.maquinaId).sensores.push(sensor);
+  }
+
+  for (const [maquinaId, estado] of maquinasAtualizadas.entries()) {
+    if (!maquinasEmSimulacao.has(maquinaId)) {
+      logger.info("simulador_maquina_added", {
+        maquinaId,
+        maquinaNome: estado.maquina?.nome ?? null,
+        sensores: estado.sensores.length
       });
-    } else {
-      sensoresEmSimulacao.get(sensor.id).sensor = sensor;
     }
   }
 
-  for (const sensorId of sensoresEmSimulacao.keys()) {
-    if (!sensoresDisponiveis.some((sensor) => sensor.id === sensorId)) {
-      sensoresEmSimulacao.delete(sensorId);
-    }
+  maquinasEmSimulacao.clear();
+  for (const [maquinaId, estado] of maquinasAtualizadas.entries()) {
+    maquinasEmSimulacao.set(maquinaId, estado);
   }
 
   return sensoresDisponiveis.length;
 }
 
-async function processarLeituraSimulada(estado, forcarAlerta = false) {
-  const sensor = estado.sensor;
-  const dadosLeitura = forcarAlerta ? gerarLeituraComAlerta(sensor) : gerarLeitura(estado);
+async function processarLeituraSimulada(sensor, estadoMaquina, forcarAlerta = false) {
+  const dadosLeitura = forcarAlerta ? gerarLeituraComAlerta(sensor) : gerarLeitura(sensor, estadoMaquina);
   const novaLeitura = await leituraService.processarNovaLeitura(dadosLeitura);
-
-  estado.ciclos += 1;
 
   if (ioServer) {
     ioServer.emit("nova-leitura", novaLeitura);
@@ -219,6 +193,29 @@ async function processarLeituraSimulada(estado, forcarAlerta = false) {
     temperatura: dadosLeitura.temperatura,
     vibracao: dadosLeitura.vibracao
   });
+
+  return novaLeitura;
+}
+
+async function processarMaquinaSimulada(estadoMaquina, forcarAlerta = false) {
+  let leiturasGeradas = 0;
+
+  for (const sensor of estadoMaquina.sensores) {
+    try {
+      await processarLeituraSimulada(sensor, estadoMaquina, forcarAlerta);
+      leiturasGeradas += 1;
+    } catch (error) {
+      logger.error("simulador_sensor_processing_error", {
+        sensorId: sensor.id,
+        maquinaId: sensor.maquinaId,
+        maquinaNome: sensor.maquina?.nome ?? null,
+        error
+      });
+    }
+  }
+
+  estadoMaquina.ciclos += 1;
+  return leiturasGeradas;
 }
 
 async function simularCiclo() {
@@ -244,7 +241,7 @@ async function simularCiclo() {
 
     const sensoresDisponiveis = await atualizarSensoresEmSimulacao();
 
-    if (sensoresEmSimulacao.size === 0) {
+    if (maquinasEmSimulacao.size === 0) {
       logger.info("simulador_cycle_finished", {
         sensoresDisponiveis,
         leiturasGeradas: 0,
@@ -254,24 +251,16 @@ async function simularCiclo() {
     }
 
     let leiturasGeradas = 0;
-    const estadoAleatorio = escolherItemAleatorio([...sensoresEmSimulacao.values()]);
+    const estadosMaquinas = [...maquinasEmSimulacao.values()];
 
-    try {
-      await processarLeituraSimulada(estadoAleatorio, deveForcarAlertas());
-      leiturasGeradas += 1;
-    } catch (error) {
-      logger.error("simulador_sensor_processing_error", {
-        sensorId: estadoAleatorio.sensor.id,
-        maquinaId: estadoAleatorio.sensor.maquinaId,
-        maquinaNome: estadoAleatorio.sensor.maquina?.nome ?? null,
-        error
-      });
+    for (const estadoMaquina of estadosMaquinas) {
+      leiturasGeradas += await processarMaquinaSimulada(estadoMaquina, deveForcarAlertas());
     }
 
     logger.info("simulador_cycle_finished", {
       sensoresDisponiveis,
       leiturasGeradas,
-      sensorAleatorioId: estadoAleatorio.sensor.id,
+      maquinasSimuladas: estadosMaquinas.length,
       forcarAlertas: deveForcarAlertas(),
       durationMs: Date.now() - startedAt
     });
@@ -312,5 +301,10 @@ function iniciarSimuladorJob(io) {
 
 module.exports = {
   iniciarSimuladorJob,
-  simularCiclo
+  simularCiclo,
+  _internals: {
+    atualizarSensoresEmSimulacao,
+    gerarLeitura,
+    maquinasEmSimulacao
+  }
 };

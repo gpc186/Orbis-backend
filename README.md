@@ -99,6 +99,8 @@ SENSOR_OFFLINE_JOB_ENABLED=true
 SENSOR_OFFLINE_INTERVAL_SECONDS=60
 SIMULADOR_JOB_ATIVO=false
 SIMULADOR_INTERVALO_MS=5000
+SIMULADOR_DEGRADACAO_HORAS=24
+SIMULADOR_RUIDO_PERCENTUAL=0.01
 
 PREDICAO_MIN_PONTOS_REGRESSAO=3
 PREDICAO_MIN_JANELA_REGRESSAO_HORAS=0.05
@@ -365,6 +367,10 @@ Ao iniciar o servidor, a aplicação carrega:
 - `sensorOfflineJob`
 - `simuladorJob`, quando habilitado por ambiente
 - Conexão MQTT, quando configurada
+
+O `simuladorJob` degrada cada máquina linearmente ao longo do tempo, gerando leituras para todos os sensores ativos da máquina em cada ciclo.
+A curva usa as specs de cada sensor: `idealTemperatura -> limiteTemperatura` e `idealVibracao -> limiteVibracao`.
+`SIMULADOR_DEGRADACAO_HORAS` controla em quantas horas a leitura chega do ideal ao limite, e `SIMULADOR_RUIDO_PERCENTUAL` adiciona uma pequena variação percentual sobre a amplitude.
 
 ## Testes
 
