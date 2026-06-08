@@ -364,6 +364,30 @@ test("PUT /perfil/foto aceita multipart imagem e chama update de foto", async ()
   });
 });
 
+test("DELETE /perfil/foto remove foto do usuario autenticado", async () => {
+  mockAuthenticatedUsers();
+
+  patch(PerfilService, "deleteFotoPerfil", async ({ usuarioId }) => ({
+    id: usuarioId,
+    fotoPerfil: null,
+    caminhoFoto: null
+  }));
+
+  await withServer(async (baseUrl) => {
+    const response = await request(baseUrl, "/perfil/foto", {
+      method: "DELETE",
+      token: tokenFor({ id: 2, role: "TECNICO" })
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.json, {
+      id: 2,
+      fotoPerfil: null,
+      caminhoFoto: null
+    });
+  });
+});
+
 test("GET /maquinas retorna lista sanitizada para usuario autenticado", async () => {
   mockAuthenticatedUsers();
 

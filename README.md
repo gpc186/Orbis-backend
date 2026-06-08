@@ -245,6 +245,7 @@ Principais rotas:
 | GET | `/perfil` | Autenticado |
 | PUT | `/perfil` | Autenticado |
 | PUT | `/perfil/foto` | Autenticado |
+| DELETE | `/perfil/foto` | Autenticado |
 | POST | `/perfil/device-token` | Autenticado |
 | POST | `/perfil/push-teste` | Autenticado |
 | GET | `/usuarios` | Autenticado |

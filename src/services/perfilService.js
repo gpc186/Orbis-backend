@@ -2,6 +2,7 @@ const UsuarioModel = require("../models/usuarioModel");
 const AppError = require("../utils/appErrorUtils");
 const OneSignalService = require("./oneSignalService");
 const StorageService = require("./storageService");
+const logger = require("../utils/logger");
 
 class PerfilService {
     static async findPerfil(id) {
@@ -102,6 +103,38 @@ class PerfilService {
             }
             throw error;
         }
+    }
+
+    static async deleteFotoPerfil({ usuarioId }) {
+        const usuario = await UsuarioModel.findById(usuarioId);
+
+        if (!usuario) {
+            throw new AppError("Usuario não encontrado!", 404);
+        };
+
+        if (!usuario.fotoPerfil && !usuario.caminhoFoto) {
+            return usuario;
+        }
+
+        const caminhoFoto = usuario.caminhoFoto;
+        const usuarioAtualizado = await UsuarioModel.update({
+            id: usuarioId,
+            dados: { fotoPerfil: null, caminhoFoto: null }
+        });
+
+        if (caminhoFoto) {
+            try {
+                await StorageService.deleteFoto({ bucket: "profile-images", caminho: caminhoFoto });
+            } catch (error) {
+                logger.error("perfil_photo_cleanup_failed", {
+                    usuarioId: usuario.id,
+                    caminhoFoto,
+                    error
+                });
+            }
+        }
+
+        return usuarioAtualizado;
     }
 
     static async sendPushTeste({ id, title, message, data = {} }) {
