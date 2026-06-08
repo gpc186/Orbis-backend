@@ -3,7 +3,7 @@ const AppError = require("../utils/appErrorUtils");
 const PredicaoRiscoService = require("./predicaoRiscoService");
 
 class PredicaoService {
-  static MIN_PONTOS_REGRESSAO = 8;
+  static MIN_PONTOS_REGRESSAO = 3;
   static LIMITE_PONTOS_REGRESSAO = 30;
   static LOOKBACK_DIAS_REGRESSAO = 7;
   static R2_MINIMO = 0.6;
@@ -11,9 +11,9 @@ class PredicaoService {
   static LIMIAR_FALHA = 30;
   static LIMITE_MAXIMO_DIAS_PREVISAO = 90;
   static DIAS_ANTECEDENCIA_FIM_JANELA = 2;
-  static MIN_JANELA_REGRESSAO_HORAS = 6;
-  static MIN_INTERVALO_REGRESSAO_HORAS = 0.05;
-  static MAX_RAZAO_INTERVALO_REGRESSAO = 12;
+  static MIN_JANELA_REGRESSAO_HORAS = 0.05;
+  static MIN_INTERVALO_REGRESSAO_HORAS = 0.005;
+  static MAX_RAZAO_INTERVALO_REGRESSAO = 60;
   static LIMIAR_SENSOR_CRITICO = 40;
   static PENALIDADE_SENSOR_CRITICO_MAX = 20;
 
@@ -55,6 +55,46 @@ class PredicaoService {
   static round(value, digits = 2) {
     if (!Number.isFinite(Number(value))) return null;
     return Number(Number(value).toFixed(digits));
+  }
+
+  static getEnvNumber(name, fallback, { min = null, integer = false } = {}) {
+    const raw = process.env[name];
+    const parsed = Number(raw);
+
+    if (!Number.isFinite(parsed)) return fallback;
+
+    const normalized = integer ? Math.trunc(parsed) : parsed;
+
+    if (min !== null && normalized < min) {
+      return fallback;
+    }
+
+    return normalized;
+  }
+
+  static obterConfigPredicao() {
+    return {
+      minPontosRegressao: this.getEnvNumber(
+        "PREDICAO_MIN_PONTOS_REGRESSAO",
+        this.MIN_PONTOS_REGRESSAO,
+        { min: 2, integer: true }
+      ),
+      minJanelaRegressaoHoras: this.getEnvNumber(
+        "PREDICAO_MIN_JANELA_REGRESSAO_HORAS",
+        this.MIN_JANELA_REGRESSAO_HORAS,
+        { min: 0 }
+      ),
+      minIntervaloRegressaoHoras: this.getEnvNumber(
+        "PREDICAO_MIN_INTERVALO_REGRESSAO_HORAS",
+        this.MIN_INTERVALO_REGRESSAO_HORAS,
+        { min: 0 }
+      ),
+      maxRazaoIntervaloRegressao: this.getEnvNumber(
+        "PREDICAO_MAX_RAZAO_INTERVALO_REGRESSAO",
+        this.MAX_RAZAO_INTERVALO_REGRESSAO,
+        { min: 1 }
+      )
+    };
   }
 
   static calcularHealthScore(sensor) {
@@ -149,7 +189,7 @@ class PredicaoService {
     };
   }
 
-  static analisarSerieTemporal(pontos) {
+  static analisarSerieTemporal(pontos, config = this.obterConfigPredicao()) {
     if (!Array.isArray(pontos) || pontos.length < 2) {
       return {
         valida: false,
@@ -191,7 +231,7 @@ class PredicaoService {
       ? maiorIntervaloHoras / menorIntervaloHoras
       : null;
 
-    if (janelaHorasCoberta < this.MIN_JANELA_REGRESSAO_HORAS) {
+    if (janelaHorasCoberta < config.minJanelaRegressaoHoras) {
       return {
         valida: false,
         motivo: this.MOTIVOS.JANELA_TEMPORAL_INSUFICIENTE,
@@ -202,7 +242,7 @@ class PredicaoService {
       };
     }
 
-    if (menorIntervaloHoras < this.MIN_INTERVALO_REGRESSAO_HORAS) {
+    if (menorIntervaloHoras < config.minIntervaloRegressaoHoras) {
       return {
         valida: false,
         motivo: this.MOTIVOS.SERIE_TEMPORAL_CONCENTRADA,
@@ -213,7 +253,7 @@ class PredicaoService {
       };
     }
 
-    if (Number.isFinite(irregularidadeIndice) && irregularidadeIndice > this.MAX_RAZAO_INTERVALO_REGRESSAO) {
+    if (Number.isFinite(irregularidadeIndice) && irregularidadeIndice > config.maxRazaoIntervaloRegressao) {
       return {
         valida: false,
         motivo: this.MOTIVOS.SERIE_TEMPORAL_IRREGULAR,
@@ -295,6 +335,7 @@ class PredicaoService {
 
   static async avaliarModeloIntegridade(maquinaId) {
     const HistoricoIntegridadeModel = require("../models/historicoIntegridadeModel");
+    const config = this.obterConfigPredicao();
     const dataInicio = new Date(Date.now() - (this.LOOKBACK_DIAS_REGRESSAO * 24 * 60 * 60 * 1000));
 
     const historico = await HistoricoIntegridadeModel.findSerieByMaquina(maquinaId, {
@@ -302,7 +343,7 @@ class PredicaoService {
       dataInicio
     });
 
-    if (historico.length < this.MIN_PONTOS_REGRESSAO) {
+    if (historico.length < config.minPontosRegressao) {
       return {
         disponivel: false,
         valido: false,
@@ -312,7 +353,7 @@ class PredicaoService {
     }
 
     const pontos = this.criarPontosRegressao(historico);
-    const serieTemporal = this.analisarSerieTemporal(pontos);
+    const serieTemporal = this.analisarSerieTemporal(pontos, config);
     const regressao = this.criarModeloRegressao(pontos);
 
     if (!regressao) {

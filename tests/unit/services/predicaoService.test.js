@@ -38,6 +38,27 @@ function useFakeNow(isoString) {
   };
 }
 
+function withEnv(overrides, run) {
+  const previous = {};
+
+  for (const key of Object.keys(overrides)) {
+    previous[key] = process.env[key];
+    process.env[key] = overrides[key];
+  }
+
+  return Promise.resolve()
+    .then(run)
+    .finally(() => {
+      for (const key of Object.keys(overrides)) {
+        if (previous[key] === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = previous[key];
+        }
+      }
+    });
+}
+
 function buildHistorico(valores, startIso = "2026-05-21T00:00:00.000Z", stepHours = 1) {
   const inicio = new RealDate(startIso).getTime();
 
@@ -101,10 +122,26 @@ test("calcularIntegridadeAgregada reduz a media quando existe sensor em estado c
   assert.equal(resultado, 47.33);
 });
 
+test("obterConfigPredicao permite calibrar velocidade por variaveis de ambiente", async () => {
+  await withEnv({
+    PREDICAO_MIN_PONTOS_REGRESSAO: "4",
+    PREDICAO_MIN_JANELA_REGRESSAO_HORAS: "0.1",
+    PREDICAO_MIN_INTERVALO_REGRESSAO_HORAS: "0.01",
+    PREDICAO_MAX_RAZAO_INTERVALO_REGRESSAO: "30"
+  }, () => {
+    assert.deepEqual(PredicaoService.obterConfigPredicao(), {
+      minPontosRegressao: 4,
+      minJanelaRegressaoHoras: 0.1,
+      minIntervaloRegressaoHoras: 0.01,
+      maxRazaoIntervaloRegressao: 30
+    });
+  });
+});
+
 test("previsaoManutencao retorna SEM_DADOS quando nao ha historico suficiente", async () => {
   const restoreDate = useFakeNow("2026-05-21T07:00:00.000Z");
   const mocks = mockPredicaoDependencies({
-    historico: buildHistorico([100, 99, 98, 97, 96, 95, 94])
+    historico: buildHistorico([100, 99])
   });
 
   try {
@@ -119,6 +156,31 @@ test("previsaoManutencao retorna SEM_DADOS quando nao ha historico suficiente", 
     assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.SEM_DADOS);
     assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.SEM_MODELO);
     assert.equal(resultado.motivo, PredicaoService.MOTIVOS.HISTORICO_INSUFICIENTE);
+  } finally {
+    mocks.restore();
+    restoreDate();
+  }
+});
+
+test("previsaoManutencao aceita serie de poucos minutos no fluxo normal", async () => {
+  const restoreDate = useFakeNow("2026-05-21T00:04:00.000Z");
+  const mocks = mockPredicaoDependencies({
+    historico: buildHistorico(
+      [100, 99, 98],
+      "2026-05-21T00:00:00.000Z",
+      0.025
+    )
+  });
+
+  try {
+    const resultado = await PredicaoService.previsaoManutencao(1);
+
+    assert.equal(mocks.updateCalls.length, 1);
+    assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.PREVISAO_VALIDA);
+    assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.REGRESSAO_LINEAR);
+    assert.equal(resultado.modeloIntegridade.pontosUsados, 3);
+    assert.equal(resultado.modeloIntegridade.janelaHorasCoberta, 0.05);
+    assert.equal(mocks.updateCalls[0].data.previsaoManutencao.toISOString(), "2026-05-21T01:45:00.000Z");
   } finally {
     mocks.restore();
     restoreDate();
@@ -242,7 +304,7 @@ test("avaliarModeloIntegridade invalida series temporais concentradas demais", a
   const historicoConcentrado = buildHistorico(
     [100, 99, 98, 97, 96, 95, 94, 93],
     "2026-05-21T00:00:00.000Z",
-    0.01
+    0.001
   );
   const mocks = mockPredicaoDependencies({ historico: historicoConcentrado });
 
@@ -251,7 +313,7 @@ test("avaliarModeloIntegridade invalida series temporais concentradas demais", a
 
     assert.equal(resultado.valido, false);
     assert.equal(resultado.motivo, PredicaoService.MOTIVOS.JANELA_TEMPORAL_INSUFICIENTE);
-    assert.equal(PredicaoService.resumirModeloIntegridade(resultado).janelaHorasCoberta, 0.07);
+    assert.equal(PredicaoService.resumirModeloIntegridade(resultado).janelaHorasCoberta, 0.01);
   } finally {
     mocks.restore();
     restoreDate();

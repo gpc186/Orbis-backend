@@ -6,6 +6,27 @@ const HistoricoIntegridadeModel = require("../../../src/models/historicoIntegrid
 const PredicaoService = require("../../../src/services/predicaoService");
 const AlertaPreditivoService = require("../../../src/services/alertaPreditivoService");
 
+function withEnv(overrides, run) {
+  const previous = {};
+
+  for (const key of Object.keys(overrides)) {
+    previous[key] = process.env[key];
+    process.env[key] = overrides[key];
+  }
+
+  return Promise.resolve()
+    .then(run)
+    .finally(() => {
+      for (const key of Object.keys(overrides)) {
+        if (previous[key] === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = previous[key];
+        }
+      }
+    });
+}
+
 function createModelResult({
   r2 = 0.84,
   slope = -1,
@@ -98,6 +119,24 @@ function mockServiceDependencies({
   };
 }
 
+test("obterConfig permite calibrar limiares operacionais por variaveis de ambiente", async () => {
+  await withEnv({
+    PREDICAO_ALERTA_MIN_AMOSTRAS_LIMIAR: "2",
+    PREDICAO_ALERTA_LIMIAR_INSTABILIDADE: "75",
+    PREDICAO_ALERTA_LIMIAR_TENDENCIA_CURTA: "82",
+    PREDICAO_ALERTA_LIMIAR_TENDENCIA_LONGA: "88"
+  }, () => {
+    assert.deepEqual(AlertaPreditivoService.obterConfig(), {
+      minAmostrasLimiar: 2,
+      limiaresOperacionais: {
+        INSTABILIDADE: 75,
+        TENDENCIA_CURTA: 82,
+        TENDENCIA_LONGA: 88
+      }
+    });
+  });
+});
+
 test("preverPorMaquina retorna estado explicito quando a maquina ja exige manutencao imediata", async () => {
   const mocks = mockServiceDependencies({
     diagnostico: {
@@ -186,11 +225,39 @@ test("preverPorMaquina usa o limiar da propria maquina quando ha amostras sufici
     const resultado = await AlertaPreditivoService.preverPorMaquina(1);
 
     assert.equal(resultado.estadoPredicao, "PREVISAO_VALIDA");
-    assert.equal(resultado.proximoAlerta.tipo, "INSTABILIDADE");
-    assert.equal(resultado.proximoAlerta.fonteLimiar, "MAQUINA");
-    assert.equal(resultado.proximoAlerta.integridadeLimiar, 72);
+    assert.equal(resultado.proximoAlerta.tipo, "TENDENCIA_LONGA");
+    assert.equal(resultado.proximoAlerta.fonteLimiar, "OPERACIONAL");
+    assert.equal(resultado.proximoAlerta.integridadeLimiar, 90);
+    assert.equal(resultado.instabilidade.fonteLimiar, "MAQUINA");
+    assert.equal(resultado.instabilidade.integridadeLimiar, 72);
     assert.equal(resultado.modeloIntegridade.janelaHorasCoberta, 30);
     assert.equal(resultado.modeloIntegridade.ultimoPontoEm.toISOString(), "2026-05-21T06:00:00.000Z");
+  } finally {
+    mocks.restore();
+  }
+});
+
+test("preverPorMaquina usa limiares operacionais quando nao ha historico de alertas", async () => {
+  const mocks = mockServiceDependencies({
+    diagnostico: {
+      maquina: { id: 1, tipo: "CNC", nome: "Maquina teste" },
+      avaliacaoModelo: createModelResult(),
+      estadoPredicao: PredicaoService.ESTADOS.PREVISAO_VALIDA,
+      fonteDecisao: PredicaoService.FONTES.REGRESSAO_LINEAR,
+      urgencia: PredicaoService.URGENCIAS.ALTA,
+      motivo: PredicaoService.MOTIVOS.PREVISAO_LINEAR_VALIDA
+    }
+  });
+
+  try {
+    const resultado = await AlertaPreditivoService.preverPorMaquina(1);
+
+    assert.equal(resultado.proximoAlerta.tipo, "TENDENCIA_LONGA");
+    assert.equal(resultado.proximoAlerta.fonteLimiar, "OPERACIONAL");
+    assert.equal(resultado.proximoAlerta.amostrasLimiar, 0);
+    assert.equal(resultado.proximoAlerta.integridadeLimiar, 90);
+    assert.equal(resultado.proximoAlerta.confianca, 0);
+    assert.equal(resultado.ausenciaProximoAlerta, null);
   } finally {
     mocks.restore();
   }
@@ -245,7 +312,8 @@ test("preverPorMaquina faz fallback para tipo da maquina e escolhe o menor candi
     assert.equal(resultado.proximoAlerta.tipo, "TENDENCIA_CURTA");
     assert.equal(resultado.proximoAlerta.fonteLimiar, "TIPO_MAQUINA");
     assert.equal(resultado.proximoAlerta.dataPrevista.toISOString(), "2026-05-21T07:00:00.000Z");
-    assert.equal(resultado.instabilidade.dataPrevista.toISOString(), "2026-05-21T08:00:00.000Z");
+    assert.equal(resultado.instabilidade.fonteLimiar, "MAQUINA");
+    assert.equal(resultado.instabilidade.dataPrevista.toISOString(), "2026-05-21T20:00:00.000Z");
   } finally {
     mocks.restore();
   }

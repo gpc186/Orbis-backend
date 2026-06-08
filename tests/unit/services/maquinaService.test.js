@@ -284,8 +284,15 @@ test("updateManualMaquina faz upsert e remove manual antigo", async () => {
 });
 
 test("consultas preditivas delegam services e encapsulam falhas inesperadas", async () => {
-  AlertaPreditivoService.preverPorMaquina = async (id) => ({ maquinaId: Number(id), estadoPredicao: "SEM_DADOS" });
-  PredicaoRiscoService.preverPorMaquina = async (id) => ({ maquinaId: Number(id), risco: "BAIXO" });
+  const chamadas = [];
+  AlertaPreditivoService.preverPorMaquina = async (id) => {
+    chamadas.push(["alertas", id]);
+    return { maquinaId: Number(id), estadoPredicao: "SEM_DADOS" };
+  };
+  PredicaoRiscoService.preverPorMaquina = async (id) => {
+    chamadas.push(["risco", id]);
+    return { maquinaId: Number(id), risco: "BAIXO" };
+  };
 
   assert.deepEqual(await MaquinaService.getPredicaoAlertas("9"), {
     maquinaId: 9,
@@ -295,6 +302,10 @@ test("consultas preditivas delegam services e encapsulam falhas inesperadas", as
     maquinaId: 9,
     risco: "BAIXO"
   });
+  assert.deepEqual(chamadas, [
+    ["alertas", "9"],
+    ["risco", "9"]
+  ]);
 
   AlertaPreditivoService.preverPorMaquina = async () => {
     throw new Error("modelo fora");

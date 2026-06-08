@@ -6,7 +6,12 @@ const AppError = require("../utils/appErrorUtils");
 
 class AlertaPreditivoService {
   static TIPOS_SUPORTADOS = ["INSTABILIDADE", "TENDENCIA_CURTA", "TENDENCIA_LONGA"];
-  static MIN_AMOSTRAS_LIMIAR = 3;
+  static MIN_AMOSTRAS_LIMIAR = 1;
+  static LIMIARES_OPERACIONAIS = {
+    INSTABILIDADE: 80,
+    TENDENCIA_CURTA: 85,
+    TENDENCIA_LONGA: 90
+  };
 
   static MOTIVOS = {
     HISTORICO_INSUFICIENTE: "historico_insuficiente",
@@ -27,6 +32,48 @@ class AlertaPreditivoService {
 
   static arredondar(valor, casas = 2) {
     return Number(Number(valor).toFixed(casas));
+  }
+
+  static getEnvNumber(name, fallback, { min = null, integer = false } = {}) {
+    const raw = process.env[name];
+    const parsed = Number(raw);
+
+    if (!Number.isFinite(parsed)) return fallback;
+
+    const normalized = integer ? Math.trunc(parsed) : parsed;
+
+    if (min !== null && normalized < min) {
+      return fallback;
+    }
+
+    return normalized;
+  }
+
+  static obterConfig() {
+    return {
+      minAmostrasLimiar: this.getEnvNumber(
+        "PREDICAO_ALERTA_MIN_AMOSTRAS_LIMIAR",
+        this.MIN_AMOSTRAS_LIMIAR,
+        { min: 1, integer: true }
+      ),
+      limiaresOperacionais: {
+        INSTABILIDADE: this.getEnvNumber(
+          "PREDICAO_ALERTA_LIMIAR_INSTABILIDADE",
+          this.LIMIARES_OPERACIONAIS.INSTABILIDADE,
+          { min: 0 }
+        ),
+        TENDENCIA_CURTA: this.getEnvNumber(
+          "PREDICAO_ALERTA_LIMIAR_TENDENCIA_CURTA",
+          this.LIMIARES_OPERACIONAIS.TENDENCIA_CURTA,
+          { min: 0 }
+        ),
+        TENDENCIA_LONGA: this.getEnvNumber(
+          "PREDICAO_ALERTA_LIMIAR_TENDENCIA_LONGA",
+          this.LIMIARES_OPERACIONAIS.TENDENCIA_LONGA,
+          { min: 0 }
+        )
+      }
+    };
   }
 
   static calcularMediana(valores) {
@@ -69,13 +116,27 @@ class AlertaPreditivoService {
     }
 
     const amostras = await this.coletarAmostrasIntegridade(alertas);
-    if (amostras.length < this.MIN_AMOSTRAS_LIMIAR) {
+    if (amostras.length < this.obterConfig().minAmostrasLimiar) {
       return null;
     }
 
     return {
       integridadeLimiar: this.calcularMediana(amostras),
       amostrasLimiar: amostras.length
+    };
+  }
+
+  static obterLimiarOperacional(tipo) {
+    const integridadeLimiar = this.obterConfig().limiaresOperacionais[tipo];
+
+    if (!Number.isFinite(integridadeLimiar)) {
+      return null;
+    }
+
+    return {
+      integridadeLimiar,
+      amostrasLimiar: 0,
+      fonteLimiar: "OPERACIONAL"
     };
   }
 
@@ -107,7 +168,7 @@ class AlertaPreditivoService {
       }
     }
 
-    return null;
+    return this.obterLimiarOperacional(tipo);
   }
 
   static montarPredicaoTipo(tipo, dataPrevista, limiarHistorico, modeloIntegridade) {

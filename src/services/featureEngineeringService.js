@@ -6,9 +6,9 @@ const MaquinaModel = require("../models/maquinaModel");
 const AppError = require("../utils/appErrorUtils");
 
 class FeatureEngineeringService {
-  static MIN_PONTOS_HISTORICO = 8;
-  static MIN_LEITURAS_24H = 6;
-  static MIN_LEITURAS_72H = 12;
+  static MIN_PONTOS_HISTORICO = 3;
+  static MIN_LEITURAS_24H = 2;
+  static MIN_LEITURAS_72H = 3;
   static LIMIAR_LEITURA_RECENTE_HORAS = 6;
   static LOOKBACK_DIAS = 7;
   static TIPOS_ALERTA_SUPORTADOS = [
@@ -31,6 +31,46 @@ class FeatureEngineeringService {
     }
 
     return Number(Number(value).toFixed(digits));
+  }
+
+  static getEnvNumber(name, fallback, { min = null, integer = false } = {}) {
+    const raw = process.env[name];
+    const parsed = Number(raw);
+
+    if (!Number.isFinite(parsed)) return fallback;
+
+    const normalized = integer ? Math.trunc(parsed) : parsed;
+
+    if (min !== null && normalized < min) {
+      return fallback;
+    }
+
+    return normalized;
+  }
+
+  static obterConfig() {
+    return {
+      minPontosHistorico: this.getEnvNumber(
+        "PREDICAO_RISCO_MIN_PONTOS_HISTORICO",
+        this.MIN_PONTOS_HISTORICO,
+        { min: 2, integer: true }
+      ),
+      minLeituras24h: this.getEnvNumber(
+        "PREDICAO_RISCO_MIN_LEITURAS_24H",
+        this.MIN_LEITURAS_24H,
+        { min: 1, integer: true }
+      ),
+      minLeituras72h: this.getEnvNumber(
+        "PREDICAO_RISCO_MIN_LEITURAS_72H",
+        this.MIN_LEITURAS_72H,
+        { min: 1, integer: true }
+      ),
+      limiarLeituraRecenteHoras: this.getEnvNumber(
+        "PREDICAO_RISCO_LEITURA_RECENTE_HORAS",
+        this.LIMIAR_LEITURA_RECENTE_HORAS,
+        { min: 0 }
+      )
+    };
   }
 
   static mean(values) {
@@ -203,13 +243,13 @@ class FeatureEngineeringService {
     };
   }
 
-  static buildCoverage(features, historico, leituras7d, alertas7d) {
+  static buildCoverage(features, historico, leituras7d, alertas7d, config = this.obterConfig()) {
     const coverage = {
-      historicoIntegridadeSuficiente: historico.length >= this.MIN_PONTOS_HISTORICO,
-      leituras24hSuficientes: (features.leituras24h || 0) >= this.MIN_LEITURAS_24H,
-      leituras72hSuficientes: (features.leituras72h || 0) >= this.MIN_LEITURAS_72H,
+      historicoIntegridadeSuficiente: historico.length >= config.minPontosHistorico,
+      leituras24hSuficientes: (features.leituras24h || 0) >= config.minLeituras24h,
+      leituras72hSuficientes: (features.leituras72h || 0) >= config.minLeituras72h,
       leituraRecenteDisponivel: Number.isFinite(features.tempoDesdeUltimaLeitura) &&
-        features.tempoDesdeUltimaLeitura <= this.LIMIAR_LEITURA_RECENTE_HORAS,
+        features.tempoDesdeUltimaLeitura <= config.limiarLeituraRecenteHoras,
       baseAlertasSuficiente: alertas7d.length > 0 || (features.alertasAtivos || 0) > 0
     };
 
@@ -223,6 +263,7 @@ class FeatureEngineeringService {
   }
 
   static async buildMachineFeatureSet(maquinaId) {
+    const config = this.obterConfig();
     const maquina = await MaquinaModel.findById(maquinaId, { include: { sensores: true } });
 
     if (!maquina) {
@@ -275,7 +316,7 @@ class FeatureEngineeringService {
       ultimaLeitura
     });
 
-    const { coverage, motivos } = this.buildCoverage(features, historico, leituras7d, alertas7d);
+    const { coverage, motivos } = this.buildCoverage(features, historico, leituras7d, alertas7d, config);
 
     return {
       maquina,

@@ -39,6 +39,27 @@ function useFakeNow(isoString) {
   };
 }
 
+function withEnv(overrides, run) {
+  const previous = {};
+
+  for (const key of Object.keys(overrides)) {
+    previous[key] = process.env[key];
+    process.env[key] = overrides[key];
+  }
+
+  return Promise.resolve()
+    .then(run)
+    .finally(() => {
+      for (const key of Object.keys(overrides)) {
+        if (previous[key] === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = previous[key];
+        }
+      }
+    });
+}
+
 function createReading({ iso, temperatura, vibracao, sensorOverrides = {} }) {
   return {
     id: Math.random(),
@@ -107,6 +128,22 @@ function mockFeatureDependencies({ machine, historico, leituras, alertasRecentes
     }
   };
 }
+
+test("obterConfig permite calibrar cobertura de risco por variaveis de ambiente", async () => {
+  await withEnv({
+    PREDICAO_RISCO_MIN_PONTOS_HISTORICO: "5",
+    PREDICAO_RISCO_MIN_LEITURAS_24H: "4",
+    PREDICAO_RISCO_MIN_LEITURAS_72H: "6",
+    PREDICAO_RISCO_LEITURA_RECENTE_HORAS: "2"
+  }, () => {
+    assert.deepEqual(FeatureEngineeringService.obterConfig(), {
+      minPontosHistorico: 5,
+      minLeituras24h: 4,
+      minLeituras72h: 6,
+      limiarLeituraRecenteHoras: 2
+    });
+  });
+});
 
 test("buildMachineFeatureSet agrega features e cobertura com dados completos", async () => {
   const restoreDate = useFakeNow("2026-05-22T12:00:00.000Z");

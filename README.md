@@ -99,6 +99,15 @@ SENSOR_OFFLINE_JOB_ENABLED=true
 SENSOR_OFFLINE_INTERVAL_SECONDS=60
 SIMULADOR_JOB_ATIVO=false
 SIMULADOR_INTERVALO_MS=5000
+SIMULADOR_DEGRADACAO_HORAS=24
+SIMULADOR_RUIDO_PERCENTUAL=0.01
+
+PREDICAO_MIN_PONTOS_REGRESSAO=3
+PREDICAO_MIN_JANELA_REGRESSAO_HORAS=0.05
+PREDICAO_RISCO_MIN_PONTOS_HISTORICO=3
+PREDICAO_RISCO_MIN_LEITURAS_24H=2
+PREDICAO_RISCO_MIN_LEITURAS_72H=3
+PREDICAO_ALERTA_MIN_AMOSTRAS_LIMIAR=1
 
 REPORT_JOB_ENABLED=false
 REPORT_JOB_CRON="* * * * *"
@@ -173,6 +182,17 @@ Campos adicionados:
 - `modeloIntegridade`: inclui `pontosUsados`, `janelaHorasCoberta`, `ultimoPontoEm`, `r2` e `slope`.
 
 Campos antigos como `proximoAlerta`, `instabilidade`, `ausenciaProximoAlerta`, `ausenciaInstabilidade` e `modeloIntegridade` foram preservados. Quando a regressão não é confiável, o sistema não inventa datas: ele retorna uma classificação operacional com fallback heurístico.
+
+Os mínimos de histórico e leituras foram reduzidos para permitir validar o fluxo de predição em poucos minutos nas rotas normais.
+Em `/maquinas/:id/predicao-alertas`, se ainda não houver alertas históricos suficientes, o sistema usa limiares operacionais marcados com `fonteLimiar: "OPERACIONAL"`.
+
+A velocidade/sensibilidade da predição pode ser calibrada pelo ambiente:
+
+- `PREDICAO_MIN_PONTOS_REGRESSAO`: pontos mínimos de integridade para regressão.
+- `PREDICAO_MIN_JANELA_REGRESSAO_HORAS`: janela temporal mínima da regressão. `0.05` equivale a cerca de 3 minutos.
+- `PREDICAO_RISCO_MIN_LEITURAS_24H` e `PREDICAO_RISCO_MIN_LEITURAS_72H`: leituras mínimas para calcular risco.
+- `PREDICAO_ALERTA_MIN_AMOSTRAS_LIMIAR`: alertas históricos mínimos para estimar limiar por histórico.
+- `PREDICAO_ALERTA_LIMIAR_INSTABILIDADE`, `PREDICAO_ALERTA_LIMIAR_TENDENCIA_CURTA` e `PREDICAO_ALERTA_LIMIAR_TENDENCIA_LONGA`: limiares operacionais usados quando ainda não há histórico suficiente.
 
 ### Dashboard e IA
 
@@ -348,6 +368,10 @@ Ao iniciar o servidor, a aplicação carrega:
 - `sensorOfflineJob`
 - `simuladorJob`, quando habilitado por ambiente
 - Conexão MQTT, quando configurada
+
+O `simuladorJob` degrada cada máquina linearmente ao longo do tempo, gerando leituras para todos os sensores ativos da máquina em cada ciclo.
+A curva usa as specs de cada sensor: `idealTemperatura -> limiteTemperatura` e `idealVibracao -> limiteVibracao`.
+`SIMULADOR_DEGRADACAO_HORAS` controla em quantas horas a leitura chega do ideal ao limite, e `SIMULADOR_RUIDO_PERCENTUAL` adiciona uma pequena variação percentual sobre a amplitude.
 
 ## Testes
 
