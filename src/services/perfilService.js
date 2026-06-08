@@ -109,7 +109,7 @@ class PerfilService {
         const usuario = await UsuarioModel.findById(usuarioId);
 
         if (!usuario) {
-            throw new AppError("Usuario nÃ£o encontrado!", 404);
+            throw new AppError("Usuario não encontrado!", 404);
         };
 
         if (!usuario.fotoPerfil && !usuario.caminhoFoto) {
