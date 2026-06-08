@@ -47,6 +47,16 @@ class PerfilController {
         };
     };
 
+    static async deleteFoto(req, res, next) {
+        try {
+            const usuarioId = req.usuario.id;
+            const response = await PerfilService.deleteFotoPerfil({ usuarioId });
+            return res.status(200).json(response);
+        } catch (error) {
+            next(error);
+        };
+    };
+
     static async sendPushTeste(req, res, next){
         try {
             const { id } = req.usuario;

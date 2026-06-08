@@ -23,6 +23,7 @@ const originals = {
   updatePerfil: PerfilService.updatePerfil,
   putOneSignalId: PerfilService.putOneSignalId,
   updateFotoPerfil: PerfilService.updateFotoPerfil,
+  deleteFotoPerfil: PerfilService.deleteFotoPerfil,
   sendPushTeste: PerfilService.sendPushTeste,
   createSensor: SensorService.create,
   listSensores: SensorService.list,
@@ -77,6 +78,7 @@ afterEach(() => {
   PerfilService.updatePerfil = originals.updatePerfil;
   PerfilService.putOneSignalId = originals.putOneSignalId;
   PerfilService.updateFotoPerfil = originals.updateFotoPerfil;
+  PerfilService.deleteFotoPerfil = originals.deleteFotoPerfil;
   PerfilService.sendPushTeste = originals.sendPushTeste;
   SensorService.create = originals.createSensor;
   SensorService.list = originals.listSensores;
@@ -203,6 +205,10 @@ test("PerfilController usa usuario autenticado em perfil, device token, foto e p
     chamadas.push(["updateFotoPerfil", payload]);
     return { id: payload.usuarioId, fotoPerfil: "url" };
   };
+  PerfilService.deleteFotoPerfil = async (payload) => {
+    chamadas.push(["deleteFotoPerfil", payload]);
+    return { id: payload.usuarioId, fotoPerfil: null, caminhoFoto: null };
+  };
   PerfilService.sendPushTeste = async (payload) => {
     chamadas.push(["sendPushTeste", payload]);
     return { ok: true };
@@ -224,6 +230,9 @@ test("PerfilController usa usuario autenticado em perfil, device token, foto e p
     file: { buffer: fotoBuffer }
   }, fotoRes, captureNext());
 
+  const deleteFotoRes = createResponse();
+  await PerfilController.deleteFoto({ usuario: { id: 4 } }, deleteFotoRes, captureNext());
+
   const pushRes = createResponse();
   await PerfilController.sendPushTeste({
     usuario: { id: 4 },
@@ -235,12 +244,14 @@ test("PerfilController usa usuario autenticado em perfil, device token, foto e p
     ["updatePerfil", { id: 4, dados: { nome: "Novo" } }],
     ["putOneSignalId", { id: 4, oneSignalId: "player" }],
     ["updateFotoPerfil", { usuarioId: 4, buffer: fotoBuffer }],
+    ["deleteFotoPerfil", { usuarioId: 4 }],
     ["sendPushTeste", { id: 4, title: "Teste", message: "Oi", data: { a: 1 } }]
   ]);
   assert.deepEqual(getRes.body, { id: 4 });
   assert.deepEqual(updateRes.body, { id: 4, nome: "Novo" });
   assert.deepEqual(tokenRes.body, { id: 4, oneSignalId: "player" });
   assert.deepEqual(fotoRes.body, { id: 4, fotoPerfil: "url" });
+  assert.deepEqual(deleteFotoRes.body, { id: 4, fotoPerfil: null, caminhoFoto: null });
   assert.deepEqual(pushRes.body, { ok: true });
 });
 

@@ -6,6 +6,7 @@ const { uploadImagemUnica, imagemProcessada } = require('../middlewares/uploadMi
 
 router.get('/', authMiddleware, PerfilController.getPerfil);
 router.put('/foto', authMiddleware, uploadImagemUnica, imagemProcessada, PerfilController.updateFoto);
+router.delete('/foto', authMiddleware, PerfilController.deleteFoto);
 router.put('/', authMiddleware, PerfilController.updatePerfil);
 router.post('/device-token', authMiddleware, PerfilController.setOneSignalId);
 router.post('/push-teste', authMiddleware, PerfilController.sendPushTeste);

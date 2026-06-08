@@ -5,6 +5,7 @@ const PerfilService = require("../../../src/services/perfilService");
 const UsuarioModel = require("../../../src/models/usuarioModel");
 const StorageService = require("../../../src/services/storageService");
 const OneSignalService = require("../../../src/services/oneSignalService");
+const logger = require("../../../src/utils/logger");
 
 const originals = {
   findUsuarioById: UsuarioModel.findById,
@@ -12,6 +13,7 @@ const originals = {
   uploadFoto: StorageService.uploadFoto,
   deleteFoto: StorageService.deleteFoto,
   sendToOneSignalIds: OneSignalService.sendToOneSignalIds,
+  loggerError: logger.error,
   dateNow: Date.now
 };
 
@@ -21,6 +23,7 @@ afterEach(() => {
   StorageService.uploadFoto = originals.uploadFoto;
   StorageService.deleteFoto = originals.deleteFoto;
   OneSignalService.sendToOneSignalIds = originals.sendToOneSignalIds;
+  logger.error = originals.loggerError;
   Date.now = originals.dateNow;
 });
 
@@ -200,6 +203,100 @@ test("updateFotoPerfil bloqueia usuario inexistente antes do upload", async () =
     (error) => error.name === "AppError" && error.statusCode === 404
   );
   assert.equal(uploadChamado, false);
+});
+
+test("deleteFotoPerfil limpa campos do usuario e remove foto do storage", async () => {
+  const chamadasDelete = [];
+  let updateRecebido;
+
+  UsuarioModel.findById = async (id) => ({
+    id,
+    fotoPerfil: "https://cdn.example.com/antiga.webp",
+    caminhoFoto: "perfil/7/antiga.webp"
+  });
+  UsuarioModel.update = async (payload) => {
+    updateRecebido = payload;
+    return { id: payload.id, ...payload.dados };
+  };
+  StorageService.deleteFoto = async (payload) => {
+    chamadasDelete.push(payload);
+    return { mensagem: "ok" };
+  };
+
+  const result = await PerfilService.deleteFotoPerfil({ usuarioId: 7 });
+
+  assert.deepEqual(updateRecebido, {
+    id: 7,
+    dados: {
+      fotoPerfil: null,
+      caminhoFoto: null
+    }
+  });
+  assert.deepEqual(chamadasDelete, [{ bucket: "profile-images", caminho: "perfil/7/antiga.webp" }]);
+  assert.deepEqual(result, {
+    id: 7,
+    fotoPerfil: null,
+    caminhoFoto: null
+  });
+});
+
+test("deleteFotoPerfil e idempotente quando usuario nao possui foto", async () => {
+  let updateChamado = false;
+  let deleteChamado = false;
+  const usuario = { id: 3, fotoPerfil: null, caminhoFoto: null };
+
+  UsuarioModel.findById = async () => usuario;
+  UsuarioModel.update = async () => {
+    updateChamado = true;
+  };
+  StorageService.deleteFoto = async () => {
+    deleteChamado = true;
+  };
+
+  const result = await PerfilService.deleteFotoPerfil({ usuarioId: 3 });
+
+  assert.deepEqual(result, usuario);
+  assert.equal(updateChamado, false);
+  assert.equal(deleteChamado, false);
+});
+
+test("deleteFotoPerfil preserva sucesso quando cleanup do storage falha", async () => {
+  const erroStorage = new Error("storage indisponivel");
+  let logRecebido;
+
+  UsuarioModel.findById = async (id) => ({
+    id,
+    fotoPerfil: "https://cdn.example.com/antiga.webp",
+    caminhoFoto: "perfil/4/antiga.webp"
+  });
+  UsuarioModel.update = async (payload) => ({ id: payload.id, ...payload.dados });
+  StorageService.deleteFoto = async () => {
+    throw erroStorage;
+  };
+  logger.error = (event, payload) => {
+    logRecebido = { event, payload };
+  };
+
+  const result = await PerfilService.deleteFotoPerfil({ usuarioId: 4 });
+
+  assert.deepEqual(result, {
+    id: 4,
+    fotoPerfil: null,
+    caminhoFoto: null
+  });
+  assert.equal(logRecebido.event, "perfil_photo_cleanup_failed");
+  assert.equal(logRecebido.payload.usuarioId, 4);
+  assert.equal(logRecebido.payload.caminhoFoto, "perfil/4/antiga.webp");
+  assert.equal(logRecebido.payload.error, erroStorage);
+});
+
+test("deleteFotoPerfil bloqueia usuario inexistente", async () => {
+  UsuarioModel.findById = async () => null;
+
+  await assert.rejects(
+    () => PerfilService.deleteFotoPerfil({ usuarioId: 404 }),
+    (error) => error.name === "AppError" && error.statusCode === 404
+  );
 });
 
 test("sendPushTeste usa oneSignalId cadastrado e bloqueia usuario sem token", async () => {
