@@ -8,17 +8,17 @@ const {
   validateStatusPayload
 } = require("../utils/reportValidation");
 const { computeNextRun } = require("../utils/reportScheduleUtils");
-const { assertRole } = require("../utils/authorization");
+const { assertAdminRead, assertAdminWrite } = require("../utils/authorization");
 const { normalizeLimit } = require("../utils/requestParsers");
 const { mapRelatorioAgendamentoResponse } = require("./reportPresenter");
 
 class RelatorioAgendamentoService {
-  static assertAdmin(usuario) {
-    assertRole({
-      usuario,
-      roles: ["ADMIN"],
-      message: "Apenas ADMIN pode gerenciar relatorios."
-    });
+  static assertAdminRead(usuario) {
+    assertAdminRead(usuario, "Apenas ADMIN ou VISITANTE pode consultar relatorios.");
+  }
+
+  static assertAdminWrite(usuario) {
+    assertAdminWrite(usuario, "Apenas ADMIN pode gerenciar relatorios.");
   }
 
   static mapResponse(agendamento) {
@@ -26,7 +26,7 @@ class RelatorioAgendamentoService {
   }
 
   static async preview({ usuario, payload }) {
-    this.assertAdmin(usuario);
+    this.assertAdminWrite(usuario);
 
     const normalized = validatePreviewPayload(payload);
     const rendered = await RelatorioRendererService.render(normalized);
@@ -40,7 +40,7 @@ class RelatorioAgendamentoService {
   }
 
   static async create({ usuario, payload }) {
-    this.assertAdmin(usuario);
+    this.assertAdminWrite(usuario);
 
     const normalized = validateSchedulePayload(payload);
     const nextRunAt = computeNextRun(normalized.agendamento);
@@ -69,13 +69,13 @@ class RelatorioAgendamentoService {
   }
 
   static async list({ usuario }) {
-    this.assertAdmin(usuario);
+    this.assertAdminRead(usuario);
     const items = await RelatorioAgendamentoModel.findAll();
     return items.map((item) => this.mapResponse(item));
   }
 
   static async findById({ usuario, id }) {
-    this.assertAdmin(usuario);
+    this.assertAdminRead(usuario);
     const agendamento = await RelatorioAgendamentoModel.findById(id);
 
     if (!agendamento) {
@@ -86,7 +86,7 @@ class RelatorioAgendamentoService {
   }
 
   static async findByDestinatarioEmail({ usuario, email, limit = 10 }) {
-    this.assertAdmin(usuario);
+    this.assertAdminRead(usuario);
 
     const emailNormalizado = String(email || "").trim();
 
@@ -104,7 +104,7 @@ class RelatorioAgendamentoService {
   }
 
   static async update({ usuario, id, payload }) {
-    this.assertAdmin(usuario);
+    this.assertAdminWrite(usuario);
 
     const current = await RelatorioAgendamentoModel.findById(id);
     if (!current) {
@@ -138,7 +138,7 @@ class RelatorioAgendamentoService {
   }
 
   static async updateStatus({ usuario, id, payload }) {
-    this.assertAdmin(usuario);
+    this.assertAdminWrite(usuario);
     const normalized = validateStatusPayload(payload);
     const current = await RelatorioAgendamentoModel.findById(id);
 
@@ -167,7 +167,7 @@ class RelatorioAgendamentoService {
   }
 
   static async delete({ usuario, id }) {
-    this.assertAdmin(usuario);
+    this.assertAdminWrite(usuario);
 
     const current = await RelatorioAgendamentoModel.findById(id);
     if (!current) {
@@ -183,7 +183,7 @@ class RelatorioAgendamentoService {
   }
 
   static async executeNow({ usuario, id }) {
-    this.assertAdmin(usuario);
+    this.assertAdminWrite(usuario);
     return RelatorioExecucaoService.executarAgendamento(id, {
       updateSchedule: false,
       tipoExecucao: "MANUAL"

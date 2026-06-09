@@ -6,6 +6,7 @@ const bcrypt = require("bcrypt");
 const { generateAccessToken, generateRefreshTokenData } = require("../utils/jwtUtils");
 const StorageService = require("./storageService");
 const logger = require("../utils/logger");
+const { ROLES, isValidUserRole } = require("../utils/authorization");
 
 class UsuarioService {
   static normalizeRoleFilter(role) {
@@ -35,6 +36,16 @@ class UsuarioService {
       "tecnicas"
     ]);
 
+    const visitanteAliases = new Set([
+      "visitante",
+      "visitantes",
+      "visitor",
+      "visitors",
+      "demo",
+      "demonstracao",
+      "demonstração"
+    ]);
+
     const genericUserAliases = new Set([
       "usuario",
       "usuarios",
@@ -43,11 +54,15 @@ class UsuarioService {
     ]);
 
     if (adminAliases.has(normalized)) {
-      return "ADMIN";
+      return ROLES.ADMIN;
     }
 
     if (tecnicoAliases.has(normalized)) {
-      return "TECNICO";
+      return ROLES.TECNICO;
+    }
+
+    if (visitanteAliases.has(normalized)) {
+      return ROLES.VISITANTE;
     }
 
     if (genericUserAliases.has(normalized)) {
@@ -108,7 +123,7 @@ class UsuarioService {
       throw new AppError("Credenciais invalidas!", 400);
     }
 
-    if (role !== "ADMIN" && role !== "TECNICO") {
+    if (!isValidUserRole(role)) {
       throw new AppError("Credenciais invalidas!", 400);
     }
 
@@ -267,7 +282,7 @@ class UsuarioService {
       throw new AppError("Tecnico nao encontrado!", 404);
     }
 
-    if (tecnico.role !== "TECNICO") {
+    if (tecnico.role !== ROLES.TECNICO) {
       throw new AppError("Usuario nao e tecnico!", 403);
     }
 
@@ -299,7 +314,7 @@ class UsuarioService {
       throw new AppError("Tecnico nao encontrado!", 404);
     }
 
-    if (tecnico.role !== "TECNICO") {
+    if (tecnico.role !== ROLES.TECNICO) {
       throw new AppError("Usuario nao e tecnico!", 403);
     }
 
@@ -321,7 +336,7 @@ class UsuarioService {
       throw new AppError("Usuario nao encontrado!", 404);
     }
 
-    if (usuario.role === "ADMIN" && role === "TECNICO") {
+    if (usuario.role === ROLES.ADMIN && role !== undefined && role !== ROLES.ADMIN) {
       const countAdmin = await UsuarioModel.countAdmins();
       if (countAdmin === 1) {
         throw new AppError("Nao e possivel rebaixar o ultimo admin!", 409);
@@ -346,7 +361,7 @@ class UsuarioService {
       throw new AppError("Telefone invalido!", 400);
     }
 
-    if (role !== undefined && role !== "ADMIN" && role !== "TECNICO") {
+    if (role !== undefined && !isValidUserRole(role)) {
       throw new AppError("Role invalido!", 400);
     }
 
@@ -410,7 +425,7 @@ class UsuarioService {
       throw new AppError("Usuario nao encontrado!", 404);
     }
 
-    if (usuario.role === "ADMIN") {
+    if (usuario.role === ROLES.ADMIN) {
       throw new AppError("Voce nao pode deletar outro admin!", 409);
     }
 

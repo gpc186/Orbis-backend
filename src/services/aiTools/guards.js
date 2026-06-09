@@ -1,5 +1,10 @@
 const AppError = require("../../utils/appErrorUtils");
-const { assertRole } = require("../../utils/authorization");
+const {
+  assertRole,
+  ADMIN_READ_ROLES,
+  ADMIN_WRITE_ROLES,
+  ROLES
+} = require("../../utils/authorization");
 
 const WRITE_TOOL_NAMES = new Set([
   "criar_agendamento_relatorio",
@@ -32,7 +37,7 @@ function isWriteTool(name) {
 function assertReadToolPermission(usuario) {
   assertRole({
     usuario,
-    roles: ["ADMIN"],
+    roles: ADMIN_READ_ROLES,
     message: "Usuario sem permissao para usar tools administrativas."
   });
 }
@@ -45,7 +50,7 @@ function assertWriteToolPermission({ name, usuario }) {
   if (ADMIN_WRITE_TOOL_NAMES.has(name)) {
     assertRole({
       usuario,
-      roles: ["ADMIN"],
+      roles: ADMIN_WRITE_ROLES,
       message: "Usuario sem permissao para usar tools administrativas."
     });
     return;
@@ -54,7 +59,7 @@ function assertWriteToolPermission({ name, usuario }) {
   if (name === "criar_manutencao_por_alerta") {
     assertRole({
       usuario,
-      roles: ["ADMIN", "TECNICO"],
+      roles: [ROLES.ADMIN, ROLES.TECNICO],
       message: "Usuario sem permissao para criar manutencao."
     });
     return;
@@ -63,7 +68,7 @@ function assertWriteToolPermission({ name, usuario }) {
   if (name === "atualizar_status_manutencao") {
     assertRole({
       usuario,
-      roles: ["TECNICO"],
+      roles: [ROLES.TECNICO],
       message: "Apenas o tecnico responsavel pode atualizar a manutencao."
     });
   }
