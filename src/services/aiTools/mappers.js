@@ -42,6 +42,7 @@ function mapAlerta(item) {
     mensagem: item.mensagem,
     criadoEm: item.criadoEm,
     encerradoEm: item.encerradoEm,
+    sla: item.sla || null,
     sensor: item.sensor
       ? {
           id: item.sensor.id,
