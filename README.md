@@ -6,7 +6,7 @@ Back-end do **Orbis**, sistema de monitoramento industrial preditivo desenvolvid
 
 A API é responsável por:
 
-- Autenticação com JWT, refresh token e controle de roles `ADMIN` e `TECNICO`.
+- Autenticação com JWT, refresh token e controle de roles `ADMIN`, `TECNICO` e `VISITANTE`.
 - Gestão de usuários, técnicos, perfil, máquinas, sensores, leituras, alertas e manutenções.
 - Monitoramento em tempo real com Socket.IO e integração MQTT/ESP32.
 - Upload de imagens e manuais técnicos em PDF via Supabase Storage.
@@ -147,6 +147,7 @@ tests/
 - Rotas protegidas exigem `Authorization: Bearer <token>`.
 - O login retorna access token e refresh token.
 - `ADMIN` pode cadastrar, editar e remover usuários.
+- `VISITANTE` pode visualizar o sistema como perfil de demonstração e enviar relatório avulso por e-mail, mas não pode criar, alterar, excluir ou executar agendamentos.
 - Usuários autenticados podem alterar o próprio status ativo pela rota `PUT /usuarios/alterar-ativo`.
 - O perfil permite atualizar dados, foto e token de dispositivo.
 
@@ -318,17 +319,17 @@ Principais rotas:
 | GET | `/alertas` | Autenticado |
 | GET | `/alertas/:id` | Autenticado |
 | GET | `/alertas/:id/eventos` | Autenticado |
-| GET | `/manutencoes` | Admin |
+| GET | `/manutencoes` | Admin, Visitante |
 | POST | `/manutencoes` | Admin, Técnico |
-| GET | `/manutencoes/alerta/:id` | Admin, Técnico |
-| GET | `/manutencoes/:id` | Admin, Técnico |
+| GET | `/manutencoes/alerta/:id` | Admin, Técnico, Visitante |
+| GET | `/manutencoes/:id` | Admin, Técnico, Visitante |
 | PUT | `/manutencoes/:id` | Técnico |
 
 ### Dashboard, IA, Email e Relatórios
 
 | Método | Rota | Acesso |
 |---|---|---|
-| GET | `/dashboard/resumo` | Admin |
+| GET | `/dashboard/resumo` | Admin, Visitante |
 | POST | `/dashboard/ia/perguntar` | Autenticado |
 | POST | `/email` | Público com rate limit |
 | POST | `/relatorios/preview` | Autenticado |

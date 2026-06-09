@@ -7,7 +7,12 @@ const {
   validatePreviewPayload,
   validateDestinatarios
 } = require("../utils/reportValidation");
-const { assertRole } = require("../utils/authorization");
+const {
+  assertAdminRead,
+  assertAdminWrite,
+  assertRole,
+  ADMIN_READ_ROLES
+} = require("../utils/authorization");
 const EmailService = require("./emailService");
 const { mapRelatorioExecucaoResponse } = require("./reportPresenter");
 
@@ -17,11 +22,19 @@ class RelatorioExecucaoService {
   }
 
   static assertAdmin(usuario) {
+    assertAdminWrite(usuario, "Apenas ADMIN pode executar relatorios.");
+  }
+
+  static assertManualExecution(usuario) {
     assertRole({
       usuario,
-      roles: ["ADMIN"],
-      message: "Apenas ADMIN pode executar relatorios."
+      roles: ADMIN_READ_ROLES,
+      message: "Apenas ADMIN ou VISITANTE pode enviar relatorios manuais."
     });
+  }
+
+  static assertAdminRead(usuario) {
+    assertAdminRead(usuario, "Apenas ADMIN ou VISITANTE pode consultar relatorios.");
   }
 
   static validateDestinatarios(emailsDestino) {
@@ -29,7 +42,7 @@ class RelatorioExecucaoService {
   }
 
   static async executarManual({ usuario, payload }) {
-    this.assertAdmin(usuario);
+    this.assertManualExecution(usuario);
 
     const normalized = validatePreviewPayload(payload);
     const emailsDestino = this.validateDestinatarios(payload.emailsDestino);
@@ -199,7 +212,7 @@ class RelatorioExecucaoService {
   }
 
   static async listExecutions({ id, usuario }) {
-    this.assertAdmin(usuario);
+    this.assertAdminRead(usuario);
     const execucoes = await RelatorioExecucaoModel.findByAgendamentoId(id);
     return execucoes.map((execucao) => this.mapExecutionResponse(execucao));
   }

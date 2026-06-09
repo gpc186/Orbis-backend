@@ -50,6 +50,49 @@ test("authMiddleware aceita token valido e injeta usuario no request", async () 
   assert.deepEqual(req.usuario, { id: 7, role: "ADMIN" });
 });
 
+test("authMiddleware permite visitante em leitura e bloqueia escrita", async () => {
+  UsuarioModel.findById = async (id) => ({ id, role: "VISITANTE" });
+
+  const token = generateAccessToken({ id: 9, role: "VISITANTE" });
+  const getReq = {
+    method: "GET",
+    originalUrl: "/dashboard/resumo",
+    headers: { authorization: `Bearer ${token}` }
+  };
+  const postReq = {
+    method: "POST",
+    originalUrl: "/maquinas",
+    headers: { authorization: `Bearer ${token}` }
+  };
+
+  const getError = await callMiddleware(authMiddleware, getReq);
+  const postError = await callMiddleware(authMiddleware, postReq);
+
+  assert.equal(getError, undefined);
+  assert.deepEqual(getReq.usuario, { id: 9, role: "VISITANTE" });
+  assert.equal(postError.name, "AppError");
+  assert.equal(postError.statusCode, 403);
+  assert.equal(postError.message, "Perfil visitante possui acesso somente leitura.");
+});
+
+test("authMiddleware permite visitante nas excecoes de IA e logout", async () => {
+  UsuarioModel.findById = async (id) => ({ id, role: "VISITANTE" });
+
+  const token = generateAccessToken({ id: 9, role: "VISITANTE" });
+  const requests = [
+    { method: "POST", originalUrl: "/dashboard/ia/perguntar", headers: { authorization: `Bearer ${token}` } },
+    { method: "POST", originalUrl: "/relatorios/enviar-agora", headers: { authorization: `Bearer ${token}` } },
+    { method: "POST", originalUrl: "/auth/logout", headers: { authorization: `Bearer ${token}` } },
+    { method: "DELETE", originalUrl: "/auth/logout-all", headers: { authorization: `Bearer ${token}` } }
+  ];
+
+  for (const req of requests) {
+    const error = await callMiddleware(authMiddleware, req);
+    assert.equal(error, undefined);
+    assert.deepEqual(req.usuario, { id: 9, role: "VISITANTE" });
+  }
+});
+
 test("authMiddleware bloqueia requisicao sem token", async () => {
   const error = await callMiddleware(authMiddleware, { headers: {} });
 

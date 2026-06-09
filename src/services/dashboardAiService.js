@@ -7,6 +7,7 @@ const logger = require("../utils/logger");
 const AiConfirmationService = require("./aiConfirmationService");
 const AiToolsRegistry = require("./aiTools/registry");
 const { buildConfirmationSummaryText } = require("./dashboardAiConfirmationPresenter");
+const { isVisitante } = require("../utils/authorization");
 
 class DashboardAiService {
   static async buildContext({ usuario }) {
@@ -216,6 +217,10 @@ Use as tools disponíveis quando precisar consultar dashboard, alertas, máquina
   }
 
   static async handleConfirmation({ pergunta, usuario, confirmationResponse }) {
+    if (isVisitante(usuario)) {
+      return this.buildReadOnlyVisitorResponse({ pergunta });
+    }
+
     const id = String(confirmationResponse?.id || "").trim();
     const decision = String(confirmationResponse?.decision || "").trim().toLowerCase();
 
@@ -333,6 +338,14 @@ Use as tools disponíveis quando precisar consultar dashboard, alertas, máquina
       );
 
       if (writeToolCall) {
+        if (isVisitante(usuario)) {
+          return {
+            ...this.buildReadOnlyVisitorResponse({ pergunta }),
+            contextoGeradoEm: contexto.metadata.generatedAt,
+            usedHistoryCount: historicoSeguro.length
+          };
+        }
+
         const writeToolArgs = this.parseToolArguments({
           toolName: writeToolCall.function.name,
           rawArguments: writeToolCall.function.arguments,
@@ -491,6 +504,16 @@ Use as tools disponíveis quando precisar consultar dashboard, alertas, máquina
       ``,
       `Prioridade agora: atender os alertas ativos e, principalmente, os sem atendimento para reduzir risco operacional.`
     ].join("\n");
+  }
+
+  static buildReadOnlyVisitorResponse({ pergunta }) {
+    return {
+      pergunta: typeof pergunta === "string" ? pergunta.trim() : "",
+      resposta: "Seu perfil visitante possui acesso somente leitura. Posso consultar e explicar os dados do Orbis, mas nao posso criar, alterar, excluir, enviar ou executar acoes no sistema.",
+      fallback: false,
+      readOnly: true,
+      requiresConfirmation: false
+    };
   }
 }
 
