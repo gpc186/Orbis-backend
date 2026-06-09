@@ -6,10 +6,11 @@ const AlertaModel = require("../models/alertaModel");
 const MaquinaModel = require("../models/maquinaModel");
 const SensorModel = require("../models/sensorModel");
 const { normalizeLimit } = require("../utils/requestParsers");
+const { attachSlaToMany } = require("./alertaSlaService");
 
 class DashboardService {
     static async resume() {
-        const [totalMaquinas, maquinasEmAlerta, alertasAtivos, alertasHoje, tecnicosAtivos, integridadeMedia, sensoresOnline, alertaSemAtendimento, alertasAtendidosHoje] = await Promise.all([
+        const [totalMaquinas, maquinasEmAlerta, alertasAtivos, alertasHoje, tecnicosAtivos, integridadeMedia, sensoresOnline, alertaSemAtendimento, alertasAtendidosHoje, slaResumo] = await Promise.all([
             MaquinaService.count(),
             AlertaService.countMaquinasWithAlerta(),
             AlertaService.countActiveAlertas(),
@@ -18,10 +19,11 @@ class DashboardService {
             MaquinaService.calculateAverageIntegrity(),
             SensorService.countActive(),
             AlertaService.countAlertaSemAtendimento(),
-            AlertaService.countAtendedToday()
+            AlertaService.countAtendedToday(),
+            AlertaService.getSlaSummary()
         ]);
          
-        return { totalMaquinas, maquinasEmAlerta, maquinasFuncionando: totalMaquinas - maquinasEmAlerta, alertasAtivos, alertasHoje, tecnicosAtivos, integridadeMedia: integridadeMedia._avg.integridade, sensoresOnline, alertaSemAtendimento, alertasAtendidosHoje }
+        return { totalMaquinas, maquinasEmAlerta, maquinasFuncionando: totalMaquinas - maquinasEmAlerta, alertasAtivos, alertasHoje, tecnicosAtivos, integridadeMedia: integridadeMedia._avg.integridade, sensoresOnline, alertaSemAtendimento, alertasAtendidosHoje, ...slaResumo }
     }
 
     static buildDestaquesFromResumo(resumo = {}) {
@@ -42,7 +44,8 @@ class DashboardService {
 
     static async getTopAlertas({ limit = 5 } = {}) {
         const safeLimit = normalizeLimit(limit, 5);
-        return AlertaModel.listTopAtivos({ limit: safeLimit });
+        const alertas = await AlertaModel.listTopAtivos({ limit: safeLimit });
+        return attachSlaToMany(alertas, { stripSources: true });
     }
 
     static async getMaquinasCriticas({ limit = 5 } = {}) {
