@@ -20,6 +20,7 @@ const originals = {
   countActive: SensorService.countActive,
   countAlertaSemAtendimento: AlertaService.countAlertaSemAtendimento,
   countAtendedToday: AlertaService.countAtendedToday,
+  getSlaSummary: AlertaService.getSlaSummary,
   listTopAtivos: AlertaModel.listTopAtivos,
   listPioresIntegridade: MaquinaModel.listPioresIntegridade,
   listOfflineRecentes: SensorModel.listOfflineRecentes
@@ -35,6 +36,7 @@ afterEach(() => {
   SensorService.countActive = originals.countActive;
   AlertaService.countAlertaSemAtendimento = originals.countAlertaSemAtendimento;
   AlertaService.countAtendedToday = originals.countAtendedToday;
+  AlertaService.getSlaSummary = originals.getSlaSummary;
   AlertaModel.listTopAtivos = originals.listTopAtivos;
   MaquinaModel.listPioresIntegridade = originals.listPioresIntegridade;
   SensorModel.listOfflineRecentes = originals.listOfflineRecentes;
@@ -50,6 +52,12 @@ test("resume agrega indicadores principais do dashboard", async () => {
   SensorService.countActive = async () => 8;
   AlertaService.countAlertaSemAtendimento = async () => 1;
   AlertaService.countAtendedToday = async () => 6;
+  AlertaService.getSlaSummary = async () => ({
+    slaAtendimentoEmRisco: 1,
+    slaAtendimentoAtrasado: 2,
+    slaResolucaoEmRisco: 3,
+    slaResolucaoAtrasado: 4
+  });
 
   const resumo = await DashboardService.resume();
 
@@ -63,7 +71,11 @@ test("resume agrega indicadores principais do dashboard", async () => {
     integridadeMedia: 87.5,
     sensoresOnline: 8,
     alertaSemAtendimento: 1,
-    alertasAtendidosHoje: 6
+    alertasAtendidosHoje: 6,
+    slaAtendimentoEmRisco: 1,
+    slaAtendimentoAtrasado: 2,
+    slaResolucaoEmRisco: 3,
+    slaResolucaoAtrasado: 4
   });
 });
 
@@ -106,6 +118,30 @@ test("listas do dashboard normalizam limit antes de consultar models", async () 
   ]);
 });
 
+test("getTopAlertas adiciona SLA aos alertas do dashboard", async () => {
+  AlertaModel.listTopAtivos = async () => [{
+    id: 1,
+    tipo: "LIMITE_ULTRAPASSADO",
+    status: "ATIVO",
+    criadoEm: new Date("2026-06-09T10:00:00.000Z"),
+    encerradoEm: null,
+    maquina: {
+      id: 2,
+      nome: "Prensa",
+      criticidade: "ALTA"
+    },
+    eventos: [],
+    manutencoes: []
+  }];
+
+  const result = await DashboardService.getTopAlertas({ limit: 3 });
+
+  assert.equal(result[0].sla.criticidade, "ALTA");
+  assert.equal(result[0].sla.atendimento.limiteMinutos, 30);
+  assert.equal(Object.hasOwn(result[0], "eventos"), false);
+  assert.equal(Object.hasOwn(result[0], "manutencoes"), false);
+});
+
 test("getOperationalContext combina resumo, listas e destaques", async () => {
   const resumo = {
     totalMaquinas: 4,
@@ -130,7 +166,8 @@ test("getOperationalContext combina resumo, listas e destaques", async () => {
     const context = await DashboardService.getOperationalContext({ limit: 3 });
 
     assert.deepEqual(context.resumo, resumo);
-    assert.deepEqual(context.topAlertas, [{ id: 1 }]);
+    assert.equal(context.topAlertas[0].id, 1);
+    assert.equal(context.topAlertas[0].sla.criticidade, "BAIXA");
     assert.deepEqual(context.maquinasCriticas, [{ id: 2 }]);
     assert.deepEqual(context.sensoresOffline, [{ id: 3 }]);
     assert.deepEqual(context.destaques, [

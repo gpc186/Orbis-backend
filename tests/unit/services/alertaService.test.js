@@ -12,9 +12,11 @@ const originals = {
   update: AlertaModel.update,
   create: AlertaModel.create,
   findById: AlertaModel.findById,
+  findAll: AlertaModel.findAll,
   findEventosByAlertaId: AlertaModel.findEventosByAlertaId,
   findAtivos: AlertaModel.findAtivos,
   findByMaquinaId: AlertaModel.findByMaquinaId,
+  findOpenForSla: AlertaModel.findOpenForSla,
   countActiveAlertas: AlertaModel.countActiveAlertas,
   maquinaFindById: MaquinaModel.findById,
   usuarioFindNotificationRecipients: UsuarioModel.findNotificationRecipients,
@@ -27,9 +29,11 @@ afterEach(() => {
   AlertaModel.update = originals.update;
   AlertaModel.create = originals.create;
   AlertaModel.findById = originals.findById;
+  AlertaModel.findAll = originals.findAll;
   AlertaModel.findEventosByAlertaId = originals.findEventosByAlertaId;
   AlertaModel.findAtivos = originals.findAtivos;
   AlertaModel.findByMaquinaId = originals.findByMaquinaId;
+  AlertaModel.findOpenForSla = originals.findOpenForSla;
   AlertaModel.countActiveAlertas = originals.countActiveAlertas;
   MaquinaModel.findById = originals.maquinaFindById;
   UsuarioModel.findNotificationRecipients = originals.usuarioFindNotificationRecipients;
@@ -150,7 +154,14 @@ test("findByMaquinaId valida maquina, aplica limit seguro e filtro de ativos", a
   let consulta;
   AlertaModel.findByMaquinaId = async (maquinaId, options) => {
     consulta = { maquinaId, options };
-    return [{ id: 1 }, { id: 2 }];
+    return [{
+      id: 1,
+      status: "ATIVO",
+      criadoEm: new Date("2026-06-09T10:00:00.000Z"),
+      maquina: { criticidade: "ALTA" },
+      eventos: [],
+      manutencoes: []
+    }];
   };
 
   const result = await AlertaService.findByMaquinaId("4", {
@@ -166,10 +177,74 @@ test("findByMaquinaId valida maquina, aplica limit seguro e filtro de ativos", a
       status: "ATIVO"
     }
   });
-  assert.deepEqual(result, {
-    total: 2,
-    dados: [{ id: 1 }, { id: 2 }]
-  });
+  assert.equal(result.total, 1);
+  assert.equal(result.dados[0].sla.criticidade, "ALTA");
+  assert.equal(result.dados[0].sla.atendimento.limiteMinutos, 30);
+  assert.equal(Object.hasOwn(result.dados[0], "eventos"), false);
+  assert.equal(Object.hasOwn(result.dados[0], "manutencoes"), false);
+});
+
+test("findAll retorna alertas com SLA sem expor fontes internas do calculo", async () => {
+  AlertaModel.findAll = async () => [{
+    id: 1,
+    status: "ATIVO",
+    criadoEm: new Date("2026-06-09T10:00:00.000Z"),
+    maquina: { criticidade: "MEDIA" },
+    eventos: [{ tipo: "ACEITO", criadoEm: new Date("2026-06-09T11:00:00.000Z") }],
+    manutencoes: []
+  }];
+
+  const result = await AlertaService.findAll();
+
+  assert.equal(result[0].sla.criticidade, "MEDIA");
+  assert.equal(result[0].sla.atendimento.status, "CONCLUIDO_NO_PRAZO");
+  assert.equal(Object.hasOwn(result[0], "eventos"), false);
+  assert.equal(Object.hasOwn(result[0], "manutencoes"), false);
+});
+
+test("getSlaSummary agrega alertas abertos por status de SLA", async () => {
+  AlertaModel.findOpenForSla = async () => [
+    {
+      id: 1,
+      status: "ATIVO",
+      criadoEm: new Date("2026-06-09T10:00:00.000Z"),
+      maquina: { criticidade: "ALTA" },
+      eventos: [],
+      manutencoes: []
+    },
+    {
+      id: 2,
+      status: "EM_ANDAMENTO",
+      criadoEm: new Date("2026-06-09T10:00:00.000Z"),
+      maquina: { criticidade: "MEDIA" },
+      eventos: [{ tipo: "ACEITO", criadoEm: new Date("2026-06-09T10:20:00.000Z") }],
+      manutencoes: []
+    }
+  ];
+
+  const originalDate = global.Date;
+  const fixedNow = new originalDate("2026-06-09T20:00:00.000Z");
+
+  global.Date = class extends originalDate {
+    constructor(...args) {
+      return args.length ? new originalDate(...args) : fixedNow;
+    }
+
+    static now() {
+      return fixedNow.getTime();
+    }
+  };
+
+  try {
+    assert.deepEqual(await AlertaService.getSlaSummary(), {
+      slaAtendimentoEmRisco: 0,
+      slaAtendimentoAtrasado: 1,
+      slaResolucaoEmRisco: 1,
+      slaResolucaoAtrasado: 1
+    });
+  } finally {
+    global.Date = originalDate;
+  }
 });
 
 test("findByMaquinaId falha para id invalido ou maquina inexistente", async () => {
