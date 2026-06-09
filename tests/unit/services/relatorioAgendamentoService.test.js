@@ -39,6 +39,10 @@ function tecnico() {
   return { id: 2, role: "TECNICO" };
 }
 
+function visitante() {
+  return { id: 3, role: "VISITANTE" };
+}
+
 function validPayload(overrides = {}) {
   return {
     nome: "Resumo semanal",
@@ -120,6 +124,13 @@ test("preview exige admin, valida payload e retorna renderizacao publica", async
       }),
       expectAppError({ statusCode: 403, message: "Apenas ADMIN pode gerenciar relatorios." })
     );
+    await assert.rejects(
+      () => RelatorioAgendamentoService.preview({
+        usuario: visitante(),
+        payload: { periodo: { tipo: "RELATIVE_DAYS", valor: 15 } }
+      }),
+      expectAppError({ statusCode: 403, message: "Apenas ADMIN pode gerenciar relatorios." })
+    );
 
     const result = await RelatorioAgendamentoService.preview({
       usuario: admin(),
@@ -179,7 +190,7 @@ test("create normaliza payload, calcula proximo envio e mapeia resposta", async 
   }
 });
 
-test("list, findById e findByDestinatarioEmail exigem admin e mapeiam resultados", async () => {
+test("list, findById e findByDestinatarioEmail permitem leitura admin/visitante e mapeiam resultados", async () => {
   const restoreModel = patchMethods(RelatorioAgendamentoModel, {
     findAll: async () => [agendamento({ id: 1 }), agendamento({ id: 2 })],
     findById: async (id) => (Number(id) === 404 ? null : agendamento({ id: Number(id) })),
@@ -200,7 +211,11 @@ test("list, findById e findByDestinatarioEmail exigem admin e mapeiam resultados
     assert.deepEqual(list.map((item) => item.id), [1, 2]);
     assert.equal(list[0].descricaoAgendamento, "Diario as 08:30");
 
+    const visitorList = await RelatorioAgendamentoService.list({ usuario: visitante() });
+    assert.deepEqual(visitorList.map((item) => item.id), [1, 2]);
+
     assert.equal((await RelatorioAgendamentoService.findById({ usuario: admin(), id: 7 })).id, 7);
+    assert.equal((await RelatorioAgendamentoService.findById({ usuario: visitante(), id: 8 })).id, 8);
     await assert.rejects(
       () => RelatorioAgendamentoService.findById({ usuario: admin(), id: 404 }),
       expectAppError({ statusCode: 404, message: "Agendamento de relatorio nao encontrado." })

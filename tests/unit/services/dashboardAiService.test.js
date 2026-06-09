@@ -229,6 +229,60 @@ test("DashboardAiService retorna confirmacao para tool de escrita", async () => 
   }
 });
 
+test("DashboardAiService responde somente leitura para visitante quando tool de escrita e solicitada", async () => {
+  const originalBuildContext = DashboardAiService.buildContext;
+  const originalBuildPrompts = DashboardAiService.buildPrompts;
+  const originalGenerateWithTools = GroqService.generateWithTools;
+  const originalPrepareWriteToolAction = AiToolsRegistry.prepareWriteToolAction;
+
+  DashboardAiService.buildContext = async () => ({
+    metadata: {
+      generatedAt: "2026-05-20T12:00:00.000Z",
+      usuario: { id: 3, nome: "Visitante", role: "VISITANTE" }
+    }
+  });
+
+  DashboardAiService.buildPrompts = () => ({
+    messages: [
+      { role: "system", content: "Teste" },
+      { role: "user", content: "Pause o agendamento 12" }
+    ]
+  });
+
+  GroqService.generateWithTools = async () => ({
+    role: "assistant",
+    tool_calls: [{
+      id: "tool-call-1",
+      type: "function",
+      function: {
+        name: "pausar_agendamento_relatorio",
+        arguments: JSON.stringify({ id: 12 })
+      }
+    }]
+  });
+
+  AiToolsRegistry.prepareWriteToolAction = async () => {
+    throw new Error("nao deveria preparar escrita");
+  };
+
+  try {
+    const result = await DashboardAiService.answer({
+      pergunta: "Pause o agendamento 12",
+      usuario: { id: 3, nome: "Visitante", role: "VISITANTE" },
+      historico: []
+    });
+
+    assert.equal(result.readOnly, true);
+    assert.equal(result.requiresConfirmation, false);
+    assert.match(result.resposta, /somente leitura/);
+  } finally {
+    DashboardAiService.buildContext = originalBuildContext;
+    DashboardAiService.buildPrompts = originalBuildPrompts;
+    GroqService.generateWithTools = originalGenerateWithTools;
+    AiToolsRegistry.prepareWriteToolAction = originalPrepareWriteToolAction;
+  }
+});
+
 test("DashboardAiService resolve cancelamento de confirmacao", async () => {
   const originalCancel = AiConfirmationService.cancel;
   const originalExecuteWriteTool = AiToolsRegistry.executeWriteTool;

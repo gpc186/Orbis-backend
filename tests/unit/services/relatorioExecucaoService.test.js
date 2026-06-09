@@ -101,6 +101,27 @@ test("executarManual valida payload, cria execucao, envia email e marca sucesso"
   assert.equal(result.origemTemplate, "backend");
 });
 
+test("executarManual permite visitante enviar relatorio avulso", async () => {
+  RelatorioRendererService.render = async (normalized) => ({
+    subject: normalized.assunto,
+    html: "<p>ok</p>",
+    text: "ok"
+  });
+
+  RelatorioExecucaoModel.create = async (payload) => ({ id: 44, ...payload });
+  RelatorioExecucaoModel.markSuccess = async () => {};
+  EmailService.send = async () => ({ provider: "resend", messageId: "msg-visitante" });
+
+  const result = await RelatorioExecucaoService.executarManual({
+    usuario: { id: 3, role: "VISITANTE" },
+    payload: buildPayload()
+  });
+
+  assert.equal(result.execucaoId, 44);
+  assert.equal(result.messageId, "msg-visitante");
+  assert.equal(result.quantidadeDestinatarios, 2);
+});
+
 test("executarManual bloqueia tecnico e marca falha quando envio falha", async () => {
   await assert.rejects(
     () => RelatorioExecucaoService.executarManual({
@@ -275,7 +296,7 @@ test("executarAgendamento preserva 404 quando agendamento nao existe", async () 
   );
 });
 
-test("listExecutions exige admin e mapeia datas de execucao", async () => {
+test("listExecutions permite admin/visitante e mapeia datas de execucao", async () => {
   await assert.rejects(
     () => RelatorioExecucaoService.listExecutions({
       id: 1,
@@ -300,4 +321,11 @@ test("listExecutions exige admin e mapeia datas de execucao", async () => {
   assert.equal(result[0].id, 1);
   assert.match(result[0].iniciadoEm, /^2026-06-04T/);
   assert.equal(result[0].finalizadoEm, null);
+
+  const visitorResult = await RelatorioExecucaoService.listExecutions({
+    id: 1,
+    usuario: { id: 3, role: "VISITANTE" }
+  });
+
+  assert.equal(visitorResult[0].id, 1);
 });

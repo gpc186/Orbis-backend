@@ -13,6 +13,7 @@ const AppError = require("../../../../src/utils/appErrorUtils");
 const { executeTool, prepareWriteToolAction, executeWriteTool } = require("../../../../src/services/aiTools/registry");
 
 const admin = { id: 1, role: "ADMIN" };
+const visitante = { id: 3, role: "VISITANTE" };
 
 test("executeTool consulta resumo do dashboard", async () => {
   const originalResume = DashboardService.resume;
@@ -157,6 +158,27 @@ test("executeTool bloqueia usuario nao ADMIN", async () => {
       return true;
     }
   );
+});
+
+test("executeTool permite visitante em consulta administrativa", async () => {
+  const originalResume = DashboardService.resume;
+
+  DashboardService.resume = async () => ({
+    totalMaquinas: 1,
+    maquinasEmAlerta: 0
+  });
+
+  try {
+    const result = await executeTool({
+      name: "buscar_dashboard_resumo",
+      args: {},
+      usuario: visitante
+    });
+
+    assert.equal(result.totalMaquinas, 1);
+  } finally {
+    DashboardService.resume = originalResume;
+  }
 });
 
 test("executeTool consulta usuario por nome", async () => {
@@ -756,6 +778,21 @@ test("prepareWriteToolAction cria agendamento de relatório", async () => {
   assert.equal(result.name, "criar_agendamento_relatorio");
   assert.equal(result.summary.nome, "Relatório Semanal");
   assert.equal(result.summary.emailsDestino[0], "gestao@orbis.com");
+});
+
+test("prepareWriteToolAction bloqueia visitante em tool de escrita", async () => {
+  await assert.rejects(
+    () => prepareWriteToolAction({
+      name: "criar_agendamento_relatorio",
+      args: {},
+      usuario: visitante
+    }),
+    (error) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 403);
+      return true;
+    }
+  );
 });
 
 test("prepareWriteToolAction atualiza agendamento por e-mail com resultado único", async () => {

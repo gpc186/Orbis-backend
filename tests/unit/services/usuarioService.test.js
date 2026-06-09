@@ -194,6 +194,15 @@ test("register valida entrada, evita email duplicado, hasheia senha e cria usuar
       senha: undefined,
       role: "TECNICO"
     });
+
+    const visitante = await UsuarioService.register({
+      nome: "Visitante Demo",
+      email: "visitante@teste.com",
+      senha: "Senha123!",
+      role: "VISITANTE"
+    });
+
+    assert.equal(visitante.usuario.role, "VISITANTE");
   } finally {
     restoreBcrypt();
     restoreUsuario();
@@ -296,6 +305,9 @@ test("findByNome normaliza aliases de role e ignora alias generico de usuario", 
 
     await UsuarioService.findByNome({ nome: "Carlos", role: "técnico" });
     assert.equal(capturedArgs.role, "TECNICO");
+
+    await UsuarioService.findByNome({ nome: "Carlos", role: "visitante" });
+    assert.equal(capturedArgs.role, "VISITANTE");
   } finally {
     UsuarioModel.findByNome = originalFindByNome;
   }
@@ -508,6 +520,10 @@ test("update valida campos, protege ultimo admin e atualiza somente dados enviad
       expectAppError({ statusCode: 409, message: "Nao e possivel rebaixar o ultimo admin!" })
     );
     await assert.rejects(
+      () => UsuarioService.update({ id: 1, dados: { role: "VISITANTE" } }),
+      expectAppError({ statusCode: 409, message: "Nao e possivel rebaixar o ultimo admin!" })
+    );
+    await assert.rejects(
       () => UsuarioService.update({ id: 2, dados: { nome: "Ca" } }),
       expectAppError({ statusCode: 400, message: "Nome invalido!" })
     );
@@ -538,6 +554,7 @@ test("update valida campos, protege ultimo admin e atualiza somente dados enviad
         nome: "Carlos Silva",
         especialidade: "Eletrica",
         telefone: "(11) 99999-9999",
+        role: "VISITANTE",
         ativo: false
       }
     }), {
@@ -545,6 +562,7 @@ test("update valida campos, protege ultimo admin e atualiza somente dados enviad
       nome: "Carlos Silva",
       especialidade: "Eletrica",
       telefone: "(11) 99999-9999",
+      role: "VISITANTE",
       ativo: false
     });
     assert.deepEqual(updates, [{
@@ -553,6 +571,7 @@ test("update valida campos, protege ultimo admin e atualiza somente dados enviad
         nome: "Carlos Silva",
         especialidade: "Eletrica",
         telefone: "(11) 99999-9999",
+        role: "VISITANTE",
         ativo: false
       }
     }]);

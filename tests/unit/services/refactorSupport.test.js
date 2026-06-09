@@ -2,7 +2,11 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const AppError = require("../../../src/utils/appErrorUtils");
-const { assertRole } = require("../../../src/utils/authorization");
+const {
+  assertRole,
+  assertAdminRead,
+  assertAdminWrite
+} = require("../../../src/utils/authorization");
 const {
   normalizeLimit,
   parseFiniteNumber,
@@ -31,6 +35,16 @@ test("assertRole permite role valida e bloqueia role invalida com mensagem custo
     assert.ok(error instanceof AppError);
     assert.equal(error.statusCode, 403);
     assert.equal(error.message, "Sem permissao.");
+    return true;
+  });
+});
+
+test("helpers de autorizacao permitem visitante na leitura admin e bloqueiam escrita", async () => {
+  assert.doesNotThrow(() => assertAdminRead({ id: 3, role: "VISITANTE" }));
+
+  assert.throws(() => assertAdminWrite({ id: 3, role: "VISITANTE" }), (error) => {
+    assert.ok(error instanceof AppError);
+    assert.equal(error.statusCode, 403);
     return true;
   });
 });
