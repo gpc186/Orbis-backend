@@ -72,7 +72,16 @@ class AlertaModel {
             include: {
                 sensor: true,
                 maquina: true,
-                tecnico: { select: { nome: true } }
+                tecnico: { select: { nome: true } },
+                eventos: {
+                    where: { tipo: { in: ["ACEITO", "RESOLVIDO"] } },
+                    select: { tipo: true, criadoEm: true },
+                    orderBy: { criadoEm: "asc" }
+                },
+                manutencoes: {
+                    select: { criadoEm: true },
+                    orderBy: { criadoEm: "asc" }
+                }
             },
             orderBy: { criadoEm: 'desc' }
         });
@@ -126,15 +135,26 @@ class AlertaModel {
                 id: true,
                 tipo: true,
                 status: true,
+                mensagem: true,
                 maquinaId: true,
                 sensorId: true,
                 criadoEm: true,
+                encerradoEm: true,
                 maquina: {
                     select: {
                         id: true,
                         nome: true,
                         criticidade: true
                     }
+                },
+                eventos: {
+                    where: { tipo: { in: ["ACEITO", "RESOLVIDO"] } },
+                    select: { tipo: true, criadoEm: true },
+                    orderBy: { criadoEm: "asc" }
+                },
+                manutencoes: {
+                    select: { criadoEm: true },
+                    orderBy: { criadoEm: "asc" }
                 }
             }
         });
@@ -173,6 +193,15 @@ class AlertaModel {
                         role: true,
                         ativo: true
                     }
+                },
+                eventos: {
+                    where: { tipo: { in: ["ACEITO", "RESOLVIDO"] } },
+                    select: { tipo: true, criadoEm: true },
+                    orderBy: { criadoEm: "asc" }
+                },
+                manutencoes: {
+                    select: { criadoEm: true },
+                    orderBy: { criadoEm: "asc" }
                 }
             }
         });
@@ -213,6 +242,41 @@ class AlertaModel {
                         role: true,
                         ativo: true
                     }
+                },
+                eventos: {
+                    where: { tipo: { in: ["ACEITO", "RESOLVIDO"] } },
+                    select: { tipo: true, criadoEm: true },
+                    orderBy: { criadoEm: "asc" }
+                },
+                manutencoes: {
+                    select: { criadoEm: true },
+                    orderBy: { criadoEm: "asc" }
+                }
+            }
+        });
+    }
+
+    static async findOpenForSla() {
+        return prisma.alerta.findMany({
+            where: { status: { in: ["ATIVO", "EM_ANDAMENTO"] } },
+            select: {
+                id: true,
+                status: true,
+                criadoEm: true,
+                encerradoEm: true,
+                maquina: {
+                    select: {
+                        criticidade: true
+                    }
+                },
+                eventos: {
+                    where: { tipo: { in: ["ACEITO", "RESOLVIDO"] } },
+                    select: { tipo: true, criadoEm: true },
+                    orderBy: { criadoEm: "asc" }
+                },
+                manutencoes: {
+                    select: { criadoEm: true },
+                    orderBy: { criadoEm: "asc" }
                 }
             }
         });

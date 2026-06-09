@@ -4,6 +4,11 @@ const UsuarioModel = require("../models/usuarioModel");
 const AppError = require("../utils/appErrorUtils");
 const OneSignalService = require("./oneSignalService");
 const logger = require("../utils/logger");
+const {
+  attachSla,
+  attachSlaToMany,
+  summarizeOpenSla
+} = require("./alertaSlaService");
 
 class AlertaService {
   static async gerarAlerta(sensorId, maquinaId, tipo, mensagem) {
@@ -157,7 +162,8 @@ class AlertaService {
   }
 
   static async findAll() {
-    return await AlertaModel.findAll();
+    const alertas = await AlertaModel.findAll();
+    return attachSlaToMany(alertas, { stripSources: true });
   }
 
   static async findAllEventos() {
@@ -197,7 +203,7 @@ class AlertaService {
         throw new AppError("Alerta nao encontrada.", 404);
       }
 
-      return alerta;
+      return attachSla(alerta);
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
@@ -218,7 +224,7 @@ class AlertaService {
       const dados = await AlertaModel.findAtivos({ limit: safeLimit });
       return {
         total: dados.length,
-        dados
+        dados: attachSlaToMany(dados, { stripSources: true })
       };
     } catch (error) {
       logger.error("alerta_find_active_error", { limit: safeLimit, error });
@@ -249,7 +255,7 @@ class AlertaService {
 
       return {
         total: dados.length,
-        dados
+        dados: attachSlaToMany(dados, { stripSources: true })
       };
     } catch (error) {
       if (error instanceof AppError) {
@@ -263,6 +269,16 @@ class AlertaService {
         error
       });
       throw new AppError("Erro ao buscar alertas da maquina.", 500);
+    }
+  }
+
+  static async getSlaSummary() {
+    try {
+      const alertas = await AlertaModel.findOpenForSla();
+      return summarizeOpenSla(alertas);
+    } catch (error) {
+      logger.error("alerta_sla_summary_error", { error });
+      throw new AppError("Erro ao calcular SLA dos alertas.", 500);
     }
   }
 }
