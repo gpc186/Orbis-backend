@@ -5,6 +5,7 @@ const ManutencaoService = require("../../../src/services/manutencaoService");
 const AlertaModel = require("../../../src/models/alertaModel");
 const ManutencaoModel = require("../../../src/models/manutencaoModel");
 const UsuarioModel = require("../../../src/models/usuarioModel");
+const simuladorJob = require("../../../src/jobs/simuladorJob");
 
 const originals = {
   alertaFindById: AlertaModel.findById,
@@ -12,7 +13,8 @@ const originals = {
   manutencaoCreateWithAlertSync: ManutencaoModel.createWithAlertSync,
   manutencaoFindById: ManutencaoModel.findById,
   manutencaoUpdateWithAlertSync: ManutencaoModel.updateWithAlertSync,
-  usuarioFindById: UsuarioModel.findById
+  usuarioFindById: UsuarioModel.findById,
+  resetarMaquinaSimulada: simuladorJob.resetarMaquinaSimulada
 };
 
 afterEach(() => {
@@ -22,6 +24,7 @@ afterEach(() => {
   ManutencaoModel.findById = originals.manutencaoFindById;
   ManutencaoModel.updateWithAlertSync = originals.manutencaoUpdateWithAlertSync;
   UsuarioModel.findById = originals.usuarioFindById;
+  simuladorJob.resetarMaquinaSimulada = originals.resetarMaquinaSimulada;
 });
 
 test("create valida entidades e cria manutencao em andamento sincronizada com alerta", async () => {
@@ -83,14 +86,20 @@ test("update valida responsavel e envia apenas campos normalizados", async () =>
     id: 5,
     alertaId: 10,
     usuarioId: 7,
-    status: "EM_ANDAMENTO"
+    status: "EM_ANDAMENTO",
+    alerta: { maquinaId: 55 }
   });
   UsuarioModel.findById = async () => ({ id: 7, ativo: true });
 
   let payloadRecebido;
+  let maquinaResetada = null;
   ManutencaoModel.updateWithAlertSync = async (payload) => {
     payloadRecebido = payload;
     return { id: payload.manutencaoId, ...payload.dados };
+  };
+  simuladorJob.resetarMaquinaSimulada = (maquinaId) => {
+    maquinaResetada = maquinaId;
+    return true;
   };
 
   const result = await ManutencaoService.update("5", "7", {
@@ -110,6 +119,7 @@ test("update valida responsavel e envia apenas campos normalizados", async () =>
     }
   });
   assert.equal(result.status, "RESOLVIDO");
+  assert.equal(maquinaResetada, 55);
 });
 
 test("update bloqueia manutencao encerrada, outro tecnico e payload vazio", async () => {
