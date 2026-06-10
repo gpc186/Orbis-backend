@@ -3,10 +3,19 @@ const ManutecaoService = require("../services/manutencaoService");
 class ManutecaoController {
   static async create(req, res, next) {
     try {
-      const { alertaId, maquinaId, tipo, observacao } = req.body;
+      const { alertaId, maquinaId, tipo, titulo, prioridade, dataAgendada, observacao } = req.body;
       const { id: usuarioId } = req.usuario;
 
-      const response = await ManutecaoService.create({ alertaId, maquinaId, tipo, usuarioId, observacao });
+      const response = await ManutecaoService.create({
+        alertaId,
+        maquinaId,
+        tipo,
+        titulo,
+        prioridade,
+        dataAgendada,
+        usuarioId,
+        observacao
+      });
       return res.status(201).json(response);
     } catch (error) {
       next(error);
