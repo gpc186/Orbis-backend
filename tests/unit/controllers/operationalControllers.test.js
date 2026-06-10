@@ -200,7 +200,7 @@ test("ManutencaoController repassa payloads e usuario autenticado", async () => 
   const createRes = createResponse();
   await ManutencaoController.create({
     usuario: { id: 9 },
-    body: { alertaId: "4", observacao: "verificar" }
+    body: { alertaId: "4", tipo: "CORRETIVA", maquinaId: "8", observacao: "verificar" }
   }, createRes, captureNext());
 
   const findRes = createResponse();
@@ -217,14 +217,17 @@ test("ManutencaoController repassa payloads e usuario autenticado", async () => 
   }, updateRes, captureNext());
 
   const listRes = createResponse();
-  await ManutencaoController.list({ query: { page: "2", limit: "10" } }, listRes, captureNext());
+  await ManutencaoController.list({
+    usuario: { id: 9, role: "TECNICO" },
+    query: { page: "2", limit: "10" }
+  }, listRes, captureNext());
 
   assert.deepEqual(chamadas, [
-    ["create", { alertaId: "4", usuarioId: 9, observacao: "verificar" }],
+    ["create", { alertaId: "4", maquinaId: "8", tipo: "CORRETIVA", usuarioId: 9, observacao: "verificar" }],
     ["findById", "5"],
     ["findByAlertaId", "4"],
     ["update", "5", 9, { dados: { status: "RESOLVIDO", observacao: "ok" } }],
-    ["list", { page: "2", limit: "10" }]
+    ["list", { page: "2", limit: "10", usuario: { id: 9, role: "TECNICO" } }]
   ]);
   assert.equal(createRes.statusCode, 201);
   assert.deepEqual(findRes.body, { id: 5 });
