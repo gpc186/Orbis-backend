@@ -990,8 +990,18 @@ function mapManutencao(item) {
     maquinaId: item.maquinaId,
     usuarioId: item.usuarioId,
     tipo: item.tipo,
+    titulo: item.titulo,
+    prioridade: item.prioridade,
+    origem: item.origem,
     observacao: item.observacao,
     status: item.status,
+    dataAgendada: item.dataAgendada,
+    janelaAgendadaInicio: item.janelaAgendadaInicio,
+    janelaAgendadaFim: item.janelaAgendadaFim,
+    concluidaEm: item.concluidaEm,
+    cumprimentoAgendamento: item.cumprimentoAgendamento,
+    diasDesvioAgendamento: item.diasDesvioAgendamento,
+    metadataPredicao: item.metadataPredicao,
     criadoEm: item.criadoEm,
     alerta: item.alerta
       ? {
@@ -1049,7 +1059,12 @@ function mapAlertaEvento(item) {
           id: item.manutencao.id,
           tipo: item.manutencao.tipo,
           maquinaId: item.manutencao.maquinaId,
+          titulo: item.manutencao.titulo,
+          prioridade: item.manutencao.prioridade,
+          origem: item.manutencao.origem,
           status: item.manutencao.status,
+          dataAgendada: item.manutencao.dataAgendada,
+          cumprimentoAgendamento: item.manutencao.cumprimentoAgendamento,
           criadoEm: item.manutencao.criadoEm
         }
       : null

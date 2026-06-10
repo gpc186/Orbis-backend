@@ -262,11 +262,15 @@ async function prepareWriteToolAction({ name, args, usuario }) {
       throw new AppError("Status de manutencao invalido.", 400);
     }
 
-    if (manutencao.usuarioId !== usuario.id) {
+    const tecnicoPodeAssumirAgendada = manutencao.usuarioId == null
+      && manutencao.status === "AGENDADA"
+      && status === "EM_ANDAMENTO";
+
+    if (manutencao.usuarioId !== usuario.id && !tecnicoPodeAssumirAgendada) {
       throw new AppError("Voce nao pode atualizar a manutencao de outro tecnico.", 403);
     }
 
-    if (manutencao.status !== "EM_ANDAMENTO") {
+    if (!["AGENDADA", "EM_ANDAMENTO"].includes(manutencao.status)) {
       throw new AppError("Manutencao encerrada nao pode mais ser alterada.", 409);
     }
 
@@ -457,7 +461,7 @@ async function executeWriteTool({ action, usuario }) {
     });
 
     return {
-      message: "Manutenção criada com sucesso.",
+      message: "Manutencao criada com sucesso.",
       manutencao: mapManutencao(result)
     };
   }
@@ -468,7 +472,7 @@ async function executeWriteTool({ action, usuario }) {
     });
 
     return {
-      message: "Manutenção atualizada com sucesso.",
+      message: "Manutencao atualizada com sucesso.",
       manutencao: mapManutencao(result)
     };
   }
