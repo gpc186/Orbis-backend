@@ -388,7 +388,38 @@ test("update reaproveita valores existentes e valida relacao entre ideal e limit
   }
 });
 
-test("update desconecta maquina quando maquinaId nao e enviado", async () => {
+test("update mantem maquina atual quando maquinaId nao e enviado", async () => {
+  let capturedArgs;
+  const restoreSensor = patchMethods(SensorModel, {
+    findById: async () => sensorFixture(),
+    update: async (id, dados) => {
+      capturedArgs = { id, dados };
+      return { id, ...dados };
+    }
+  });
+  const restoreMaquina = patchMethods(MaquinaModel, {
+    findById: async (id) => ({ id, nome: "Prensa" })
+  });
+
+  try {
+    const result = await SensorService.update(7, {
+      tipo: "Temperatura",
+      status: "ONLINE",
+      limiteTemperatura: 95
+    });
+
+    assert.equal(capturedArgs.id, 7);
+    assert.equal(capturedArgs.dados.maquinaId, 1);
+    assert.equal(capturedArgs.dados.limiteTemperatura, 95);
+    assert.equal(capturedArgs.dados.idealTemperatura, 60);
+    assert.equal(result.maquinaId, 1);
+  } finally {
+    restoreMaquina();
+    restoreSensor();
+  }
+});
+
+test("update desconecta maquina quando maquinaId e enviado vazio", async () => {
   let capturedArgs;
   const restoreSensor = patchMethods(SensorModel, {
     findById: async () => sensorFixture(),
@@ -400,6 +431,7 @@ test("update desconecta maquina quando maquinaId nao e enviado", async () => {
 
   try {
     const result = await SensorService.update(7, {
+      maquinaId: "",
       tipo: "Temperatura",
       status: "ONLINE"
     });
@@ -407,6 +439,7 @@ test("update desconecta maquina quando maquinaId nao e enviado", async () => {
     assert.deepEqual(capturedArgs, {
       id: 7,
       dados: {
+        maquinaId: "",
         tipo: "Temperatura",
         status: "INATIVO"
       }
