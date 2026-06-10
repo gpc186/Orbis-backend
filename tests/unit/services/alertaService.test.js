@@ -11,6 +11,7 @@ const originals = {
   findAtivo: AlertaModel.findAtivo,
   update: AlertaModel.update,
   create: AlertaModel.create,
+  createComentario: AlertaModel.createComentario,
   findById: AlertaModel.findById,
   findAll: AlertaModel.findAll,
   findEventosByAlertaId: AlertaModel.findEventosByAlertaId,
@@ -28,6 +29,7 @@ afterEach(() => {
   AlertaModel.findAtivo = originals.findAtivo;
   AlertaModel.update = originals.update;
   AlertaModel.create = originals.create;
+  AlertaModel.createComentario = originals.createComentario;
   AlertaModel.findById = originals.findById;
   AlertaModel.findAll = originals.findAll;
   AlertaModel.findEventosByAlertaId = originals.findEventosByAlertaId;
@@ -200,6 +202,102 @@ test("findAll retorna alertas com SLA sem expor fontes internas do calculo", asy
   assert.equal(result[0].sla.atendimento.status, "CONCLUIDO_NO_PRAZO");
   assert.equal(Object.hasOwn(result[0], "eventos"), false);
   assert.equal(Object.hasOwn(result[0], "manutencoes"), false);
+});
+
+test("createComentario cria evento de comentario para admin ou tecnico", async () => {
+  AlertaModel.findById = async (id) => ({ id: Number(id), status: "RESOLVIDO" });
+
+  let payloadRecebido;
+  AlertaModel.createComentario = async (payload) => {
+    payloadRecebido = payload;
+    return {
+      id: 31,
+      alertaId: Number(payload.alertaId),
+      usuarioId: payload.usuarioId,
+      tipo: "COMENTARIO",
+      mensagem: payload.mensagem,
+      descricao: "Comentario adicionado",
+      usuario: {
+        id: payload.usuarioId,
+        nome: "Tecnico",
+        email: "tecnico@orbis.com",
+        role: "TECNICO"
+      }
+    };
+  };
+
+  const result = await AlertaService.createComentario({
+    alertaId: "12",
+    usuario: { id: 5, role: "TECNICO" },
+    mensagem: "  Verifiquei a maquina.  "
+  });
+
+  assert.deepEqual(payloadRecebido, {
+    alertaId: "12",
+    usuarioId: 5,
+    mensagem: "Verifiquei a maquina."
+  });
+  assert.deepEqual(result, {
+    id: 31,
+    alertaId: 12,
+    usuarioId: 5,
+    tipo: "COMENTARIO",
+    mensagem: "Verifiquei a maquina.",
+    descricao: "Comentario adicionado",
+    usuario: {
+      id: 5,
+      nome: "Tecnico",
+      email: "tecnico@orbis.com",
+      role: "TECNICO"
+    }
+  });
+});
+
+test("createComentario valida permissao, mensagem e alerta existente", async () => {
+  let createChamado = false;
+  AlertaModel.createComentario = async () => {
+    createChamado = true;
+  };
+
+  await assert.rejects(
+    () => AlertaService.createComentario({
+      alertaId: "12",
+      usuario: { id: 9, role: "VISITANTE" },
+      mensagem: "Nao posso alterar"
+    }),
+    (error) => error.name === "AppError" && error.statusCode === 403
+  );
+
+  await assert.rejects(
+    () => AlertaService.createComentario({
+      alertaId: "12",
+      usuario: { id: 1, role: "ADMIN" },
+      mensagem: "   "
+    }),
+    (error) => error.name === "AppError" && error.statusCode === 400
+  );
+
+  await assert.rejects(
+    () => AlertaService.createComentario({
+      alertaId: "12",
+      usuario: { id: 1, role: "ADMIN" },
+      mensagem: "x".repeat(1001)
+    }),
+    (error) => error.name === "AppError" && error.statusCode === 400
+  );
+
+  AlertaModel.findById = async () => null;
+
+  await assert.rejects(
+    () => AlertaService.createComentario({
+      alertaId: "404",
+      usuario: { id: 1, role: "ADMIN" },
+      mensagem: "Alerta inexistente"
+    }),
+    (error) => error.name === "AppError" && error.statusCode === 404
+  );
+
+  assert.equal(createChamado, false);
 });
 
 test("getSlaSummary agrega alertas abertos por status de SLA", async () => {
