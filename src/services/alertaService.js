@@ -5,10 +5,16 @@ const AppError = require("../utils/appErrorUtils");
 const OneSignalService = require("./oneSignalService");
 const logger = require("../utils/logger");
 const {
+  ROLES,
+  assertRole
+} = require("../utils/authorization");
+const {
   attachSla,
   attachSlaToMany,
   summarizeOpenSla
 } = require("./alertaSlaService");
+
+const COMENTARIO_MAX_LENGTH = 1000;
 
 class AlertaService {
   static async gerarAlerta(sensorId, maquinaId, tipo, mensagem) {
@@ -214,6 +220,48 @@ class AlertaService {
         error
       });
       throw new AppError("Erro ao buscar alerta.", 500);
+    }
+  }
+
+  static async createComentario({ alertaId, usuario, mensagem }) {
+    assertRole({
+      usuario,
+      roles: [ROLES.ADMIN, ROLES.TECNICO],
+      message: "Credenciais invalidas!"
+    });
+
+    const mensagemNormalizada = typeof mensagem === "string" ? mensagem.trim() : "";
+
+    if (!mensagemNormalizada) {
+      throw new AppError("Mensagem do comentario e obrigatoria.", 400);
+    }
+
+    if (mensagemNormalizada.length > COMENTARIO_MAX_LENGTH) {
+      throw new AppError(`Mensagem do comentario deve ter no maximo ${COMENTARIO_MAX_LENGTH} caracteres.`, 400);
+    }
+
+    try {
+      const alerta = await AlertaModel.findById(alertaId);
+      if (!alerta) {
+        throw new AppError("Alerta nao encontrada.", 404);
+      }
+
+      return await AlertaModel.createComentario({
+        alertaId,
+        usuarioId: usuario.id,
+        mensagem: mensagemNormalizada
+      });
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      logger.error("alerta_create_comentario_error", {
+        alertaId,
+        usuarioId: usuario?.id,
+        error
+      });
+      throw new AppError("Erro ao criar comentario do alerta.", 500);
     }
   }
 

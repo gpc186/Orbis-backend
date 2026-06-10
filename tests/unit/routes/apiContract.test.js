@@ -55,6 +55,10 @@ function mockAuthenticatedUsers() {
       return { id: numericId, nome: "Tecnico", role: "TECNICO", ativo: true };
     }
 
+    if (numericId === 3) {
+      return { id: numericId, nome: "Visitante", role: "VISITANTE", ativo: true };
+    }
+
     return null;
   });
 }
@@ -624,6 +628,62 @@ test("GET /alertas/:id/eventos retorna eventos do alerta autenticado", async () 
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.json, [{ id: 6, alertaId: 3, tipo: "CRIADO" }]);
+  });
+});
+
+test("POST /alertas/:id/comentarios permite admin e tecnico, bloqueia visitante", async () => {
+  mockAuthenticatedUsers();
+
+  const chamadas = [];
+  patch(AlertaService, "createComentario", async (payload) => {
+    chamadas.push(payload);
+    return {
+      id: 31,
+      alertaId: Number(payload.alertaId),
+      usuarioId: payload.usuario.id,
+      tipo: "COMENTARIO",
+      mensagem: payload.mensagem,
+      descricao: "Comentario adicionado"
+    };
+  });
+
+  await withServer(async (baseUrl) => {
+    const admin = await request(baseUrl, "/alertas/3/comentarios", {
+      method: "POST",
+      token: tokenFor({ id: 1, role: "ADMIN" }),
+      body: { mensagem: "Comentario do admin" }
+    });
+    const tecnico = await request(baseUrl, "/alertas/3/comentarios", {
+      method: "POST",
+      token: tokenFor({ id: 2, role: "TECNICO" }),
+      body: { mensagem: "Comentario do tecnico" }
+    });
+    const visitante = await request(baseUrl, "/alertas/3/comentarios", {
+      method: "POST",
+      token: tokenFor({ id: 3, role: "VISITANTE" }),
+      body: { mensagem: "Comentario visitante" }
+    });
+
+    assert.equal(admin.status, 201);
+    assert.deepEqual(admin.json, {
+      id: 31,
+      alertaId: 3,
+      usuarioId: 1,
+      tipo: "COMENTARIO",
+      mensagem: "Comentario do admin",
+      descricao: "Comentario adicionado"
+    });
+    assert.equal(tecnico.status, 201);
+    assert.equal(tecnico.json.usuarioId, 2);
+    assert.equal(visitante.status, 403);
+    assert.deepEqual(chamadas.map((payload) => ({
+      alertaId: payload.alertaId,
+      usuarioId: payload.usuario.id,
+      mensagem: payload.mensagem
+    })), [
+      { alertaId: "3", usuarioId: 1, mensagem: "Comentario do admin" },
+      { alertaId: "3", usuarioId: 2, mensagem: "Comentario do tecnico" }
+    ]);
   });
 });
 

@@ -297,6 +297,43 @@ test("AlertaModel.create cria evento inicial na mesma transacao", async () => {
   }]);
 });
 
+test("AlertaModel.createComentario cria evento COMENTARIO com usuario", async () => {
+  let receivedPayload = null;
+
+  patch(prisma.alertaEvento, "create", async (payload) => {
+    receivedPayload = payload;
+    return { id: 31, ...payload.data };
+  });
+
+  const result = await AlertaModel.createComentario({
+    alertaId: "12",
+    usuarioId: "5",
+    mensagem: "Verifiquei a maquina."
+  });
+
+  assert.deepEqual(receivedPayload, {
+    data: {
+      alertaId: 12,
+      usuarioId: 5,
+      tipo: "COMENTARIO",
+      mensagem: "Verifiquei a maquina.",
+      descricao: "Comentario adicionado"
+    },
+    include: {
+      usuario: { select: { id: true, nome: true, email: true, role: true } },
+      manutencao: true
+    }
+  });
+  assert.deepEqual(result, {
+    id: 31,
+    alertaId: 12,
+    usuarioId: 5,
+    tipo: "COMENTARIO",
+    mensagem: "Verifiquei a maquina.",
+    descricao: "Comentario adicionado"
+  });
+});
+
 test("AlertaModel.findByMaquinaPeriodo monta filtros opcionais de periodo, tipos e status", async () => {
   let receivedPayload = null;
 

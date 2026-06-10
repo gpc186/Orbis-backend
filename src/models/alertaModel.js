@@ -115,6 +115,22 @@ class AlertaModel {
         });
     }
 
+    static async createComentario({ alertaId, usuarioId, mensagem }) {
+        return await prisma.alertaEvento.create({
+            data: {
+                alertaId: parseInt(alertaId),
+                usuarioId: parseInt(usuarioId),
+                tipo: "COMENTARIO",
+                mensagem,
+                descricao: "Comentario adicionado"
+            },
+            include: {
+                usuario: { select: { id: true, nome: true, email: true, role: true } },
+                manutencao: true
+            }
+        });
+    }
+
     static async countMaquinasWithAlerta() {
         const alerta = await prisma.alerta.findMany({
             where: { status: 'ATIVO' },

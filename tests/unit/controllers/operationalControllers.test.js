@@ -20,6 +20,7 @@ const originals = {
   findAllEventos: AlertaService.findAllEventos,
   findEventosByAlertaId: AlertaService.findEventosByAlertaId,
   findAlertaById: AlertaService.findById,
+  createAlertaComentario: AlertaService.createComentario,
   createManutencao: ManutencaoService.create,
   findManutencaoById: ManutencaoService.findById,
   findManutencaoByAlertaId: ManutencaoService.findByAlertaId,
@@ -65,6 +66,7 @@ afterEach(() => {
   AlertaService.findAllEventos = originals.findAllEventos;
   AlertaService.findEventosByAlertaId = originals.findEventosByAlertaId;
   AlertaService.findById = originals.findAlertaById;
+  AlertaService.createComentario = originals.createAlertaComentario;
   ManutencaoService.create = originals.createManutencao;
   ManutencaoService.findById = originals.findManutencaoById;
   ManutencaoService.findByAlertaId = originals.findManutencaoByAlertaId;
@@ -139,6 +141,37 @@ test("AlertaController lista alertas, eventos e detalhes por id", async () => {
   assert.deepEqual(eventosRes.body, [{ id: 2 }]);
   assert.deepEqual(eventosByIdRes.body, [{ id: 3, alertaId: 7 }]);
   assert.deepEqual(findRes.body, { id: 7 });
+});
+
+test("AlertaController.createComentario repassa params, usuario e body ao service", async () => {
+  let payloadRecebido;
+  AlertaService.createComentario = async (payload) => {
+    payloadRecebido = payload;
+    return {
+      id: 31,
+      alertaId: Number(payload.alertaId),
+      mensagem: payload.mensagem
+    };
+  };
+
+  const res = createResponse();
+  await AlertaController.createComentario({
+    params: { id: "7" },
+    usuario: { id: 2, role: "TECNICO" },
+    body: { mensagem: "Verifiquei a maquina." }
+  }, res, captureNext());
+
+  assert.deepEqual(payloadRecebido, {
+    alertaId: "7",
+    usuario: { id: 2, role: "TECNICO" },
+    mensagem: "Verifiquei a maquina."
+  });
+  assert.equal(res.statusCode, 201);
+  assert.deepEqual(res.body, {
+    id: 31,
+    alertaId: 7,
+    mensagem: "Verifiquei a maquina."
+  });
 });
 
 test("ManutencaoController repassa payloads e usuario autenticado", async () => {
