@@ -38,6 +38,10 @@ class ManutecaoService {
     }
 
     if (tipoNormalizado === "PREVENTIVA") {
+      if (usuario.role !== ROLES.TECNICO) {
+        throw new AppError("Apenas tecnicos podem criar manutencao preventiva!", 403);
+      }
+
       return await this.createPreventiva({
         maquinaId,
         usuarioId: usuarioIdNum,
