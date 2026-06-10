@@ -5,7 +5,7 @@ const ManutecaoController = require('../controllers/manutencaoController');
 const { ADMIN_READ_ROLES, ROLES } = require('../utils/authorization');
 const router = express.Router();
 
-router.get('/', authMiddleware, roleMiddleware(...ADMIN_READ_ROLES), ManutecaoController.list);
+router.get('/', authMiddleware, roleMiddleware(...ADMIN_READ_ROLES, ROLES.TECNICO), ManutecaoController.list);
 router.post('/', authMiddleware, roleMiddleware(ROLES.ADMIN, ROLES.TECNICO), ManutecaoController.create);
 router.get('/alerta/:id', authMiddleware, roleMiddleware(...ADMIN_READ_ROLES, ROLES.TECNICO), ManutecaoController.findByAlertaId);
 router.get('/:id', authMiddleware, roleMiddleware(...ADMIN_READ_ROLES, ROLES.TECNICO), ManutecaoController.findById);

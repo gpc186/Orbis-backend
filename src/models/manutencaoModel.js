@@ -4,52 +4,60 @@ class ManutecaoModel {
     static INTEGRIDADE_REPARADA = 100;
     static SCORE_ESTABILIDADE_REPARADO = 100;
 
-    static async create({ alertaId, usuarioId, observacao, status }) {
+    static includeRelations = {
+        alerta: true,
+        maquina: {
+            select: {
+                id: true,
+                nome: true,
+                setor: true,
+                tipo: true,
+                criticidade: true,
+                ativo: true,
+                integridade: true,
+                scoreEstabilidade: true
+            }
+        },
+        usuario: {
+            select: {
+                id: true,
+                nome: true,
+                email: true,
+                role: true,
+                telefone: true,
+                especialidade: true
+            }
+        }
+    };
+
+    static async create({ alertaId, maquinaId, usuarioId, tipo, observacao, status }) {
         return await prisma.manutencao.create({
             data: {
                 alertaId,
+                maquinaId,
                 usuarioId,
+                tipo,
                 observacao,
                 status
-            }
+            },
+            include: this.includeRelations
         });
     };
 
-    static async findAll({ skip, take }) {
+    static async findAll({ skip, take, where = {} }) {
         return await prisma.manutencao.findMany({
+            where,
             skip,
             take,
-            include: {
-                alerta: true,
-                usuario: {
-                    select: {
-                        id: true,
-                        nome: true,
-                        email: true,
-                        role: true,
-                        telefone: true,
-                        especialidade: true
-                    }
-                }
-            }
+            include: this.includeRelations,
+            orderBy: { criadoEm: "desc" }
         });
     };
 
     static async findByAlertaId(alertaId) {
         return await prisma.manutencao.findMany({
             where: { alertaId: parseInt(alertaId) },
-            include: {
-                usuario: {
-                    select: {
-                        id: true,
-                        nome: true,
-                        email: true,
-                        role: true,
-                        telefone: true,
-                        especialidade: true
-                    }
-                }
-            },
+            include: this.includeRelations,
             orderBy: { criadoEm: "desc" }
         });
     };
@@ -57,26 +65,15 @@ class ManutecaoModel {
     static async findById(id) {
         return await prisma.manutencao.findUnique({
             where: { id: parseInt(id) },
-            include: {
-                alerta: true,
-                usuario: {
-                    select: {
-                        id: true,
-                        nome: true,
-                        email: true,
-                        role: true,
-                        telefone: true,
-                        especialidade: true
-                    }
-                }
-            }
+            include: this.includeRelations
         });
     };
 
     static async update({ id, dados }) {
         return await prisma.manutencao.update({
             where: { id: parseInt(id) },
-            data: dados
+            data: dados,
+            include: this.includeRelations
         });
     };
 
@@ -89,10 +86,13 @@ class ManutecaoModel {
             const manutencao = await tx.manutencao.create({
                 data: {
                     alertaId,
+                    maquinaId: alerta.maquinaId,
                     usuarioId,
+                    tipo: "CORRETIVA",
                     observacao,
                     status
-                }
+                },
+                include: this.includeRelations
             });
 
             await tx.alerta.update({
@@ -121,6 +121,47 @@ class ManutecaoModel {
         });
     };
 
+    static async repairMaquina(tx, maquinaId, { origem, observacao, referenciaTemporal = new Date() }) {
+        const maquinaReparada = await tx.maquina.update({
+            where: { id: parseInt(maquinaId) },
+            data: {
+                integridade: this.INTEGRIDADE_REPARADA,
+                scoreEstabilidade: this.SCORE_ESTABILIDADE_REPARADO,
+                previsaoManutencao: null,
+                janelaManuInicio: null,
+                janelaManuFim: null
+            }
+        });
+
+        const sensores = await tx.sensor.findMany({
+            where: { maquinaId: maquinaReparada.id },
+            select: {
+                id: true,
+                idealTemperatura: true,
+                idealVibracao: true
+            }
+        });
+
+        await Promise.all(sensores.map((sensor) => tx.sensor.update({
+            where: { id: sensor.id },
+            data: {
+                ultimaTemperatura: sensor.idealTemperatura,
+                ultimaVibracao: sensor.idealVibracao,
+                ultimaLeituraEm: referenciaTemporal
+            }
+        })));
+
+        await tx.historicoIntegridade.create({
+            data: {
+                maquinaId: maquinaReparada.id,
+                integridade: maquinaReparada.integridade,
+                scoreEstabilidade: maquinaReparada.scoreEstabilidade,
+                origem,
+                observacao
+            }
+        });
+    }
+
     static async updateWithAlertSync({ manutencaoId, alertaId, usuarioId, dados }) {
         return await prisma.$transaction(async (tx) => {
             const alerta = await tx.alerta.findUnique({
@@ -129,7 +170,8 @@ class ManutecaoModel {
 
             const manutencaoAtualizada = await tx.manutencao.update({
                 where: { id: parseInt(manutencaoId) },
-                data: dados
+                data: dados,
+                include: this.includeRelations
             });
 
             let tipoEvento = "ATUALIZADO";
@@ -149,43 +191,10 @@ class ManutecaoModel {
                     descricao = dados.observacao ?? "Alerta resolvido";
 
                     if (alerta?.maquinaId) {
-                        const maquinaReparada = await tx.maquina.update({
-                            where: { id: alerta.maquinaId },
-                            data: {
-                                integridade: this.INTEGRIDADE_REPARADA,
-                                scoreEstabilidade: this.SCORE_ESTABILIDADE_REPARADO,
-                                previsaoManutencao: null,
-                                janelaManuInicio: null,
-                                janelaManuFim: null
-                            }
-                        });
-
-                        const sensores = await tx.sensor.findMany({
-                            where: { maquinaId: maquinaReparada.id },
-                            select: {
-                                id: true,
-                                idealTemperatura: true,
-                                idealVibracao: true
-                            }
-                        });
-
-                        await Promise.all(sensores.map((sensor) => tx.sensor.update({
-                            where: { id: sensor.id },
-                            data: {
-                                ultimaTemperatura: sensor.idealTemperatura,
-                                ultimaVibracao: sensor.idealVibracao,
-                                ultimaLeituraEm: encerradoEm
-                            }
-                        })));
-
-                        await tx.historicoIntegridade.create({
-                            data: {
-                                maquinaId: maquinaReparada.id,
-                                integridade: maquinaReparada.integridade,
-                                scoreEstabilidade: maquinaReparada.scoreEstabilidade,
-                                origem: "MANUTENCAO_RESOLVIDA",
-                                observacao: descricao
-                            }
+                        await this.repairMaquina(tx, alerta.maquinaId, {
+                            origem: "MANUTENCAO_RESOLVIDA",
+                            observacao: descricao,
+                            referenciaTemporal: encerradoEm
                         });
                     }
                 } else if (dados.status === "ENCERRADO_SEM_SOLUCAO") {
@@ -226,8 +235,27 @@ class ManutecaoModel {
         });
     };
 
-    static async count(){
-        return prisma.manutencao.count()
+    static async updatePreventiva({ manutencaoId, dados }) {
+        return await prisma.$transaction(async (tx) => {
+            const manutencaoAtualizada = await tx.manutencao.update({
+                where: { id: parseInt(manutencaoId) },
+                data: dados,
+                include: this.includeRelations
+            });
+
+            if (dados.status === "RESOLVIDO") {
+                await this.repairMaquina(tx, manutencaoAtualizada.maquinaId, {
+                    origem: "MANUTENCAO_PREVENTIVA_RESOLVIDA",
+                    observacao: dados.observacao ?? "Manutencao preventiva resolvida"
+                });
+            }
+
+            return manutencaoAtualizada;
+        });
+    };
+
+    static async count(where = {}){
+        return prisma.manutencao.count({ where })
     }
 }
 
