@@ -63,6 +63,21 @@ class AlertaController {
       next(error);
     }
   }
+
+  static async createComentario(req, res, next) {
+    try {
+      const { id } = req.params;
+      const comentario = await AlertaService.createComentario({
+        alertaId: id,
+        usuario: req.usuario,
+        mensagem: req.body?.mensagem
+      });
+
+      return res.status(201).json(comentario);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = AlertaController;
