@@ -1082,7 +1082,7 @@ test("executeWriteTool cria manutenção por alerta", async () => {
       usuario: admin
     });
 
-    assert.equal(result.message, "Manutenção criada com sucesso.");
+    assert.equal(result.message, "Manutencao criada com sucesso.");
     assert.equal(result.manutencao.id, 31);
   } finally {
     ManutecaoService.create = originalCreate;

@@ -223,7 +223,16 @@ test("ManutencaoController repassa payloads e usuario autenticado", async () => 
   }, listRes, captureNext());
 
   assert.deepEqual(chamadas, [
-    ["create", { alertaId: "4", maquinaId: "8", tipo: "CORRETIVA", usuarioId: 9, observacao: "verificar" }],
+    ["create", {
+      alertaId: "4",
+      maquinaId: "8",
+      tipo: "CORRETIVA",
+      titulo: undefined,
+      prioridade: undefined,
+      dataAgendada: undefined,
+      usuarioId: 9,
+      observacao: "verificar"
+    }],
     ["findById", "5"],
     ["findByAlertaId", "4"],
     ["update", "5", 9, { dados: { status: "RESOLVIDO", observacao: "ok" } }],

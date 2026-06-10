@@ -53,14 +53,36 @@ enum TipoEvento {
 }
 
 enum StatusManutencao {
+  AGENDADA
   EM_ANDAMENTO
   RESOLVIDO
   ENCERRADO_SEM_SOLUCAO
+  CANCELADA
 }
 
 enum TipoManutencao {
   CORRETIVA
   PREVENTIVA
+}
+
+enum PrioridadeManutencao {
+  BAIXA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+enum OrigemManutencao {
+  MANUAL
+  ALERTA
+  PREDICAO
+}
+
+enum CumprimentoAgendamento {
+  ANTECIPADA
+  NO_PRAZO
+  ATRASADA
+  NAO_APLICAVEL
 }
 
 enum FrequenciaRelatorio {
@@ -259,22 +281,34 @@ model AlertaEvento {
 }
 
 model Manutencao {
-  id         Int              @id @default(autoincrement())
-  alertaId   Int?
-  maquinaId  Int
-  usuarioId  Int
-  tipo       TipoManutencao   @default(CORRETIVA)
-  observacao String           @db.Text
-  status     StatusManutencao
-  criadoEm   DateTime         @default(now())
+  id                       Int                     @id @default(autoincrement())
+  alertaId                 Int?
+  maquinaId                Int
+  usuarioId                Int?
+  tipo                     TipoManutencao          @default(CORRETIVA)
+  titulo                   String
+  prioridade               PrioridadeManutencao    @default(MEDIA)
+  origem                   OrigemManutencao        @default(ALERTA)
+  observacao               String                  @db.Text
+  status                   StatusManutencao
+  dataAgendada             DateTime?
+  janelaAgendadaInicio     DateTime?
+  janelaAgendadaFim        DateTime?
+  concluidaEm              DateTime?
+  cumprimentoAgendamento   CumprimentoAgendamento  @default(NAO_APLICAVEL)
+  metadataPredicao         Json?
+  criadoEm                 DateTime                @default(now())
 
   alerta  Alerta?        @relation(fields: [alertaId], references: [id], onDelete: SetNull)
   maquina Maquina        @relation(fields: [maquinaId], references: [id])
-  usuario Usuario        @relation(fields: [usuarioId], references: [id])
+  usuario Usuario?       @relation(fields: [usuarioId], references: [id])
   eventos AlertaEvento[]
 
   @@index([maquinaId])
   @@index([tipo])
+  @@index([status])
+  @@index([origem])
+  @@index([dataAgendada])
 }
 
 model RefreshToken {

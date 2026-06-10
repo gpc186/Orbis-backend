@@ -5,6 +5,7 @@ const MaquinaModel = require("../../../src/models/maquinaModel");
 const HistoricoIntegridadeModel = require("../../../src/models/historicoIntegridadeModel");
 const PredicaoRiscoService = require("../../../src/services/predicaoRiscoService");
 const PredicaoService = require("../../../src/services/predicaoService");
+const ManutencaoService = require("../../../src/services/manutencaoService");
 
 const RealDate = Date;
 
@@ -94,8 +95,10 @@ function mockPredicaoDependencies({
   const originalUpdate = MaquinaModel.update;
   const originalFindSerieByMaquina = HistoricoIntegridadeModel.findSerieByMaquina;
   const originalPreverPorMaquina = PredicaoRiscoService.preverPorMaquina;
+  const originalSyncPreventivaPreditiva = ManutencaoService.syncPreventivaPreditiva;
 
   const updateCalls = [];
+  const syncCalls = [];
 
   MaquinaModel.findById = async () => machine;
   MaquinaModel.update = async (id, data) => {
@@ -104,14 +107,20 @@ function mockPredicaoDependencies({
   };
   HistoricoIntegridadeModel.findSerieByMaquina = async () => historico;
   PredicaoRiscoService.preverPorMaquina = async () => riskResult;
+  ManutencaoService.syncPreventivaPreditiva = async (diagnostico) => {
+    syncCalls.push(diagnostico);
+    return null;
+  };
 
   return {
     updateCalls,
+    syncCalls,
     restore() {
       MaquinaModel.findById = originalFindById;
       MaquinaModel.update = originalUpdate;
       HistoricoIntegridadeModel.findSerieByMaquina = originalFindSerieByMaquina;
       PredicaoRiscoService.preverPorMaquina = originalPreverPorMaquina;
+      ManutencaoService.syncPreventivaPreditiva = originalSyncPreventivaPreditiva;
     }
   };
 }
@@ -156,6 +165,7 @@ test("previsaoManutencao retorna SEM_DADOS quando nao ha historico suficiente", 
     assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.SEM_DADOS);
     assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.SEM_MODELO);
     assert.equal(resultado.motivo, PredicaoService.MOTIVOS.HISTORICO_INSUFICIENTE);
+    assert.equal(mocks.syncCalls.length, 1);
   } finally {
     mocks.restore();
     restoreDate();
@@ -181,6 +191,7 @@ test("previsaoManutencao aceita serie de poucos minutos no fluxo normal", async 
     assert.equal(resultado.modeloIntegridade.pontosUsados, 3);
     assert.equal(resultado.modeloIntegridade.janelaHorasCoberta, 0.05);
     assert.equal(mocks.updateCalls[0].data.previsaoManutencao.toISOString(), "2026-05-21T01:45:00.000Z");
+    assert.equal(mocks.syncCalls.length, 1);
   } finally {
     mocks.restore();
     restoreDate();

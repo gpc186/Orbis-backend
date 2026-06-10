@@ -627,6 +627,9 @@ class PredicaoService {
         persisted = await this.limparPrevisao(maquinaId, MaquinaModel);
       }
 
+      const ManutencaoService = require("./manutencaoService");
+      const manutencaoPreditiva = await ManutencaoService.syncPreventivaPreditiva(diagnostico);
+
       return {
         maquinaId: diagnostico.maquina.id,
         estadoPredicao: diagnostico.estadoPredicao,
@@ -636,7 +639,8 @@ class PredicaoService {
         previsaoManutencao: persisted?.previsaoManutencao || null,
         janelaManuInicio: persisted?.janelaManuInicio || null,
         janelaManuFim: persisted?.janelaManuFim || null,
-        modeloIntegridade: this.resumirModeloIntegridade(diagnostico.avaliacaoModelo)
+        modeloIntegridade: this.resumirModeloIntegridade(diagnostico.avaliacaoModelo),
+        manutencaoPreditiva
       };
     } catch (error) {
       throw new AppError("Erro ao calcular previsao de manutencao.", 500);

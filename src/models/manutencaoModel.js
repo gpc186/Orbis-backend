@@ -30,15 +30,40 @@ class ManutecaoModel {
         }
     };
 
-    static async create({ alertaId, maquinaId, usuarioId, tipo, observacao, status }) {
+    static async create({
+        alertaId,
+        maquinaId,
+        usuarioId,
+        tipo,
+        titulo,
+        prioridade,
+        origem,
+        observacao,
+        status,
+        dataAgendada,
+        janelaAgendadaInicio,
+        janelaAgendadaFim,
+        concluidaEm,
+        cumprimentoAgendamento,
+        metadataPredicao
+    }) {
         return await prisma.manutencao.create({
             data: {
                 alertaId,
                 maquinaId,
                 usuarioId,
                 tipo,
+                titulo,
+                prioridade,
+                origem,
                 observacao,
-                status
+                status,
+                dataAgendada,
+                janelaAgendadaInicio,
+                janelaAgendadaFim,
+                concluidaEm,
+                cumprimentoAgendamento,
+                metadataPredicao
             },
             include: this.includeRelations
         });
@@ -69,6 +94,19 @@ class ManutecaoModel {
         });
     };
 
+    static async findOpenPredictiveByMaquinaId(maquinaId) {
+        return await prisma.manutencao.findFirst({
+            where: {
+                maquinaId: parseInt(maquinaId),
+                tipo: "PREVENTIVA",
+                origem: "PREDICAO",
+                status: { in: ["AGENDADA", "EM_ANDAMENTO"] }
+            },
+            include: this.includeRelations,
+            orderBy: { criadoEm: "desc" }
+        });
+    };
+
     static async update({ id, dados }) {
         return await prisma.manutencao.update({
             where: { id: parseInt(id) },
@@ -77,7 +115,17 @@ class ManutecaoModel {
         });
     };
 
-    static async createWithAlertSync({ alertaId, usuarioId, observacao, status }) {
+    static async createWithAlertSync({
+        alertaId,
+        usuarioId,
+        titulo,
+        prioridade,
+        origem,
+        observacao,
+        status,
+        concluidaEm,
+        cumprimentoAgendamento
+    }) {
         return await prisma.$transaction(async (tx) => {
             const alerta = await tx.alerta.findUnique({
                 where: { id: alertaId }
@@ -89,8 +137,13 @@ class ManutecaoModel {
                     maquinaId: alerta.maquinaId,
                     usuarioId,
                     tipo: "CORRETIVA",
+                    titulo,
+                    prioridade,
+                    origem,
                     observacao,
-                    status
+                    status,
+                    concluidaEm,
+                    cumprimentoAgendamento
                 },
                 include: this.includeRelations
             });
@@ -246,7 +299,8 @@ class ManutecaoModel {
             if (dados.status === "RESOLVIDO") {
                 await this.repairMaquina(tx, manutencaoAtualizada.maquinaId, {
                     origem: "MANUTENCAO_PREVENTIVA_RESOLVIDA",
-                    observacao: dados.observacao ?? "Manutencao preventiva resolvida"
+                    observacao: dados.observacao ?? "Manutencao preventiva resolvida",
+                    referenciaTemporal: dados.concluidaEm || new Date()
                 });
             }
 
