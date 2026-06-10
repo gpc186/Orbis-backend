@@ -337,7 +337,7 @@ const tools = [
     type: "function",
     function: {
       name: "buscar_manutencao_por_id",
-      description: "Busca uma manutencao pelo ID com alerta e tecnico vinculados",
+      description: "Busca uma manutencao pelo ID com maquina, alerta opcional e tecnico vinculados",
       parameters: {
         type: "object",
         properties: {
@@ -987,7 +987,9 @@ function mapManutencao(item) {
   return {
     id: item.id,
     alertaId: item.alertaId,
+    maquinaId: item.maquinaId,
     usuarioId: item.usuarioId,
+    tipo: item.tipo,
     observacao: item.observacao,
     status: item.status,
     criadoEm: item.criadoEm,
@@ -997,6 +999,18 @@ function mapManutencao(item) {
           tipo: item.alerta.tipo,
           status: item.alerta.status,
           mensagem: item.alerta.mensagem
+        }
+      : null,
+    maquina: item.maquina
+      ? {
+          id: item.maquina.id,
+          nome: item.maquina.nome,
+          setor: item.maquina.setor,
+          tipo: item.maquina.tipo,
+          criticidade: item.maquina.criticidade,
+          ativo: item.maquina.ativo,
+          integridade: item.maquina.integridade,
+          scoreEstabilidade: item.maquina.scoreEstabilidade
         }
       : null,
     usuario: item.usuario
@@ -1033,6 +1047,8 @@ function mapAlertaEvento(item) {
     manutencao: item.manutencao
       ? {
           id: item.manutencao.id,
+          tipo: item.manutencao.tipo,
+          maquinaId: item.manutencao.maquinaId,
           status: item.manutencao.status,
           criadoEm: item.manutencao.criadoEm
         }

@@ -58,6 +58,11 @@ enum StatusManutencao {
   ENCERRADO_SEM_SOLUCAO
 }
 
+enum TipoManutencao {
+  CORRETIVA
+  PREVENTIVA
+}
+
 enum FrequenciaRelatorio {
   DIARIO
   SEMANAL
@@ -138,6 +143,7 @@ model Maquina {
 
   sensores             Sensor[]
   alertas              Alerta[]
+  manutencoes          Manutencao[]
   historicoIntegridade HistoricoIntegridade[]
   manual               MaquinaManual?
 }
@@ -254,15 +260,21 @@ model AlertaEvento {
 
 model Manutencao {
   id         Int              @id @default(autoincrement())
-  alertaId   Int
+  alertaId   Int?
+  maquinaId  Int
   usuarioId  Int
+  tipo       TipoManutencao   @default(CORRETIVA)
   observacao String           @db.Text
   status     StatusManutencao
   criadoEm   DateTime         @default(now())
 
-  alerta  Alerta         @relation(fields: [alertaId], references: [id], onDelete: Cascade)
+  alerta  Alerta?        @relation(fields: [alertaId], references: [id], onDelete: SetNull)
+  maquina Maquina        @relation(fields: [maquinaId], references: [id])
   usuario Usuario        @relation(fields: [usuarioId], references: [id])
   eventos AlertaEvento[]
+
+  @@index([maquinaId])
+  @@index([tipo])
 }
 
 model RefreshToken {

@@ -687,14 +687,19 @@ test("POST /alertas/:id/comentarios permite admin e tecnico, bloqueia visitante"
   });
 });
 
-test("GET /manutencoes permite apenas admin listar manutencoes", async () => {
+test("GET /manutencoes permite admin/visitante listar tudo e tecnico listar preventivas", async () => {
   mockAuthenticatedUsers();
 
-  patch(ManutencaoService, "list", async ({ page, limit }) => ({
+  const chamadas = [];
+  patch(ManutencaoService, "list", async ({ page, limit, usuario }) => {
+    chamadas.push({ page, limit, usuarioId: usuario.id, role: usuario.role });
+    return {
     page,
     limit,
+    role: usuario.role,
     items: [{ id: 1, status: "EM_ANDAMENTO" }]
-  }));
+    };
+  });
 
   await withServer(async (baseUrl) => {
     const tecnico = await request(baseUrl, "/manutencoes", {
@@ -703,23 +708,42 @@ test("GET /manutencoes permite apenas admin listar manutencoes", async () => {
     const admin = await request(baseUrl, "/manutencoes?page=2&limit=10", {
       token: tokenFor({ id: 1, role: "ADMIN" })
     });
+    const visitante = await request(baseUrl, "/manutencoes", {
+      token: tokenFor({ id: 3, role: "VISITANTE" })
+    });
 
-    assert.equal(tecnico.status, 403);
+    assert.equal(tecnico.status, 200);
     assert.equal(admin.status, 200);
+    assert.equal(visitante.status, 200);
+    assert.deepEqual(tecnico.json, {
+      role: "TECNICO",
+      items: [{ id: 1, status: "EM_ANDAMENTO" }]
+    });
     assert.deepEqual(admin.json, {
       page: "2",
       limit: "10",
+      role: "ADMIN",
       items: [{ id: 1, status: "EM_ANDAMENTO" }]
     });
+    assert.deepEqual(chamadas.map((chamada) => ({
+      usuarioId: chamada.usuarioId,
+      role: chamada.role
+    })), [
+      { usuarioId: 2, role: "TECNICO" },
+      { usuarioId: 1, role: "ADMIN" },
+      { usuarioId: 3, role: "VISITANTE" }
+    ]);
   });
 });
 
-test("POST /manutencoes permite tecnico criar manutencao com usuario autenticado", async () => {
+test("POST /manutencoes permite tecnico criar manutencao corretiva ou preventiva com usuario autenticado", async () => {
   mockAuthenticatedUsers();
 
-  patch(ManutencaoService, "create", async ({ alertaId, usuarioId, observacao }) => ({
+  patch(ManutencaoService, "create", async ({ alertaId, maquinaId, tipo, usuarioId, observacao }) => ({
     id: 12,
     alertaId,
+    maquinaId,
+    tipo,
     usuarioId,
     observacao,
     status: "EM_ANDAMENTO"
@@ -738,6 +762,22 @@ test("POST /manutencoes permite tecnico criar manutencao com usuario autenticado
       alertaId: 5,
       usuarioId: 2,
       observacao: "Iniciando atendimento",
+      status: "EM_ANDAMENTO"
+    });
+
+    const preventiva = await request(baseUrl, "/manutencoes", {
+      method: "POST",
+      token: tokenFor({ id: 2, role: "TECNICO" }),
+      body: { tipo: "PREVENTIVA", maquinaId: 9, observacao: "Inspecao semanal" }
+    });
+
+    assert.equal(preventiva.status, 201);
+    assert.deepEqual(preventiva.json, {
+      id: 12,
+      maquinaId: 9,
+      tipo: "PREVENTIVA",
+      usuarioId: 2,
+      observacao: "Inspecao semanal",
       status: "EM_ANDAMENTO"
     });
   });

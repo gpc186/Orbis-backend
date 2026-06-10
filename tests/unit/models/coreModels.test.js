@@ -7,6 +7,7 @@ const SensorModel = require("../../../src/models/sensorModel");
 const UsuarioModel = require("../../../src/models/usuarioModel");
 const RelatorioAgendamentoModel = require("../../../src/models/relatorioAgendamentoModel");
 const AlertaModel = require("../../../src/models/alertaModel");
+const ManutencaoModel = require("../../../src/models/manutencaoModel");
 
 const patches = [];
 
@@ -332,6 +333,70 @@ test("AlertaModel.createComentario cria evento COMENTARIO com usuario", async ()
     mensagem: "Verifiquei a maquina.",
     descricao: "Comentario adicionado"
   });
+});
+
+test("ManutencaoModel.updatePreventiva repara maquina quando resolvida", async () => {
+  const operations = [];
+
+  patch(prisma, "$transaction", async (callback) => callback({
+    manutencao: {
+      update: async (payload) => {
+        operations.push({ op: "manutencao.update", payload });
+        return {
+          id: payload.where.id,
+          maquinaId: 9,
+          tipo: "PREVENTIVA",
+          status: payload.data.status
+        };
+      }
+    },
+    maquina: {
+      update: async (payload) => {
+        operations.push({ op: "maquina.update", payload });
+        return {
+          id: payload.where.id,
+          integridade: payload.data.integridade,
+          scoreEstabilidade: payload.data.scoreEstabilidade
+        };
+      }
+    },
+    sensor: {
+      findMany: async (payload) => {
+        operations.push({ op: "sensor.findMany", payload });
+        return [{ id: 3, idealTemperatura: 70, idealVibracao: 4 }];
+      },
+      update: async (payload) => {
+        operations.push({ op: "sensor.update", payload });
+      }
+    },
+    historicoIntegridade: {
+      create: async (payload) => {
+        operations.push({ op: "historico.create", payload });
+      }
+    }
+  }));
+
+  const result = await ManutencaoModel.updatePreventiva({
+    manutencaoId: "5",
+    dados: {
+      status: "RESOLVIDO",
+      observacao: "Preventiva finalizada"
+    }
+  });
+
+  assert.equal(result.status, "RESOLVIDO");
+  assert.equal(operations[0].op, "manutencao.update");
+  assert.equal(operations[0].payload.where.id, 5);
+  assert.equal(operations[1].op, "maquina.update");
+  assert.deepEqual(operations[1].payload.data, {
+    integridade: 100,
+    scoreEstabilidade: 100,
+    previsaoManutencao: null,
+    janelaManuInicio: null,
+    janelaManuFim: null
+  });
+  assert.equal(operations[3].op, "sensor.update");
+  assert.equal(operations[4].payload.data.origem, "MANUTENCAO_PREVENTIVA_RESOLVIDA");
 });
 
 test("AlertaModel.findByMaquinaPeriodo monta filtros opcionais de periodo, tipos e status", async () => {
