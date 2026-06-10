@@ -72,7 +72,7 @@ class MaquinaController {
     };
     static async updateManual(req, res, next){
         if(!req.file){
-            return next(new AppError("Manual nÃ£o enviado!", 400));
+            return next(new AppError("Manual nao enviado!", 400));
         };
         try {
             const maquinaId = req.params.id;
