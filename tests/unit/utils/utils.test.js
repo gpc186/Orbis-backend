@@ -22,6 +22,11 @@ const {
   REPORT_TIMEZONE
 } = require("../../../src/utils/reportScheduleUtils");
 const {
+  calculateScheduleCompliance,
+  normalizePriority,
+  normalizeTitle
+} = require("../../../src/utils/manutencaoScheduleUtils");
+const {
   validateAgendamento,
   validateFiltros,
   validatePeriodo,
@@ -146,6 +151,48 @@ test("reportScheduleUtils calcula proximas execucoes e descricoes no timezone co
   assert.equal(monthly.toISOString(), "2026-02-28T11:00:00.000Z");
   assert.equal(formatReportDateTime("2026-06-05T13:30:00.123Z"), "2026-06-05T10:30:00.123+03:00");
   assert.equal(buildScheduleDescription({ frequencia: "SEMANAL", diaSemana: 5, hora: 9, minuto: 5 }), "Semanal toda Sexta as 09:05");
+});
+
+test("manutencaoScheduleUtils calcula cumprimento por dia de conclusao", () => {
+  assert.deepEqual(calculateScheduleCompliance({
+    dataAgendada: "2026-06-20T10:00:00.000Z",
+    concluidaEm: "2026-06-20T22:00:00.000Z",
+    status: "RESOLVIDO"
+  }), {
+    cumprimentoAgendamento: "NO_PRAZO",
+    diasDesvioAgendamento: 0
+  });
+
+  assert.deepEqual(calculateScheduleCompliance({
+    dataAgendada: "2026-06-20T10:00:00.000Z",
+    concluidaEm: "2026-06-18T22:00:00.000Z",
+    status: "RESOLVIDO"
+  }), {
+    cumprimentoAgendamento: "ANTECIPADA",
+    diasDesvioAgendamento: -2
+  });
+
+  assert.deepEqual(calculateScheduleCompliance({
+    dataAgendada: "2026-06-20T10:00:00.000Z",
+    concluidaEm: "2026-06-22T22:00:00.000Z",
+    status: "RESOLVIDO"
+  }), {
+    cumprimentoAgendamento: "ATRASADA",
+    diasDesvioAgendamento: 2
+  });
+
+  assert.deepEqual(calculateScheduleCompliance({
+    dataAgendada: "2026-06-20T10:00:00.000Z",
+    concluidaEm: null,
+    status: "AGENDADA"
+  }), {
+    cumprimentoAgendamento: "NAO_APLICAVEL",
+    diasDesvioAgendamento: null
+  });
+
+  assert.equal(normalizePriority("urgente"), "URGENTE");
+  assert.equal(normalizePriority("x"), null);
+  assert.equal(normalizeTitle("  Revisao  ", "fallback"), "Revisao");
 });
 
 test("reportValidation normaliza periodo, filtros, preview, status e agendamento", () => {

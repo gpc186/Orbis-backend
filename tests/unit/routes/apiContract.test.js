@@ -739,11 +739,23 @@ test("GET /manutencoes permite admin/visitante listar tudo e tecnico listar prev
 test("POST /manutencoes permite tecnico criar manutencao corretiva ou preventiva com usuario autenticado", async () => {
   mockAuthenticatedUsers();
 
-  patch(ManutencaoService, "create", async ({ alertaId, maquinaId, tipo, usuarioId, observacao }) => ({
+  patch(ManutencaoService, "create", async ({
+    alertaId,
+    maquinaId,
+    tipo,
+    titulo,
+    prioridade,
+    dataAgendada,
+    usuarioId,
+    observacao
+  }) => ({
     id: 12,
     alertaId,
     maquinaId,
     tipo,
+    titulo,
+    prioridade,
+    dataAgendada,
     usuarioId,
     observacao,
     status: "EM_ANDAMENTO"
@@ -768,7 +780,14 @@ test("POST /manutencoes permite tecnico criar manutencao corretiva ou preventiva
     const preventiva = await request(baseUrl, "/manutencoes", {
       method: "POST",
       token: tokenFor({ id: 2, role: "TECNICO" }),
-      body: { tipo: "PREVENTIVA", maquinaId: 9, observacao: "Inspecao semanal" }
+      body: {
+        tipo: "PREVENTIVA",
+        maquinaId: 9,
+        titulo: "Inspecao dos rolamentos",
+        prioridade: "ALTA",
+        dataAgendada: "2026-06-20T14:00:00.000Z",
+        observacao: "Inspecao semanal"
+      }
     });
 
     assert.equal(preventiva.status, 201);
@@ -776,6 +795,9 @@ test("POST /manutencoes permite tecnico criar manutencao corretiva ou preventiva
       id: 12,
       maquinaId: 9,
       tipo: "PREVENTIVA",
+      titulo: "Inspecao dos rolamentos",
+      prioridade: "ALTA",
+      dataAgendada: "2026-06-20T14:00:00.000Z",
       usuarioId: 2,
       observacao: "Inspecao semanal",
       status: "EM_ANDAMENTO"
