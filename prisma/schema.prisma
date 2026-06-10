@@ -49,6 +49,7 @@ enum TipoEvento {
   REABERTO
   RESOLVIDO
   CANCELADO
+  COMENTARIO
 }
 
 enum StatusManutencao {
