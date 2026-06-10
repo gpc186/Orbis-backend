@@ -1,6 +1,9 @@
 const prisma = require("../prisma/prisma");
 
 class ManutecaoModel {
+    static INTEGRIDADE_REPARADA = 100;
+    static SCORE_ESTABILIDADE_REPARADO = 100;
+
     static async create({ alertaId, usuarioId, observacao, status }) {
         return await prisma.manutencao.create({
             data: {
@@ -137,12 +140,54 @@ class ManutecaoModel {
                 const dadosAlerta = {};
 
                 if (dados.status === "RESOLVIDO") {
+                    const encerradoEm = new Date();
                     dadosAlerta.status = "RESOLVIDO";
                     dadosAlerta.tecnicoId = usuarioId;
-                    dadosAlerta.encerradoEm = new Date();
+                    dadosAlerta.encerradoEm = encerradoEm;
                     tipoEvento = "RESOLVIDO";
                     statusNovo = "RESOLVIDO";
                     descricao = dados.observacao ?? "Alerta resolvido";
+
+                    if (alerta?.maquinaId) {
+                        const maquinaReparada = await tx.maquina.update({
+                            where: { id: alerta.maquinaId },
+                            data: {
+                                integridade: this.INTEGRIDADE_REPARADA,
+                                scoreEstabilidade: this.SCORE_ESTABILIDADE_REPARADO,
+                                previsaoManutencao: null,
+                                janelaManuInicio: null,
+                                janelaManuFim: null
+                            }
+                        });
+
+                        const sensores = await tx.sensor.findMany({
+                            where: { maquinaId: maquinaReparada.id },
+                            select: {
+                                id: true,
+                                idealTemperatura: true,
+                                idealVibracao: true
+                            }
+                        });
+
+                        await Promise.all(sensores.map((sensor) => tx.sensor.update({
+                            where: { id: sensor.id },
+                            data: {
+                                ultimaTemperatura: sensor.idealTemperatura,
+                                ultimaVibracao: sensor.idealVibracao,
+                                ultimaLeituraEm: encerradoEm
+                            }
+                        })));
+
+                        await tx.historicoIntegridade.create({
+                            data: {
+                                maquinaId: maquinaReparada.id,
+                                integridade: maquinaReparada.integridade,
+                                scoreEstabilidade: maquinaReparada.scoreEstabilidade,
+                                origem: "MANUTENCAO_RESOLVIDA",
+                                observacao: descricao
+                            }
+                        });
+                    }
                 } else if (dados.status === "ENCERRADO_SEM_SOLUCAO") {
                     dadosAlerta.status = "ATIVO";
                     dadosAlerta.tecnicoId = null;

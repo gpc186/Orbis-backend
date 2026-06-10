@@ -40,6 +40,23 @@ function simuladorEstaAtivo() {
   return process.env.SIMULADOR_JOB_ATIVO !== "false";
 }
 
+function resetarMaquinaSimulada(maquinaId) {
+  const idNormalizado = Number(maquinaId);
+  const estadoMaquina = maquinasEmSimulacao.get(idNormalizado);
+
+  if (!estadoMaquina) {
+    return false;
+  }
+
+  estadoMaquina.ciclos = 0;
+  logger.info("simulador_maquina_reset", {
+    maquinaId: idNormalizado,
+    maquinaNome: estadoMaquina.maquina?.nome ?? null
+  });
+
+  return true;
+}
+
 function deveForcarAlertas() {
   return process.env.SIMULADOR_FORCAR_ALERTAS === "true";
 }
@@ -302,6 +319,7 @@ function iniciarSimuladorJob(io) {
 module.exports = {
   iniciarSimuladorJob,
   simularCiclo,
+  resetarMaquinaSimulada,
   _internals: {
     atualizarSensoresEmSimulacao,
     gerarLeitura,

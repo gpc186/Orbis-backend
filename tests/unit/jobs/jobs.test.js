@@ -215,8 +215,10 @@ test("simuladorJob degrada maquinas linearmente pelas specs dos sensores", async
 
   await simulador.simularCiclo();
   await simulador.simularCiclo();
+  simulador.resetarMaquinaSimulada(10);
+  await simulador.simularCiclo();
 
-  assert.equal(leituras.length, 6);
+  assert.equal(leituras.length, 9);
   assert.deepEqual(leituras.slice(0, 3), [
     { sensorId: 1, temperatura: 60, vibracao: 5 },
     { sensorId: 2, temperatura: 40, vibracao: 2 },
@@ -226,6 +228,11 @@ test("simuladorJob degrada maquinas linearmente pelas specs dos sensores", async
     { sensorId: 1, temperatura: 60.5, vibracao: 5.1 },
     { sensorId: 2, temperatura: 40.5, vibracao: 2.1 },
     { sensorId: 3, temperatura: 50.5, vibracao: 3.1 }
+  ]);
+  assert.deepEqual(leituras.slice(6), [
+    { sensorId: 1, temperatura: 60, vibracao: 5 },
+    { sensorId: 2, temperatura: 40, vibracao: 2 },
+    { sensorId: 3, temperatura: 51, vibracao: 3.2 }
   ]);
 });
 

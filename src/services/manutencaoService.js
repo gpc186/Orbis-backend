@@ -3,6 +3,7 @@ const ManutecaoModel = require("../models/manutencaoModel");
 const UsuarioModel = require("../models/usuarioModel");
 const AppError = require("../utils/appErrorUtils");
 const logger = require("../utils/logger");
+const simuladorJob = require("../jobs/simuladorJob");
 
 class ManutecaoService {
   static STATUS_VALIDOS = ["EM_ANDAMENTO", "RESOLVIDO", "ENCERRADO_SEM_SOLUCAO"];
@@ -160,6 +161,10 @@ class ManutecaoService {
       usuarioId: manutencao.usuarioId,
       dados: dadosAtualizados
     });
+
+    if (dadosAtualizados.status === "RESOLVIDO" && manutencao.alerta?.maquinaId) {
+      simuladorJob.resetarMaquinaSimulada(manutencao.alerta.maquinaId);
+    }
 
     logger.info("manutencao_updated", {
       manutencaoId,
