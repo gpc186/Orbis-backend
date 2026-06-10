@@ -187,16 +187,25 @@ class SensorService {
       const sensorExiste = await SensorModel.findById(id);
       if (!sensorExiste) throw new AppError("Sensor nao encontrado.", 404);
 
-      if (!dados.maquinaId || dados.maquinaId === null || dados.maquinaId === undefined) {
+      const maquinaIdFoiEnviado = Object.prototype.hasOwnProperty.call(dados, "maquinaId");
+      if (maquinaIdFoiEnviado && (dados.maquinaId === null || dados.maquinaId === "")) {
         return await SensorModel.updateDisconnect(id, { ...dados, status: "INATIVO" });
       }
 
-      const maquinaExiste = await MaquinaModel.findById(dados.maquinaId);
+      const maquinaId = maquinaIdFoiEnviado ? parseInt(dados.maquinaId) : sensorExiste.maquinaId;
+      if (!Number.isInteger(maquinaId)) {
+        throw new AppError("maquinaId deve ser um numero inteiro valido.", 400);
+      }
+
+      const maquinaExiste = await MaquinaModel.findById(maquinaId);
       if (!maquinaExiste) {
         throw new AppError("Maquina selecionada nao existe.", 400);
       }
 
-      const dadosValidados = this.normalizeSensorPayload(dados, {
+      const dadosValidados = this.normalizeSensorPayload({
+        ...dados,
+        maquinaId
+      }, {
         existing: sensorExiste
       });
 
