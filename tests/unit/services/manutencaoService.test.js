@@ -65,7 +65,7 @@ test("create valida entidades e cria manutencao em andamento sincronizada com al
 });
 
 test("create cria manutencao preventiva vinculada a maquina sem alerta", async () => {
-  UsuarioModel.findById = async () => ({ id: 7, ativo: true });
+  UsuarioModel.findById = async () => ({ id: 7, role: "TECNICO", ativo: true });
   MaquinaModel.findById = async () => ({ id: 22, ativo: true });
 
   let payloadRecebido;
@@ -93,6 +93,20 @@ test("create cria manutencao preventiva vinculada a maquina sem alerta", async (
   assert.equal(result.alertaId, null);
 });
 
+test("create preventiva bloqueia admin", async () => {
+  UsuarioModel.findById = async () => ({ id: 1, role: "ADMIN", ativo: true });
+
+  await assert.rejects(
+    () => ManutencaoService.create({
+      tipo: "PREVENTIVA",
+      maquinaId: "22",
+      usuarioId: "1",
+      observacao: "inspecao mensal"
+    }),
+    (error) => error.name === "AppError" && error.statusCode === 403
+  );
+});
+
 test("create bloqueia alerta encerrado e manutencao ja em andamento", async () => {
   UsuarioModel.findById = async () => ({ id: 7, ativo: true });
   AlertaModel.findById = async () => ({ id: 10, status: "RESOLVIDO" });
@@ -112,7 +126,7 @@ test("create bloqueia alerta encerrado e manutencao ja em andamento", async () =
 });
 
 test("create preventiva bloqueia maquina inexistente ou inativa", async () => {
-  UsuarioModel.findById = async () => ({ id: 7, ativo: true });
+  UsuarioModel.findById = async () => ({ id: 7, role: "TECNICO", ativo: true });
   MaquinaModel.findById = async () => null;
 
   await assert.rejects(
