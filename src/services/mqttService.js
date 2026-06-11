@@ -66,6 +66,7 @@ function createConnectMQTT({
 
         const io = app.get("io");
         if (io) {
+          io.emit("nova-leitura", novaLeitura);
           io.emit("novaLeitura", novaLeitura);
 
           log.info("mqtt_websocket_forwarded", {

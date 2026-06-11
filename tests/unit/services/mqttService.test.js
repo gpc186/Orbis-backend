@@ -118,10 +118,16 @@ test("message processa leitura valida, usa vibracao_rms e encaminha websocket", 
   })));
 
   assert.deepEqual(leituraPayload, { sensorId: 4, temperatura: 31.5, vibracao: 2.7 });
-  assert.deepEqual(emissions, [{
-    event: "novaLeitura",
-    payload: { id: 9, sensorId: 4, temperatura: 31.5, vibracao: 2.7 }
-  }]);
+  assert.deepEqual(emissions, [
+    {
+      event: "nova-leitura",
+      payload: { id: 9, sensorId: 4, temperatura: 31.5, vibracao: 2.7 }
+    },
+    {
+      event: "novaLeitura",
+      payload: { id: 9, sensorId: 4, temperatura: 31.5, vibracao: 2.7 }
+    }
+  ]);
   assert.equal(logger.errors.length, 0);
 });
 

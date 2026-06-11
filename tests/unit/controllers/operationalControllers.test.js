@@ -283,7 +283,10 @@ test("LeituraController.store valida payload, salva leitura e emite socket", asy
   assert.deepEqual(payloadRecebido, { sensorId: 1, temperatura: 31, vibracao: 4 });
   assert.equal(res.statusCode, 201);
   assert.deepEqual(res.body, { id: 10, sensorId: 1, temperatura: 31, vibracao: 4 });
-  assert.deepEqual(emits, [["nova-leitura", res.body]]);
+  assert.deepEqual(emits, [
+    ["nova-leitura", res.body],
+    ["novaLeitura", res.body]
+  ]);
 });
 
 test("LeituraController.index retorna leituras em ordem cronologica reversa do service", async () => {
