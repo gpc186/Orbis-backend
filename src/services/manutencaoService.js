@@ -22,6 +22,12 @@ class ManutecaoService {
   static STATUS_FINAIS = ["RESOLVIDO", "ENCERRADO_SEM_SOLUCAO", "CANCELADA"];
   static STATUS_CRIACAO = "EM_ANDAMENTO";
   static TIPOS_VALIDOS = ["CORRETIVA", "PREVENTIVA"];
+  static PREDICAO_AUTO_AGENDAR_ENABLED = true;
+  static PREDICAO_AUTO_AGENDAR_MIN_CONFIRMACOES = 3;
+  static PREDICAO_AUTO_AGENDAR_R2_MINIMO = 0.75;
+  static PREDICAO_AUTO_AGENDAR_PONTOS_MINIMOS = 5;
+  static PREDICAO_AUTO_AGENDAR_REAGENDAR_TOLERANCIA_HORAS = 24;
+  static PREDICAO_AUTO_AGENDAR_BLOQUEIO_MANUAL_DIAS = 7;
 
   static enrich(item) {
     if (Array.isArray(item)) return item.map((row) => this.enrich(row));
@@ -99,6 +105,195 @@ class ManutecaoService {
         ? Number(Number(modelo.janelaHorasCoberta).toFixed(2))
         : null,
       ultimoPontoEm: modelo.ultimoPontoEm
+    };
+  }
+
+  static getEnvNumber(name, fallback, { min = null, integer = false } = {}) {
+    const parsed = Number(process.env[name]);
+
+    if (!Number.isFinite(parsed)) return fallback;
+
+    const normalized = integer ? Math.trunc(parsed) : parsed;
+
+    if (min !== null && normalized < min) {
+      return fallback;
+    }
+
+    return normalized;
+  }
+
+  static getEnvBoolean(name, fallback) {
+    const raw = process.env[name];
+    if (raw === undefined) return fallback;
+
+    return !["false", "0", "nao", "no"].includes(String(raw).trim().toLowerCase());
+  }
+
+  static obterConfigAutoAgendamentoPredicao() {
+    return {
+      enabled: this.getEnvBoolean(
+        "PREDICAO_AUTO_AGENDAR_ENABLED",
+        this.PREDICAO_AUTO_AGENDAR_ENABLED
+      ),
+      minConfirmacoes: this.getEnvNumber(
+        "PREDICAO_AUTO_AGENDAR_MIN_CONFIRMACOES",
+        this.PREDICAO_AUTO_AGENDAR_MIN_CONFIRMACOES,
+        { min: 1, integer: true }
+      ),
+      r2Minimo: this.getEnvNumber(
+        "PREDICAO_AUTO_AGENDAR_R2_MINIMO",
+        this.PREDICAO_AUTO_AGENDAR_R2_MINIMO,
+        { min: 0 }
+      ),
+      pontosMinimos: this.getEnvNumber(
+        "PREDICAO_AUTO_AGENDAR_PONTOS_MINIMOS",
+        this.PREDICAO_AUTO_AGENDAR_PONTOS_MINIMOS,
+        { min: 2, integer: true }
+      ),
+      toleranciaReagendamentoHoras: this.getEnvNumber(
+        "PREDICAO_AUTO_AGENDAR_REAGENDAR_TOLERANCIA_HORAS",
+        this.PREDICAO_AUTO_AGENDAR_REAGENDAR_TOLERANCIA_HORAS,
+        { min: 0 }
+      ),
+      bloqueioManualDias: this.getEnvNumber(
+        "PREDICAO_AUTO_AGENDAR_BLOQUEIO_MANUAL_DIAS",
+        this.PREDICAO_AUTO_AGENDAR_BLOQUEIO_MANUAL_DIAS,
+        { min: 0 }
+      )
+    };
+  }
+
+  static toIsoOrNull(value) {
+    if (!value) return null;
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+
+    return date.toISOString();
+  }
+
+  static dateDiffHours(left, right) {
+    if (!left || !right) return null;
+
+    const leftDate = new Date(left);
+    const rightDate = new Date(right);
+
+    if (Number.isNaN(leftDate.getTime()) || Number.isNaN(rightDate.getTime())) {
+      return null;
+    }
+
+    return Math.abs(leftDate.getTime() - rightDate.getTime()) / (1000 * 60 * 60);
+  }
+
+  static avaliarCriteriosAutoAgendamento({ diagnostico, dataAgendada, modeloPredicao, config, preventivaManualProxima }) {
+    const r2 = Number(modeloPredicao?.r2);
+    const pontosUsados = Number(modeloPredicao?.pontosUsados);
+
+    return {
+      estadoValido: diagnostico.estadoPredicao === "PREVISAO_VALIDA",
+      dataAgendadaDisponivel: Boolean(dataAgendada),
+      r2Minimo: Number.isFinite(r2) && r2 >= config.r2Minimo,
+      pontosMinimos: Number.isFinite(pontosUsados) && pontosUsados >= config.pontosMinimos,
+      preventivaManualProxima: !preventivaManualProxima
+    };
+  }
+
+  static listarCriterios(criterios, esperado = true) {
+    return Object.entries(criterios)
+      .filter(([, aprovado]) => aprovado === esperado)
+      .map(([nome]) => nome);
+  }
+
+  static calcularScoreConfianca({ modeloPredicao, validasConsecutivas, config }) {
+    const r2 = Number(modeloPredicao?.r2);
+    const pontosUsados = Number(modeloPredicao?.pontosUsados);
+    const parcelaR2 = Number.isFinite(r2) ? Math.min(Math.max(r2, 0), 1) * 50 : 0;
+    const parcelaPontos = Number.isFinite(pontosUsados)
+      ? Math.min(pontosUsados / config.pontosMinimos, 1) * 30
+      : 0;
+    const parcelaConfirmacoes = Math.min(validasConsecutivas / config.minConfirmacoes, 1) * 20;
+
+    return Math.round(parcelaR2 + parcelaPontos + parcelaConfirmacoes);
+  }
+
+  static buildEstadoPredicaoManutencao({
+    diagnostico,
+    dataAgendada,
+    estadoAnterior = {},
+    criterios,
+    config,
+    preventivaManualProxima,
+    resetMotivo = null
+  }) {
+    const modeloPredicao = this.summarizeModeloPredicao(diagnostico.avaliacaoModelo);
+    const estadoValido = diagnostico.estadoPredicao === "PREVISAO_VALIDA";
+    const criteriosAprovados = this.listarCriterios(criterios, true);
+    const criteriosReprovados = this.listarCriterios(criterios, false);
+    const todosCriteriosAprovados = criteriosReprovados.length === 0;
+
+    let validasConsecutivas = 0;
+    let invalidasConsecutivas = Number(estadoAnterior.invalidasConsecutivas || 0);
+
+    if (estadoValido && todosCriteriosAprovados) {
+      validasConsecutivas = Number(estadoAnterior.validasConsecutivas || 0) + 1;
+      invalidasConsecutivas = 0;
+    } else {
+      validasConsecutivas = 0;
+      invalidasConsecutivas += 1;
+    }
+
+    const scoreConfianca = this.calcularScoreConfianca({
+      modeloPredicao,
+      validasConsecutivas,
+      config
+    });
+
+    return {
+      validasConsecutivas,
+      invalidasConsecutivas,
+      ultimaPredicaoEm: new Date().toISOString(),
+      ultimaDataAgendada: this.toIsoOrNull(dataAgendada),
+      ultimaPrevisaoManutencao: this.toIsoOrNull(diagnostico.dataFalha),
+      ultimoEstadoPredicao: diagnostico.estadoPredicao,
+      ultimoMotivo: resetMotivo || diagnostico.motivo || null,
+      criterios: {
+        ...criterios,
+        r2MinimoEsperado: config.r2Minimo,
+        pontosMinimosEsperados: config.pontosMinimos,
+        minConfirmacoesEsperadas: config.minConfirmacoes,
+        toleranciaReagendamentoHoras: config.toleranciaReagendamentoHoras,
+        bloqueioManualDias: config.bloqueioManualDias
+      },
+      scoreConfianca,
+      criteriosAprovados,
+      criteriosReprovados,
+      bloqueadaPorPreventivaManual: Boolean(preventivaManualProxima),
+      preventivaManualProximaId: preventivaManualProxima?.id || null,
+      modeloIntegridade: modeloPredicao
+    };
+  }
+
+  static buildMetadataPredicao({ diagnostico, estadoPredicaoManutencao, preventivaManualProxima }) {
+    const modeloPredicao = estadoPredicaoManutencao.modeloIntegridade
+      || this.summarizeModeloPredicao(diagnostico.avaliacaoModelo);
+
+    return {
+      estadoPredicao: diagnostico.estadoPredicao,
+      fonteDecisao: diagnostico.fonteDecisao,
+      urgencia: diagnostico.urgencia,
+      motivo: diagnostico.motivo,
+      previsaoManutencao: this.toIsoOrNull(diagnostico.dataFalha),
+      modeloIntegridade: modeloPredicao,
+      confirmacoesValidas: estadoPredicaoManutencao.validasConsecutivas,
+      scoreConfianca: estadoPredicaoManutencao.scoreConfianca,
+      criteriosAprovados: estadoPredicaoManutencao.criteriosAprovados,
+      criteriosReprovados: estadoPredicaoManutencao.criteriosReprovados,
+      r2: modeloPredicao?.r2 ?? null,
+      slope: modeloPredicao?.slope ?? null,
+      pontosUsados: modeloPredicao?.pontosUsados ?? null,
+      janelaHorasCoberta: modeloPredicao?.janelaHorasCoberta ?? null,
+      bloqueadaPorPreventivaManual: Boolean(preventivaManualProxima),
+      preventivaManualProximaId: preventivaManualProxima?.id || null
     };
   }
 
@@ -269,23 +464,67 @@ class ManutecaoService {
     const maquina = diagnostico?.maquina;
     if (!maquina?.id) return null;
 
+    const config = this.obterConfigAutoAgendamentoPredicao();
     const existente = await ManutecaoModel.findOpenPredictiveByMaquinaId(maquina.id);
+    const dataAgendada = diagnostico.janelaManuInicio || diagnostico.dataInicioManutencao || null;
+    const modeloPredicao = this.summarizeModeloPredicao(diagnostico.avaliacaoModelo);
+    let preventivaManualProxima = null;
+
+    if (diagnostico.estadoPredicao === "PREVISAO_VALIDA" && dataAgendada) {
+      preventivaManualProxima = await ManutecaoModel.findOpenManualPreventiveNearDate({
+        maquinaId: maquina.id,
+        dataAgendada,
+        windowDays: config.bloqueioManualDias
+      });
+    }
+
+    const estadoAnterior = maquina.estadoPredicaoManutencao || {};
+    const diffCandidataAnteriorHoras = this.dateDiffHours(dataAgendada, estadoAnterior.ultimaDataAgendada);
+    const mudouDataCandidata = diffCandidataAnteriorHoras !== null
+      && diffCandidataAnteriorHoras > config.toleranciaReagendamentoHoras;
+    const estadoBase = mudouDataCandidata ? {} : estadoAnterior;
+    const criterios = this.avaliarCriteriosAutoAgendamento({
+      diagnostico,
+      dataAgendada,
+      modeloPredicao,
+      config,
+      preventivaManualProxima
+    });
+
+    const estadoPredicaoManutencao = this.buildEstadoPredicaoManutencao({
+      diagnostico,
+      dataAgendada,
+      estadoAnterior: estadoBase,
+      criterios,
+      config,
+      preventivaManualProxima,
+      resetMotivo: mudouDataCandidata ? "data_prevista_alterada_acima_da_tolerancia" : null
+    });
+
+    await MaquinaModel.update(maquina.id, { estadoPredicaoManutencao });
 
     if (diagnostico.estadoPredicao !== "PREVISAO_VALIDA") {
       return existente ? this.enrich(existente) : null;
     }
 
-    const dataAgendada = diagnostico.janelaManuInicio || diagnostico.dataInicioManutencao;
     if (!dataAgendada) return existente ? this.enrich(existente) : null;
 
-    const metadataPredicao = {
-      estadoPredicao: diagnostico.estadoPredicao,
-      fonteDecisao: diagnostico.fonteDecisao,
-      urgencia: diagnostico.urgencia,
-      motivo: diagnostico.motivo,
-      previsaoManutencao: diagnostico.dataFalha ? diagnostico.dataFalha.toISOString() : null,
-      modeloIntegridade: this.summarizeModeloPredicao(diagnostico.avaliacaoModelo)
-    };
+    const confirmacoesSuficientes = estadoPredicaoManutencao.validasConsecutivas >= config.minConfirmacoes;
+    const criteriosSuficientes = estadoPredicaoManutencao.criteriosReprovados.length === 0;
+
+    if (!config.enabled || !confirmacoesSuficientes || !criteriosSuficientes) {
+      return existente ? this.enrich(existente) : null;
+    }
+
+    if (existente?.status === "EM_ANDAMENTO") {
+      return this.enrich(existente);
+    }
+
+    const metadataPredicao = this.buildMetadataPredicao({
+      diagnostico,
+      estadoPredicaoManutencao,
+      preventivaManualProxima
+    });
 
     const payload = {
       titulo: buildMaintenanceTitle({
@@ -305,9 +544,20 @@ class ManutecaoService {
         return this.enrich(existente);
       }
 
+      const diffAgendadaAtualHoras = this.dateDiffHours(dataAgendada, existente.dataAgendada);
+      const deveReagendar = diffAgendadaAtualHoras === null
+        || diffAgendadaAtualHoras >= config.toleranciaReagendamentoHoras;
+      const dados = deveReagendar
+        ? payload
+        : {
+            titulo: payload.titulo,
+            prioridade: payload.prioridade,
+            metadataPredicao
+          };
+
       const atualizada = await ManutecaoModel.update({
         id: existente.id,
-        dados: payload
+        dados
       });
 
       return this.enrich(atualizada);

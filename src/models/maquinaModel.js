@@ -57,6 +57,7 @@ class MaquinaModel {
                 integridade: true,
                 scoreEstabilidade: true,
                 previsaoManutencao: true,
+                estadoPredicaoManutencao: true,
                 janelaManuInicio: true,
                 janelaManuFim: true,
                 imagem: true,
@@ -157,6 +158,7 @@ class MaquinaModel {
                 integridade: true,
                 scoreEstabilidade: true,
                 previsaoManutencao: true,
+                estadoPredicaoManutencao: true,
                 janelaManuInicio: true,
                 janelaManuFim: true
             }

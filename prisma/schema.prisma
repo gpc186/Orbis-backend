@@ -157,6 +157,7 @@ model Maquina {
   integridade        Float       @default(100)
   scoreEstabilidade  Float       @default(100)
   previsaoManutencao DateTime?
+  estadoPredicaoManutencao Json?
   janelaManuInicio   DateTime?
   janelaManuFim      DateTime?
   imagem             String?
