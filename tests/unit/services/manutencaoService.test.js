@@ -417,7 +417,7 @@ test("update calcula cumprimento de preventiva agendada resolvida no prazo", asy
   }
 });
 
-test("syncPreventivaPreditiva cria, atualiza e cancela agendamento preditivo", async () => {
+test("syncPreventivaPreditiva cria, atualiza e preserva agendamento preditivo em oscilacao", async () => {
   const maquina = { id: 22, nome: "Esteira" };
   const diagnostico = {
     maquina,
@@ -456,11 +456,13 @@ test("syncPreventivaPreditiva cria, atualiza e cancela agendamento preditivo", a
   assert.equal(chamadas[1][0], "update");
   assert.equal(chamadas[1][2].prioridade, "ALTA");
 
-  const cancelada = await ManutencaoService.syncPreventivaPreditiva({
+  const totalChamadasAntesOscilacao = chamadas.length;
+  const preservada = await ManutencaoService.syncPreventivaPreditiva({
     ...diagnostico,
     estadoPredicao: "SEM_DADOS",
     motivo: "historico_insuficiente"
   });
 
-  assert.equal(cancelada.status, "CANCELADA");
+  assert.equal(preservada.status, "AGENDADA");
+  assert.equal(chamadas.length, totalChamadasAntesOscilacao);
 });

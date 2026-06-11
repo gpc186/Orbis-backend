@@ -272,25 +272,6 @@ class ManutecaoService {
     const existente = await ManutecaoModel.findOpenPredictiveByMaquinaId(maquina.id);
 
     if (diagnostico.estadoPredicao !== "PREVISAO_VALIDA") {
-      if (existente?.status === "AGENDADA") {
-        const cancelada = await ManutecaoModel.update({
-          id: existente.id,
-          dados: {
-            status: "CANCELADA",
-            cumprimentoAgendamento: CUMPRIMENTO_AGENDAMENTO.NAO_APLICAVEL,
-            metadataPredicao: {
-              ...(existente.metadataPredicao || {}),
-              canceladaPorPredicao: true,
-              estadoPredicao: diagnostico.estadoPredicao,
-              motivo: diagnostico.motivo,
-              canceladaEm: new Date().toISOString()
-            }
-          }
-        });
-
-        return this.enrich(cancelada);
-      }
-
       return existente ? this.enrich(existente) : null;
     }
 
