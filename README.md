@@ -370,9 +370,10 @@ Ao iniciar o servidor, a aplicação carrega:
 - `simuladorJob`, quando habilitado por ambiente
 - Conexão MQTT, quando configurada
 
-O `simuladorJob` degrada cada máquina linearmente ao longo do tempo, gerando leituras para todos os sensores ativos da máquina em cada ciclo.
+O `simuladorJob` degrada cada máquina linearmente pelo tempo decorrido, gerando leituras para todos os sensores ativos da máquina em cada ciclo.
 A curva usa as specs de cada sensor: `idealTemperatura -> limiteTemperatura` e `idealVibracao -> limiteVibracao`.
 `SIMULADOR_DEGRADACAO_HORAS` controla em quantas horas a leitura chega do ideal ao limite, e `SIMULADOR_RUIDO_PERCENTUAL` adiciona uma pequena variação percentual sobre a amplitude.
+Ao reiniciar a API, o simulador infere o progresso pelas últimas leituras persistidas dos sensores, evitando voltar ao início após redeploy.
 
 ## Testes
 

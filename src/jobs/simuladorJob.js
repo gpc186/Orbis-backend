@@ -13,10 +13,7 @@ const degradacaoHorasConfigurada = Number(process.env.SIMULADOR_DEGRADACAO_HORAS
 const DEGRADACAO_HORAS = Number.isFinite(degradacaoHorasConfigurada) && degradacaoHorasConfigurada > 0
   ? degradacaoHorasConfigurada
   : 24;
-const CICLOS_ATE_DEGRADACAO_MAXIMA = Math.max(
-  1,
-  Math.ceil((DEGRADACAO_HORAS * 60 * 60 * 1000) / INTERVALO_MS)
-);
+const DURACAO_DEGRADACAO_MS = DEGRADACAO_HORAS * 60 * 60 * 1000;
 const ruidoPercentualConfigurado = Number(process.env.SIMULADOR_RUIDO_PERCENTUAL);
 const RUIDO_PERCENTUAL = Number.isFinite(ruidoPercentualConfigurado) && ruidoPercentualConfigurado >= 0
   ? ruidoPercentualConfigurado
@@ -48,7 +45,7 @@ function resetarMaquinaSimulada(maquinaId) {
     return false;
   }
 
-  estadoMaquina.ciclos = 0;
+  estadoMaquina.simulacaoIniciadaEm = new Date();
   logger.info("simulador_maquina_reset", {
     maquinaId: idNormalizado,
     maquinaNome: estadoMaquina.maquina?.nome ?? null
@@ -88,13 +85,52 @@ function calcularFaixaDegradacao(sensor, campoIdeal, campoLimite) {
   };
 }
 
+function calcularProgressoPorValor(sensor, campoIdeal, campoLimite, campoAtual) {
+  const { ideal, amplitude } = calcularFaixaDegradacao(sensor, campoIdeal, campoLimite);
+  const atual = Number(sensor[campoAtual]);
+
+  if (!Number.isFinite(atual) || amplitude <= 0) {
+    return 0;
+  }
+
+  return limitar((atual - ideal) / amplitude, 0, 1);
+}
+
+function calcularProgressoPersistido(sensor) {
+  return Math.max(
+    calcularProgressoPorValor(sensor, "idealTemperatura", "limiteTemperatura", "ultimaTemperatura"),
+    calcularProgressoPorValor(sensor, "idealVibracao", "limiteVibracao", "ultimaVibracao")
+  );
+}
+
+function inferirInicioSimulacao(sensores, agora = new Date()) {
+  const progressoPersistido = sensores.reduce(
+    (maiorProgresso, sensor) => Math.max(maiorProgresso, calcularProgressoPersistido(sensor)),
+    0
+  );
+
+  return new Date(agora.getTime() - (progressoPersistido * DURACAO_DEGRADACAO_MS));
+}
+
+function calcularProgressoPorTempo(estadoMaquina, agora = new Date()) {
+  const inicio = estadoMaquina.simulacaoIniciadaEm instanceof Date
+    ? estadoMaquina.simulacaoIniciadaEm
+    : new Date(estadoMaquina.simulacaoIniciadaEm);
+
+  if (Number.isNaN(inicio.getTime()) || DURACAO_DEGRADACAO_MS <= 0) {
+    return 0;
+  }
+
+  return limitar((agora.getTime() - inicio.getTime()) / DURACAO_DEGRADACAO_MS, 0, 1);
+}
+
 function gerarValorLinearComDegradacao(sensor, estadoMaquina, configuracao) {
   const { ideal, limite, amplitude } = calcularFaixaDegradacao(
     sensor,
     configuracao.campoIdeal,
     configuracao.campoLimite
   );
-  const progresso = limitar(estadoMaquina.ciclos / CICLOS_ATE_DEGRADACAO_MAXIMA, 0, 1);
+  const progresso = calcularProgressoPorTempo(estadoMaquina);
   const degradacao = amplitude * progresso;
   const ruidoMaximo = amplitude * RUIDO_PERCENTUAL;
   const ruido = numeroAleatorioEntre(-ruidoMaximo, ruidoMaximo);
@@ -162,18 +198,25 @@ async function buscarSensoresDisponiveis() {
 async function atualizarSensoresEmSimulacao() {
   const sensoresDisponiveis = await buscarSensoresDisponiveis();
   const maquinasAtualizadas = new Map();
+  const agora = new Date();
 
   for (const sensor of sensoresDisponiveis) {
     if (!maquinasAtualizadas.has(sensor.maquinaId)) {
       const estadoAnterior = maquinasEmSimulacao.get(sensor.maquinaId);
       maquinasAtualizadas.set(sensor.maquinaId, {
         maquina: sensor.maquina,
-        ciclos: estadoAnterior?.ciclos ?? 0,
+        simulacaoIniciadaEm: estadoAnterior?.simulacaoIniciadaEm ?? agora,
         sensores: []
       });
     }
 
     maquinasAtualizadas.get(sensor.maquinaId).sensores.push(sensor);
+  }
+
+  for (const [maquinaId, estado] of maquinasAtualizadas.entries()) {
+    if (!maquinasEmSimulacao.has(maquinaId)) {
+      estado.simulacaoIniciadaEm = inferirInicioSimulacao(estado.sensores, agora);
+    }
   }
 
   for (const [maquinaId, estado] of maquinasAtualizadas.entries()) {
@@ -230,8 +273,6 @@ async function processarMaquinaSimulada(estadoMaquina, forcarAlerta = false) {
       });
     }
   }
-
-  estadoMaquina.ciclos += 1;
   return leiturasGeradas;
 }
 
@@ -322,6 +363,9 @@ module.exports = {
   resetarMaquinaSimulada,
   _internals: {
     atualizarSensoresEmSimulacao,
+    calcularProgressoPersistido,
+    calcularProgressoPorTempo,
+    inferirInicioSimulacao,
     gerarLeitura,
     maquinasEmSimulacao
   }
