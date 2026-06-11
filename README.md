@@ -67,6 +67,7 @@ npm run test:integration # roda integração Prisma contra banco de teste
 npm run smoke:health # valida /health e /ready de uma URL publicada
 npm run ci:local     # valida schema Prisma, testes, cobertura e integração segura
 npm run simulador  # executa o simulador de leituras
+npm run seed:leituras # gera leituras historicas em lote para demo
 ```
 
 ## Variáveis de Ambiente
@@ -101,6 +102,15 @@ SIMULADOR_JOB_ATIVO=false
 SIMULADOR_INTERVALO_MS=5000
 SIMULADOR_DEGRADACAO_HORAS=24
 SIMULADOR_RUIDO_PERCENTUAL=0.01
+
+SEED_LEITURAS_DIAS=7
+SEED_LEITURAS_INTERVALO_MINUTOS=5
+SEED_LEITURAS_BATCH_SIZE=1000
+SEED_LEITURAS_MAX_POR_SENSOR=5000
+SEED_LEITURAS_RUIDO_PERCENTUAL=0.015
+SEED_LEITURAS_CRIAR_ALERTAS=false
+SEED_LEITURAS_ATUALIZAR_MAQUINAS=true
+SEED_LEITURAS_GARANTIR_LEITURA_ATUAL=true
 
 PREDICAO_MIN_PONTOS_REGRESSAO=3
 PREDICAO_MIN_JANELA_REGRESSAO_HORAS=0.05
@@ -373,7 +383,10 @@ Ao iniciar o servidor, a aplicação carrega:
 O `simuladorJob` degrada cada máquina linearmente pelo tempo decorrido, gerando leituras para todos os sensores ativos da máquina em cada ciclo.
 A curva usa as specs de cada sensor: `idealTemperatura -> limiteTemperatura` e `idealVibracao -> limiteVibracao`.
 `SIMULADOR_DEGRADACAO_HORAS` controla em quantas horas a leitura chega do ideal ao limite, e `SIMULADOR_RUIDO_PERCENTUAL` adiciona uma pequena variação percentual sobre a amplitude.
-Ao reiniciar a API, o simulador infere o progresso pelas últimas leituras persistidas dos sensores, evitando voltar ao início após redeploy.
+Ao reiniciar a API, o simulador infere o progresso pelas ultimas leituras persistidas dos sensores, evitando voltar ao inicio apos redeploy.
+
+Para reduzir uso de network transfer no Neon, mantenha `SIMULADOR_JOB_ATIVO=false` fora da demonstracao e rode `npm run seed:leituras` para carregar historico em lote. Na demonstracao, ligue o simulador e/ou ESP32 para leituras em tempo real; o seed nao impede leituras novas.
+Se voce estiver usando apenas seed, aumente `SENSOR_OFFLINE_INTERVAL_SECONDS` ou desabilite temporariamente `SENSOR_OFFLINE_JOB_ENABLED`, porque sem novas leituras reais o job de offline pode marcar sensores como `OFFLINE` novamente apos a janela configurada.
 
 ## Testes
 

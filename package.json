@@ -9,6 +9,7 @@
     "test:ci": "npm test && npm run test:coverage",
     "test:integration": "node --test --experimental-test-isolation=none \"tests/integration/*.integration.test.js\"",
     "smoke:health": "node scripts/smoke-health.js",
+    "seed:leituras": "node scripts/seed-leituras.js",
     "seed:visitor": "node scripts/create-visitor-user.js",
     "ci:local": "npx prisma validate && npm run test:ci && npm run test:integration",
     "dev": "nodemon src/server.js",
