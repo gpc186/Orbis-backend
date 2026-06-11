@@ -20,6 +20,7 @@ class LeituraController {
 
       if (io) {
         io.emit("nova-leitura", novaLeitura);
+        io.emit("novaLeitura", novaLeitura);
       }
 
       return res.status(201).json(novaLeitura);
