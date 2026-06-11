@@ -11,6 +11,7 @@ const simuladorJob = require("../../../src/jobs/simuladorJob");
 const originals = {
   alertaFindById: AlertaModel.findById,
   maquinaFindById: MaquinaModel.findById,
+  maquinaUpdate: MaquinaModel.update,
   manutencaoCreate: ManutencaoModel.create,
   manutencaoFindAll: ManutencaoModel.findAll,
   manutencaoCount: ManutencaoModel.count,
@@ -18,6 +19,7 @@ const originals = {
   manutencaoCreateWithAlertSync: ManutencaoModel.createWithAlertSync,
   manutencaoFindById: ManutencaoModel.findById,
   manutencaoFindOpenPredictiveByMaquinaId: ManutencaoModel.findOpenPredictiveByMaquinaId,
+  manutencaoFindOpenManualPreventiveNearDate: ManutencaoModel.findOpenManualPreventiveNearDate,
   manutencaoUpdate: ManutencaoModel.update,
   manutencaoUpdateWithAlertSync: ManutencaoModel.updateWithAlertSync,
   manutencaoUpdatePreventiva: ManutencaoModel.updatePreventiva,
@@ -28,6 +30,7 @@ const originals = {
 afterEach(() => {
   AlertaModel.findById = originals.alertaFindById;
   MaquinaModel.findById = originals.maquinaFindById;
+  MaquinaModel.update = originals.maquinaUpdate;
   ManutencaoModel.create = originals.manutencaoCreate;
   ManutencaoModel.findAll = originals.manutencaoFindAll;
   ManutencaoModel.count = originals.manutencaoCount;
@@ -35,6 +38,7 @@ afterEach(() => {
   ManutencaoModel.createWithAlertSync = originals.manutencaoCreateWithAlertSync;
   ManutencaoModel.findById = originals.manutencaoFindById;
   ManutencaoModel.findOpenPredictiveByMaquinaId = originals.manutencaoFindOpenPredictiveByMaquinaId;
+  ManutencaoModel.findOpenManualPreventiveNearDate = originals.manutencaoFindOpenManualPreventiveNearDate;
   ManutencaoModel.update = originals.manutencaoUpdate;
   ManutencaoModel.updateWithAlertSync = originals.manutencaoUpdateWithAlertSync;
   ManutencaoModel.updatePreventiva = originals.manutencaoUpdatePreventiva;
@@ -417,50 +421,281 @@ test("update calcula cumprimento de preventiva agendada resolvida no prazo", asy
   }
 });
 
-test("syncPreventivaPreditiva cria, atualiza e cancela agendamento preditivo", async () => {
-  const maquina = { id: 22, nome: "Esteira" };
-  const diagnostico = {
-    maquina,
-    estadoPredicao: "PREVISAO_VALIDA",
-    fonteDecisao: "REGRESSAO_LINEAR",
-    urgencia: "ALTA",
-    motivo: "previsao_linear_valida",
-    dataFalha: new Date("2026-06-30T10:00:00.000Z"),
-    janelaManuInicio: new Date("2026-06-25T10:00:00.000Z"),
-    janelaManuFim: new Date("2026-06-26T10:00:00.000Z"),
-    avaliacaoModelo: null
+function buildAvaliacaoModelo({ r2 = 0.86, pontosUsados = 6 } = {}) {
+  return {
+    modeloIntegridade: {
+      score: { r2 },
+      slope: -1.25,
+      intercept: 100,
+      pontosUsados,
+      janelaHorasCoberta: 6,
+      ultimoPontoEm: "2026-06-20T10:00:00.000Z"
+    }
   };
+}
 
+function buildDiagnosticoPreditivo({
+  maquina,
+  estadoPredicao = "PREVISAO_VALIDA",
+  motivo = "previsao_linear_valida",
+  inicio = "2026-06-25T10:00:00.000Z",
+  fim = "2026-06-26T10:00:00.000Z",
+  falha = "2026-06-30T10:00:00.000Z",
+  r2 = 0.86,
+  pontosUsados = 6
+}) {
+  return {
+    maquina,
+    estadoPredicao,
+    fonteDecisao: estadoPredicao === "PREVISAO_VALIDA" ? "REGRESSAO_LINEAR" : "SEM_MODELO",
+    urgencia: "ALTA",
+    motivo,
+    dataFalha: falha ? new Date(falha) : null,
+    janelaManuInicio: inicio ? new Date(inicio) : null,
+    janelaManuFim: fim ? new Date(fim) : null,
+    avaliacaoModelo: buildAvaliacaoModelo({ r2, pontosUsados })
+  };
+}
+
+function mockSyncPredicao({ maquina, existente = null, preventivaManualProxima = null }) {
   const chamadas = [];
-  ManutencaoModel.findOpenPredictiveByMaquinaId = async () => null;
+  let manutencaoExistente = existente;
+
+  MaquinaModel.update = async (id, data) => {
+    Object.assign(maquina, data);
+    return { id, ...maquina };
+  };
+  ManutencaoModel.findOpenPredictiveByMaquinaId = async () => manutencaoExistente;
+  ManutencaoModel.findOpenManualPreventiveNearDate = async () => preventivaManualProxima;
   ManutencaoModel.create = async (payload) => {
     chamadas.push(["create", payload]);
-    return { id: 1, ...payload };
+    manutencaoExistente = { id: 1, ...payload };
+    return manutencaoExistente;
   };
-
-  const criada = await ManutencaoService.syncPreventivaPreditiva(diagnostico);
-
-  assert.equal(criada.status, "AGENDADA");
-  assert.equal(criada.usuarioId, null);
-  assert.equal(criada.prioridade, "ALTA");
-  assert.equal(chamadas[0][0], "create");
-
-  ManutencaoModel.findOpenPredictiveByMaquinaId = async () => ({ id: 1, status: "AGENDADA", metadataPredicao: {} });
   ManutencaoModel.update = async ({ id, dados }) => {
     chamadas.push(["update", id, dados]);
-    return { id, maquinaId: 22, tipo: "PREVENTIVA", origem: "PREDICAO", status: dados.status || "AGENDADA", ...dados };
+    manutencaoExistente = {
+      ...manutencaoExistente,
+      id,
+      ...dados
+    };
+    return manutencaoExistente;
   };
 
-  const atualizada = await ManutencaoService.syncPreventivaPreditiva(diagnostico);
-  assert.equal(atualizada.id, 1);
-  assert.equal(chamadas[1][0], "update");
-  assert.equal(chamadas[1][2].prioridade, "ALTA");
+  return chamadas;
+}
 
-  const cancelada = await ManutencaoService.syncPreventivaPreditiva({
-    ...diagnostico,
+test("syncPreventivaPreditiva nao cria na primeira e segunda previsao valida", async () => {
+  const maquina = { id: 22, nome: "Esteira" };
+  const chamadas = mockSyncPredicao({ maquina });
+
+  const primeira = await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({ maquina }));
+  const segunda = await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({ maquina }));
+
+  assert.equal(primeira, null);
+  assert.equal(segunda, null);
+  assert.equal(chamadas.length, 0);
+  assert.equal(maquina.estadoPredicaoManutencao.validasConsecutivas, 2);
+});
+
+test("syncPreventivaPreditiva cria manutencao na terceira previsao valida consecutiva", async () => {
+  const maquina = { id: 22, nome: "Esteira" };
+  const chamadas = mockSyncPredicao({ maquina });
+
+  await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({ maquina }));
+  await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({ maquina }));
+  const criada = await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({ maquina }));
+
+  assert.equal(criada.status, "AGENDADA");
+  assert.equal(criada.tipo, "PREVENTIVA");
+  assert.equal(criada.origem, "PREDICAO");
+  assert.equal(chamadas.length, 1);
+  assert.equal(chamadas[0][0], "create");
+  assert.equal(chamadas[0][1].metadataPredicao.confirmacoesValidas, 3);
+  assert.equal(chamadas[0][1].metadataPredicao.r2, 0.86);
+});
+
+test("syncPreventivaPreditiva atualiza estado mas nao cria quando auto agendamento esta desabilitado", async () => {
+  const maquina = { id: 22, nome: "Esteira" };
+  const chamadas = mockSyncPredicao({ maquina });
+  const previous = process.env.PREDICAO_AUTO_AGENDAR_ENABLED;
+  process.env.PREDICAO_AUTO_AGENDAR_ENABLED = "false";
+
+  try {
+    await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({ maquina }));
+    await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({ maquina }));
+    const resultado = await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({ maquina }));
+
+    assert.equal(resultado, null);
+    assert.equal(chamadas.length, 0);
+    assert.equal(maquina.estadoPredicaoManutencao.validasConsecutivas, 3);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.PREDICAO_AUTO_AGENDAR_ENABLED;
+    } else {
+      process.env.PREDICAO_AUTO_AGENDAR_ENABLED = previous;
+    }
+  }
+});
+
+test("syncPreventivaPreditiva reseta contagem quando ocorre estado SEM_DADOS entre previsoes validas", async () => {
+  const maquina = { id: 22, nome: "Esteira" };
+  const chamadas = mockSyncPredicao({ maquina });
+
+  await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({ maquina }));
+  await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({ maquina }));
+  await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({
+    maquina,
     estadoPredicao: "SEM_DADOS",
-    motivo: "historico_insuficiente"
+    motivo: "historico_insuficiente",
+    inicio: null,
+    fim: null,
+    falha: null
+  }));
+  await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({ maquina }));
+
+  assert.equal(chamadas.length, 0);
+  assert.equal(maquina.estadoPredicaoManutencao.validasConsecutivas, 1);
+});
+
+test("syncPreventivaPreditiva reseta contagem quando data candidata muda mais de 24h", async () => {
+  const maquina = { id: 22, nome: "Esteira" };
+  const chamadas = mockSyncPredicao({ maquina });
+
+  await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({
+    maquina,
+    inicio: "2026-06-25T10:00:00.000Z"
+  }));
+  await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({
+    maquina,
+    inicio: "2026-06-26T11:30:00.000Z"
+  }));
+
+  assert.equal(chamadas.length, 0);
+  assert.equal(maquina.estadoPredicaoManutencao.validasConsecutivas, 1);
+  assert.equal(maquina.estadoPredicaoManutencao.ultimoMotivo, "data_prevista_alterada_acima_da_tolerancia");
+});
+
+test("syncPreventivaPreditiva bloqueia criacao quando ha preventiva manual proxima", async () => {
+  const maquina = { id: 22, nome: "Esteira" };
+  const chamadas = mockSyncPredicao({
+    maquina,
+    preventivaManualProxima: {
+      id: 88,
+      status: "AGENDADA",
+      origem: "MANUAL",
+      tipo: "PREVENTIVA",
+      dataAgendada: new Date("2026-06-24T10:00:00.000Z")
+    }
   });
 
-  assert.equal(cancelada.status, "CANCELADA");
+  await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({ maquina }));
+  await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({ maquina }));
+  const resultado = await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({ maquina }));
+
+  assert.equal(resultado, null);
+  assert.equal(chamadas.length, 0);
+  assert.equal(maquina.estadoPredicaoManutencao.bloqueadaPorPreventivaManual, true);
+  assert.deepEqual(maquina.estadoPredicaoManutencao.criteriosReprovados, ["preventivaManualProxima"]);
+});
+
+test("syncPreventivaPreditiva cria quando preventiva manual esta fora da janela de bloqueio", async () => {
+  const maquina = { id: 22, nome: "Esteira" };
+  const chamadas = mockSyncPredicao({ maquina, preventivaManualProxima: null });
+
+  await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({ maquina }));
+  await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({ maquina }));
+  const criada = await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({ maquina }));
+
+  assert.equal(criada.status, "AGENDADA");
+  assert.equal(chamadas[0][0], "create");
+});
+
+test("syncPreventivaPreditiva nao reagenda existente quando diferenca e menor que 24h", async () => {
+  const maquina = {
+    id: 22,
+    nome: "Esteira",
+    estadoPredicaoManutencao: {
+      validasConsecutivas: 2,
+      ultimaDataAgendada: "2026-06-25T10:00:00.000Z"
+    }
+  };
+  const existente = {
+    id: 1,
+    maquinaId: 22,
+    status: "AGENDADA",
+    tipo: "PREVENTIVA",
+    origem: "PREDICAO",
+    dataAgendada: new Date("2026-06-25T10:00:00.000Z"),
+    metadataPredicao: {}
+  };
+  const chamadas = mockSyncPredicao({ maquina, existente });
+
+  const atualizada = await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({
+    maquina,
+    inicio: "2026-06-25T20:00:00.000Z"
+  }));
+
+  assert.equal(atualizada.id, 1);
+  assert.equal(chamadas.length, 1);
+  assert.equal(chamadas[0][0], "update");
+  assert.equal(Object.prototype.hasOwnProperty.call(chamadas[0][2], "dataAgendada"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(chamadas[0][2], "janelaAgendadaInicio"), false);
+});
+
+test("syncPreventivaPreditiva atualiza existente quando diferenca e maior ou igual a 24h", async () => {
+  const maquina = {
+    id: 22,
+    nome: "Esteira",
+    estadoPredicaoManutencao: {
+      validasConsecutivas: 2,
+      ultimaDataAgendada: "2026-06-24T10:00:00.000Z"
+    }
+  };
+  const existente = {
+    id: 1,
+    maquinaId: 22,
+    status: "AGENDADA",
+    tipo: "PREVENTIVA",
+    origem: "PREDICAO",
+    dataAgendada: new Date("2026-06-24T10:00:00.000Z"),
+    metadataPredicao: {}
+  };
+  const chamadas = mockSyncPredicao({ maquina, existente });
+
+  await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({
+    maquina,
+    inicio: "2026-06-25T10:00:00.000Z"
+  }));
+
+  assert.equal(chamadas.length, 1);
+  assert.equal(chamadas[0][0], "update");
+  assert.equal(chamadas[0][2].dataAgendada.toISOString(), "2026-06-25T10:00:00.000Z");
+});
+
+test("syncPreventivaPreditiva nao altera preditiva em andamento", async () => {
+  const maquina = {
+    id: 22,
+    nome: "Esteira",
+    estadoPredicaoManutencao: {
+      validasConsecutivas: 2,
+      ultimaDataAgendada: "2026-06-25T10:00:00.000Z"
+    }
+  };
+  const existente = {
+    id: 1,
+    maquinaId: 22,
+    status: "EM_ANDAMENTO",
+    tipo: "PREVENTIVA",
+    origem: "PREDICAO",
+    dataAgendada: new Date("2026-06-25T10:00:00.000Z"),
+    metadataPredicao: {}
+  };
+  const chamadas = mockSyncPredicao({ maquina, existente });
+
+  const preservada = await ManutencaoService.syncPreventivaPreditiva(buildDiagnosticoPreditivo({ maquina }));
+
+  assert.equal(preservada.id, 1);
+  assert.equal(preservada.status, "EM_ANDAMENTO");
+  assert.equal(chamadas.length, 0);
 });

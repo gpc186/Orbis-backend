@@ -107,6 +107,34 @@ class ManutecaoModel {
         });
     };
 
+    static async findOpenManualPreventiveNearDate({ maquinaId, dataAgendada, windowDays }) {
+        const dataReferencia = new Date(dataAgendada);
+        const diasJanela = Number(windowDays);
+
+        if (Number.isNaN(dataReferencia.getTime()) || !Number.isFinite(diasJanela) || diasJanela < 0) {
+            return null;
+        }
+
+        const janelaMs = diasJanela * 24 * 60 * 60 * 1000;
+        const inicio = new Date(dataReferencia.getTime() - janelaMs);
+        const fim = new Date(dataReferencia.getTime() + janelaMs);
+
+        return await prisma.manutencao.findFirst({
+            where: {
+                maquinaId: parseInt(maquinaId),
+                tipo: "PREVENTIVA",
+                origem: "MANUAL",
+                status: { in: ["AGENDADA", "EM_ANDAMENTO"] },
+                dataAgendada: {
+                    gte: inicio,
+                    lte: fim
+                }
+            },
+            include: this.includeRelations,
+            orderBy: { dataAgendada: "asc" }
+        });
+    };
+
     static async update({ id, dados }) {
         return await prisma.manutencao.update({
             where: { id: parseInt(id) },

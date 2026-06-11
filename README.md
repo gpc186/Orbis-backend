@@ -114,6 +114,12 @@ SEED_LEITURAS_GARANTIR_LEITURA_ATUAL=true
 
 PREDICAO_MIN_PONTOS_REGRESSAO=3
 PREDICAO_MIN_JANELA_REGRESSAO_HORAS=0.05
+PREDICAO_AUTO_AGENDAR_ENABLED=true
+PREDICAO_AUTO_AGENDAR_MIN_CONFIRMACOES=3
+PREDICAO_AUTO_AGENDAR_R2_MINIMO=0.75
+PREDICAO_AUTO_AGENDAR_PONTOS_MINIMOS=5
+PREDICAO_AUTO_AGENDAR_REAGENDAR_TOLERANCIA_HORAS=24
+PREDICAO_AUTO_AGENDAR_BLOQUEIO_MANUAL_DIAS=7
 PREDICAO_RISCO_MIN_PONTOS_HISTORICO=3
 PREDICAO_RISCO_MIN_LEITURAS_24H=2
 PREDICAO_RISCO_MIN_LEITURAS_72H=3
@@ -201,6 +207,11 @@ A velocidade/sensibilidade da predição pode ser calibrada pelo ambiente:
 
 - `PREDICAO_MIN_PONTOS_REGRESSAO`: pontos mínimos de integridade para regressão.
 - `PREDICAO_MIN_JANELA_REGRESSAO_HORAS`: janela temporal mínima da regressão. `0.05` equivale a cerca de 3 minutos.
+- `PREDICAO_AUTO_AGENDAR_ENABLED`: habilita a criação automática de preventiva por predição. Quando `false`, apenas o estado preditivo da máquina é atualizado.
+- `PREDICAO_AUTO_AGENDAR_MIN_CONFIRMACOES`: quantidade de previsões válidas consecutivas necessárias antes de criar ou reagendar preventiva preditiva.
+- `PREDICAO_AUTO_AGENDAR_R2_MINIMO` e `PREDICAO_AUTO_AGENDAR_PONTOS_MINIMOS`: qualidade mínima do modelo para considerar a predição estável.
+- `PREDICAO_AUTO_AGENDAR_REAGENDAR_TOLERANCIA_HORAS`: diferença mínima para alterar a data de uma preventiva preditiva já agendada.
+- `PREDICAO_AUTO_AGENDAR_BLOQUEIO_MANUAL_DIAS`: janela em dias para bloquear criação preditiva quando existe preventiva manual aberta próxima.
 - `PREDICAO_RISCO_MIN_LEITURAS_24H` e `PREDICAO_RISCO_MIN_LEITURAS_72H`: leituras mínimas para calcular risco.
 - `PREDICAO_ALERTA_MIN_AMOSTRAS_LIMIAR`: alertas históricos mínimos para estimar limiar por histórico.
 - `PREDICAO_ALERTA_LIMIAR_INSTABILIDADE`, `PREDICAO_ALERTA_LIMIAR_TENDENCIA_CURTA` e `PREDICAO_ALERTA_LIMIAR_TENDENCIA_LONGA`: limiares operacionais usados quando ainda não há histórico suficiente.
