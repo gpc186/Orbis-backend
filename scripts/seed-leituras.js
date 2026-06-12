@@ -8,6 +8,9 @@ const DEFAULT_BATCH_SIZE = 1000;
 const DEFAULT_MAX_READINGS_PER_SENSOR = 5000;
 const DEFAULT_NOISE_PERCENT = 0.015;
 const DEFAULT_ENSURE_CURRENT_READING = true;
+const DEFAULT_INTEGRITY_DAYS = 30;
+const DEFAULT_INTEGRITY_INTERVAL_MINUTES = 30;
+const DEFAULT_INTEGRITY_FINAL_PERCENT = 70;
 
 function parsePositiveNumber(value, fallback) {
   const parsed = Number(value);
@@ -35,6 +38,11 @@ function round(value) {
 function buildConfig(env = process.env) {
   const days = parsePositiveNumber(env.SEED_LEITURAS_DIAS, DEFAULT_DAYS);
   const intervalMinutes = parsePositiveNumber(env.SEED_LEITURAS_INTERVALO_MINUTOS, DEFAULT_INTERVAL_MINUTES);
+  const integrityDays = parsePositiveNumber(env.SEED_INTEGRIDADE_DIAS_DEGRADACAO, DEFAULT_INTEGRITY_DAYS);
+  const integrityIntervalMinutes = parsePositiveNumber(
+    env.SEED_INTEGRIDADE_INTERVALO_MINUTOS,
+    DEFAULT_INTEGRITY_INTERVAL_MINUTES
+  );
 
   return {
     days,
@@ -48,7 +56,15 @@ function buildConfig(env = process.env) {
     noisePercent: parseNonNegativeNumber(env.SEED_LEITURAS_RUIDO_PERCENTUAL, DEFAULT_NOISE_PERCENT),
     createAlerts: parseBoolean(env.SEED_LEITURAS_CRIAR_ALERTAS, false),
     updateMachines: parseBoolean(env.SEED_LEITURAS_ATUALIZAR_MAQUINAS, true),
-    ensureCurrentReading: parseBoolean(env.SEED_LEITURAS_GARANTIR_LEITURA_ATUAL, DEFAULT_ENSURE_CURRENT_READING)
+    ensureCurrentReading: parseBoolean(env.SEED_LEITURAS_GARANTIR_LEITURA_ATUAL, DEFAULT_ENSURE_CURRENT_READING),
+    integrityDays,
+    integrityIntervalMinutes,
+    integrityIntervalMs: integrityIntervalMinutes * 60 * 1000,
+    integrityFinalPercent: clamp(
+      parseNonNegativeNumber(env.SEED_INTEGRIDADE_FINAL_PERCENTUAL, DEFAULT_INTEGRITY_FINAL_PERCENT),
+      0,
+      100
+    )
   };
 }
 
@@ -183,6 +199,44 @@ function calculateSensorHealth(sensor, reading) {
   return round(clamp(100 - (Math.max(tempProgress, vibProgress) * 55), 35, 100));
 }
 
+function buildIntegrityRowsForMachine({ maquinaId, finalIntegrity, finalStability, config, now = new Date() }) {
+  const rows = [];
+  const end = now;
+  const start = new Date(end.getTime() - (config.integrityDays * 24 * 60 * 60 * 1000));
+  let cursor = start;
+
+  while (cursor <= end) {
+    const progress = progressForDate(cursor, start, end);
+    const integridade = round(100 - ((100 - finalIntegrity) * progress));
+    const scoreEstabilidade = round(100 - ((100 - finalStability) * progress));
+
+    rows.push({
+      maquinaId,
+      integridade,
+      scoreEstabilidade,
+      origem: "SEED_LEITURAS",
+      observacao: "Historico gerado pelo seed de leituras para demonstracao.",
+      criadoEm: new Date(cursor)
+    });
+
+    cursor = new Date(cursor.getTime() + config.integrityIntervalMs);
+  }
+
+  const lastRow = rows[rows.length - 1];
+  if (!lastRow || lastRow.criadoEm.getTime() < end.getTime()) {
+    rows.push({
+      maquinaId,
+      integridade: finalIntegrity,
+      scoreEstabilidade: finalStability,
+      origem: "SEED_LEITURAS",
+      observacao: "Historico gerado pelo seed de leituras para demonstracao.",
+      criadoEm: end
+    });
+  }
+
+  return rows;
+}
+
 function groupLatestByMachine(sensors, latestReadingsBySensor) {
   const machines = new Map();
 
@@ -231,9 +285,10 @@ async function updateSensorsAndMachines({ sensors, latestReadingsBySensor, confi
   const latestByMachine = groupLatestByMachine(sensors, latestReadingsBySensor);
 
   for (const [maquinaId, data] of latestByMachine.entries()) {
-    const integridade = round(
+    const integridadeCalculada = round(
       data.healthScores.reduce((sum, value) => sum + value, 0) / data.healthScores.length
     );
+    const integridade = Math.min(integridadeCalculada, config.integrityFinalPercent);
     const scoreEstabilidade = round(clamp(integridade + 5, 35, 100));
 
     await prisma.maquina.update({
@@ -244,14 +299,12 @@ async function updateSensorsAndMachines({ sensors, latestReadingsBySensor, confi
       }
     });
 
-    historicoRows.push({
+    historicoRows.push(...buildIntegrityRowsForMachine({
       maquinaId,
-      integridade,
-      scoreEstabilidade,
-      origem: "SEED_LEITURAS",
-      observacao: "Historico gerado pelo seed de leituras para demonstracao.",
-      criadoEm: new Date()
-    });
+      finalIntegrity: integridade,
+      finalStability: scoreEstabilidade,
+      config
+    }));
     updatedMachines += 1;
   }
 
@@ -377,7 +430,10 @@ async function main() {
     alertasCriados: createdAlerts,
     periodoInicio: range.start.toISOString(),
     periodoFim: range.end.toISOString(),
-    intervaloMinutos: config.intervalMinutes
+    intervaloMinutos: config.intervalMinutes,
+    integridadeDiasDegradacao: config.integrityDays,
+    integridadeIntervaloMinutos: config.integrityIntervalMinutes,
+    integridadeFinalPercentual: config.integrityFinalPercent
   });
 }
 
@@ -394,6 +450,7 @@ if (require.main === module) {
 
 module.exports = {
   buildConfig,
+  buildIntegrityRowsForMachine,
   buildReading,
   buildReadingsForSensor,
   calculateSensorHealth,

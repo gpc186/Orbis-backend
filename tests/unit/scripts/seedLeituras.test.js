@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 
 const {
   buildConfig,
+  buildIntegrityRowsForMachine,
   buildReading,
   buildReadingsForSensor,
   calculateSensorHealth,
@@ -30,7 +31,10 @@ test("seed leituras normaliza configuracao com defaults seguros", () => {
     SEED_LEITURAS_DIAS: "3",
     SEED_LEITURAS_INTERVALO_MINUTOS: "15",
     SEED_LEITURAS_BATCH_SIZE: "200",
-    SEED_LEITURAS_CRIAR_ALERTAS: "true"
+    SEED_LEITURAS_CRIAR_ALERTAS: "true",
+    SEED_INTEGRIDADE_DIAS_DEGRADACAO: "30",
+    SEED_INTEGRIDADE_INTERVALO_MINUTOS: "30",
+    SEED_INTEGRIDADE_FINAL_PERCENTUAL: "70"
   });
 
   assert.equal(config.days, 3);
@@ -39,6 +43,9 @@ test("seed leituras normaliza configuracao com defaults seguros", () => {
   assert.equal(config.batchSize, 200);
   assert.equal(config.createAlerts, true);
   assert.equal(config.updateMachines, true);
+  assert.equal(config.integrityDays, 30);
+  assert.equal(config.integrityIntervalMinutes, 30);
+  assert.equal(config.integrityFinalPercent, 70);
 });
 
 test("seed leituras calcula progresso e proximo inicio sem duplicar leitura existente", () => {
@@ -107,4 +114,41 @@ test("seed leituras respeita specs do sensor e calcula saude", () => {
   assert.equal(reading.temperatura, 75.2);
   assert.equal(reading.vibracao, 9.04);
   assert.equal(health, 51.6);
+});
+
+test("seed leituras cria historico de integridade em curva configuravel", () => {
+  const config = buildConfig({
+    SEED_INTEGRIDADE_DIAS_DEGRADACAO: "1",
+    SEED_INTEGRIDADE_INTERVALO_MINUTOS: "720",
+    SEED_INTEGRIDADE_FINAL_PERCENTUAL: "70"
+  });
+  const rows = buildIntegrityRowsForMachine({
+    maquinaId: 9,
+    finalIntegrity: 70,
+    finalStability: 75,
+    config,
+    now: new Date("2026-06-11T12:00:00.000Z")
+  });
+
+  assert.deepEqual(rows.map((row) => ({
+    integridade: row.integridade,
+    scoreEstabilidade: row.scoreEstabilidade,
+    criadoEm: row.criadoEm.toISOString()
+  })), [
+    {
+      integridade: 100,
+      scoreEstabilidade: 100,
+      criadoEm: "2026-06-10T12:00:00.000Z"
+    },
+    {
+      integridade: 85,
+      scoreEstabilidade: 87.5,
+      criadoEm: "2026-06-11T00:00:00.000Z"
+    },
+    {
+      integridade: 70,
+      scoreEstabilidade: 75,
+      criadoEm: "2026-06-11T12:00:00.000Z"
+    }
+  ]);
 });
