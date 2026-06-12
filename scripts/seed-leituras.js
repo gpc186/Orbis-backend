@@ -1,6 +1,7 @@
 require("../src/config/env")();
 
 const prisma = require("../src/prisma/prisma");
+const PredicaoService = require("../src/services/predicaoService");
 
 const DEFAULT_DAYS = 7;
 const DEFAULT_INTERVAL_MINUTES = 5;
@@ -85,11 +86,12 @@ function wave(sensorId, timestamp, multiplier = 1) {
   return Math.sin((minutes / 17) + (sensorId * 1.37) + multiplier);
 }
 
-function valueFromRange({ ideal, limit, progress, noisePercent, noiseFactor, allowLimitSpike }) {
+function valueFromRange({ ideal, limit, progress, noisePercent, noiseFactor, allowLimitSpike, config }) {
   const safeIdeal = Number.isFinite(ideal) ? ideal : 0;
   const safeLimit = Number.isFinite(limit) && limit > safeIdeal ? limit : safeIdeal;
   const amplitude = Math.max(safeLimit - safeIdeal, 0);
-  const baseProgress = allowLimitSpike ? 1.05 : 0.88;
+  const finalSensorProgress = clamp((100 - config.integrityFinalPercent) / 100, 0, 1);
+  const baseProgress = allowLimitSpike ? 1.05 : finalSensorProgress;
   const base = safeIdeal + (amplitude * progress * baseProgress);
   const noise = amplitude * noisePercent * noiseFactor;
 
@@ -115,7 +117,8 @@ function buildReading(sensor, date, range, config) {
       progress,
       noisePercent: config.noisePercent,
       noiseFactor: wave(sensor.id, date.getTime(), 0.3),
-      allowLimitSpike: spike
+      allowLimitSpike: spike,
+      config
     }),
     vibracao: valueFromRange({
       ideal: Number(sensor.idealVibracao),
@@ -123,7 +126,8 @@ function buildReading(sensor, date, range, config) {
       progress,
       noisePercent: config.noisePercent,
       noiseFactor: wave(sensor.id, date.getTime(), 1.1),
-      allowLimitSpike: spike
+      allowLimitSpike: spike,
+      config
     }),
     criadoEm: date
   };
@@ -191,18 +195,16 @@ async function createInBatches(model, rows, batchSize) {
 }
 
 function calculateSensorHealth(sensor, reading) {
-  const tempRange = Math.max(Number(sensor.limiteTemperatura) - Number(sensor.idealTemperatura), 1);
-  const vibRange = Math.max(Number(sensor.limiteVibracao) - Number(sensor.idealVibracao), 1);
-  const tempProgress = clamp((reading.temperatura - Number(sensor.idealTemperatura)) / tempRange, 0, 1);
-  const vibProgress = clamp((reading.vibracao - Number(sensor.idealVibracao)) / vibRange, 0, 1);
-
-  return round(clamp(100 - (Math.max(tempProgress, vibProgress) * 55), 35, 100));
+  return PredicaoService.calcularHealthScore({
+    ...sensor,
+    temperatura: reading.temperatura,
+    vibracao: reading.vibracao
+  });
 }
 
 function buildIntegrityRowsForMachine({
   maquinaId,
-  finalIntegrity,
-  finalStability,
+  sensors,
   latestHistoryDate,
   config,
   now = new Date()
@@ -216,10 +218,18 @@ function buildIntegrityRowsForMachine({
     intervalMs: config.integrityIntervalMs
   });
 
-  while (cursor <= end) {
-    const progress = progressForDate(cursor, start, end);
-    const integridade = round(100 - ((100 - finalIntegrity) * progress));
-    const scoreEstabilidade = round(100 - ((100 - finalStability) * progress));
+  while (cursor < end) {
+    const scores = sensors.map((sensor) => {
+      const reading = buildReading(sensor, new Date(cursor), { start, end }, {
+        ...config,
+        createAlerts: false,
+        noisePercent: 0
+      });
+
+      return calculateSensorHealth(sensor, reading);
+    });
+    const integridade = PredicaoService.calcularIntegridadeAgregada(scores);
+    const scoreEstabilidade = round(clamp(integridade + 5, 35, 100));
 
     rows.push({
       maquinaId,
@@ -246,10 +256,12 @@ function groupLatestByMachine(sensors, latestReadingsBySensor) {
     if (!machines.has(sensor.maquinaId)) {
       machines.set(sensor.maquinaId, {
         maquina: sensor.maquina,
+        sensors: [],
         healthScores: []
       });
     }
 
+    machines.get(sensor.maquinaId).sensors.push(sensor);
     machines.get(sensor.maquinaId).healthScores.push(calculateSensorHealth(sensor, reading));
   }
 
@@ -298,27 +310,15 @@ async function updateSensorsAndMachines({ sensors, latestReadingsBySensor, lates
   const latestByMachine = groupLatestByMachine(sensors, latestReadingsBySensor);
 
   for (const [maquinaId, data] of latestByMachine.entries()) {
-    const integridadeCalculada = round(
-      data.healthScores.reduce((sum, value) => sum + value, 0) / data.healthScores.length
-    );
-    const integridade = Math.min(integridadeCalculada, config.integrityFinalPercent);
-    const scoreEstabilidade = round(clamp(integridade + 5, 35, 100));
-
-    await prisma.maquina.update({
-      where: { id: maquinaId },
-      data: {
-        integridade,
-        scoreEstabilidade
-      }
-    });
-
     historicoRows.push(...buildIntegrityRowsForMachine({
       maquinaId,
-      finalIntegrity: integridade,
-      finalStability: scoreEstabilidade,
+      sensors: data.sensors,
       latestHistoryDate: latestHistoryByMachine.get(maquinaId),
       config
     }));
+
+    await PredicaoService.atualizarSaudeMaquina(maquinaId);
+    await PredicaoService.previsaoManutencao(maquinaId);
     updatedMachines += 1;
   }
 
@@ -327,59 +327,6 @@ async function updateSensorsAndMachines({ sensors, latestReadingsBySensor, lates
   }
 
   return { updatedSensors, updatedMachines, historicoRows };
-}
-
-async function createSeedAlerts({ sensors, alertReadingsBySensor, config }) {
-  if (!config.createAlerts) {
-    return 0;
-  }
-
-  let createdAlerts = 0;
-
-  for (const sensor of sensors) {
-    const reading = alertReadingsBySensor.get(sensor.id);
-    if (!reading) continue;
-
-    const overTemperature = reading.temperatura > Number(sensor.limiteTemperatura);
-    const overVibration = reading.vibracao > Number(sensor.limiteVibracao);
-    if (!overTemperature && !overVibration) continue;
-
-    const existing = await prisma.alerta.findFirst({
-      where: {
-        sensorId: sensor.id,
-        status: { in: ["ATIVO", "EM_ANDAMENTO"] },
-        tipo: "LIMITE_ULTRAPASSADO"
-      },
-      select: { id: true }
-    });
-
-    if (existing) continue;
-
-    const alerta = await prisma.alerta.create({
-      data: {
-        sensorId: sensor.id,
-        maquinaId: sensor.maquinaId,
-        tipo: "LIMITE_ULTRAPASSADO",
-        status: "ATIVO",
-        mensagem: `Seed detectou leitura acima do limite no sensor ${sensor.tipo}.`,
-        criadoEm: reading.criadoEm,
-        eventos: {
-          create: {
-            tipo: "CRIADO",
-            statusNovo: "ATIVO",
-            mensagem: "Alerta criado pelo seed de leituras.",
-            descricao: "Alerta sintetico para demonstracao.",
-            criadoEm: reading.criadoEm
-          }
-        }
-      },
-      select: { id: true }
-    });
-
-    if (alerta) createdAlerts += 1;
-  }
-
-  return createdAlerts;
 }
 
 async function main() {
@@ -408,7 +355,6 @@ async function main() {
   const latestDatesBySensor = await getLatestReadingsBySensor(sensors.map((sensor) => sensor.id));
   const allReadings = [];
   const latestReadingsBySensor = new Map();
-  const alertReadingsBySensor = new Map();
 
   for (const sensor of sensors) {
     const readings = buildReadingsForSensor(sensor, latestDatesBySensor.get(sensor.id), range, config);
@@ -416,14 +362,6 @@ async function main() {
 
     if (readings.length > 0) {
       latestReadingsBySensor.set(sensor.id, readings[readings.length - 1]);
-      const alertReading = readings.findLast((reading) => (
-        reading.temperatura > Number(sensor.limiteTemperatura) ||
-        reading.vibracao > Number(sensor.limiteVibracao)
-      ));
-
-      if (alertReading) {
-        alertReadingsBySensor.set(sensor.id, alertReading);
-      }
     }
   }
 
@@ -436,7 +374,6 @@ async function main() {
     latestHistoryByMachine,
     config
   });
-  const createdAlerts = await createSeedAlerts({ sensors, alertReadingsBySensor, config });
 
   console.log("seed_leituras_finished", {
     sensores: sensors.length,
@@ -444,7 +381,6 @@ async function main() {
     sensoresAtualizados: updatedSensors,
     maquinasAtualizadas: updatedMachines,
     historicosCriados: historicoRows.length,
-    alertasCriados: createdAlerts,
     periodoInicio: range.start.toISOString(),
     periodoFim: range.end.toISOString(),
     intervaloMinutos: config.intervalMinutes,

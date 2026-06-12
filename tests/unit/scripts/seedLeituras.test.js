@@ -101,7 +101,8 @@ test("seed leituras garante leitura atual mesmo quando sensor tinha leitura rece
 test("seed leituras respeita specs do sensor e calcula saude", () => {
   const config = buildConfig({
     SEED_LEITURAS_RUIDO_PERCENTUAL: "0",
-    SEED_LEITURAS_CRIAR_ALERTAS: "false"
+    SEED_LEITURAS_CRIAR_ALERTAS: "false",
+    SEED_INTEGRIDADE_FINAL_PERCENTUAL: "70"
   });
   const range = {
     start: new Date("2026-06-10T00:00:00.000Z"),
@@ -111,9 +112,9 @@ test("seed leituras respeita specs do sensor e calcula saude", () => {
   const reading = buildReading(sensor, new Date("2026-06-11T00:00:00.000Z"), range, config);
   const health = calculateSensorHealth(sensor, reading);
 
-  assert.equal(reading.temperatura, 75.2);
-  assert.equal(reading.vibracao, 9.04);
-  assert.equal(health, 51.6);
+  assert.equal(reading.temperatura, 52);
+  assert.equal(reading.vibracao, 4.4);
+  assert.equal(health, 70);
 });
 
 test("seed leituras cria historico de integridade em curva configuravel", () => {
@@ -124,8 +125,7 @@ test("seed leituras cria historico de integridade em curva configuravel", () => 
   });
   const rows = buildIntegrityRowsForMachine({
     maquinaId: 9,
-    finalIntegrity: 70,
-    finalStability: 75,
+    sensors: [sensor],
     config,
     now: new Date("2026-06-11T12:00:00.000Z")
   });
@@ -142,13 +142,8 @@ test("seed leituras cria historico de integridade em curva configuravel", () => 
     },
     {
       integridade: 85,
-      scoreEstabilidade: 87.5,
+      scoreEstabilidade: 90,
       criadoEm: "2026-06-11T00:00:00.000Z"
-    },
-    {
-      integridade: 70,
-      scoreEstabilidade: 75,
-      criadoEm: "2026-06-11T12:00:00.000Z"
     }
   ]);
 });
@@ -161,8 +156,7 @@ test("seed leituras cria historico de integridade de forma incremental", () => {
   });
   const rows = buildIntegrityRowsForMachine({
     maquinaId: 9,
-    finalIntegrity: 70,
-    finalStability: 75,
+    sensors: [sensor],
     latestHistoryDate: new Date("2026-06-11T00:00:00.000Z"),
     config,
     now: new Date("2026-06-11T12:00:00.000Z")
@@ -172,11 +166,5 @@ test("seed leituras cria historico de integridade de forma incremental", () => {
     integridade: row.integridade,
     scoreEstabilidade: row.scoreEstabilidade,
     criadoEm: row.criadoEm.toISOString()
-  })), [
-    {
-      integridade: 70,
-      scoreEstabilidade: 75,
-      criadoEm: "2026-06-11T12:00:00.000Z"
-    }
-  ]);
+  })), []);
 });
