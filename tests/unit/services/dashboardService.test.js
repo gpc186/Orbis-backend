@@ -6,6 +6,7 @@ const AlertaService = require("../../../src/services/alertaService");
 const MaquinaService = require("../../../src/services/maquinaService");
 const SensorService = require("../../../src/services/sensorService");
 const UsuarioService = require("../../../src/services/usuarioService");
+const ManutencaoService = require("../../../src/services/manutencaoService");
 const AlertaModel = require("../../../src/models/alertaModel");
 const MaquinaModel = require("../../../src/models/maquinaModel");
 const SensorModel = require("../../../src/models/sensorModel");
@@ -21,6 +22,12 @@ const originals = {
   countAlertaSemAtendimento: AlertaService.countAlertaSemAtendimento,
   countAtendedToday: AlertaService.countAtendedToday,
   getSlaSummary: AlertaService.getSlaSummary,
+  resume: DashboardService.resume,
+  findAtivos: AlertaService.findAtivos,
+  listMaquinas: MaquinaService.list,
+  sanitizeForResponse: MaquinaService.sanitizeForResponse,
+  listSensores: SensorService.list,
+  listManutencoes: ManutencaoService.list,
   listTopAtivos: AlertaModel.listTopAtivos,
   listPioresIntegridade: MaquinaModel.listPioresIntegridade,
   listOfflineRecentes: SensorModel.listOfflineRecentes
@@ -37,6 +44,12 @@ afterEach(() => {
   AlertaService.countAlertaSemAtendimento = originals.countAlertaSemAtendimento;
   AlertaService.countAtendedToday = originals.countAtendedToday;
   AlertaService.getSlaSummary = originals.getSlaSummary;
+  DashboardService.resume = originals.resume;
+  AlertaService.findAtivos = originals.findAtivos;
+  MaquinaService.list = originals.listMaquinas;
+  MaquinaService.sanitizeForResponse = originals.sanitizeForResponse;
+  SensorService.list = originals.listSensores;
+  ManutencaoService.list = originals.listManutencoes;
   AlertaModel.listTopAtivos = originals.listTopAtivos;
   MaquinaModel.listPioresIntegridade = originals.listPioresIntegridade;
   SensorModel.listOfflineRecentes = originals.listOfflineRecentes;
@@ -178,4 +191,77 @@ test("getOperationalContext combina resumo, listas e destaques", async () => {
   } finally {
     DashboardService.resume = originalResume;
   }
+});
+
+test("complete monta bootstrap do dashboard com listas limitadas e usuario", async () => {
+  const chamadas = [];
+  const resumo = {
+    totalMaquinas: 4,
+    maquinasEmAlerta: 1,
+    maquinasFuncionando: 3,
+    alertasAtivos: 2,
+    alertasHoje: 1,
+    tecnicosAtivos: 2,
+    integridadeMedia: 91,
+    sensoresOnline: 7,
+    alertaSemAtendimento: 1,
+    alertasAtendidosHoje: 3
+  };
+
+  DashboardService.resume = async () => resumo;
+  AlertaModel.listTopAtivos = async ({ limit }) => {
+    chamadas.push(["topAlertas", limit]);
+    return [{ id: 1, maquina: { criticidade: "BAIXA" }, eventos: [], manutencoes: [] }];
+  };
+  AlertaService.findAtivos = async ({ limit }) => {
+    chamadas.push(["alertasAtivos", limit]);
+    return { total: 1, dados: [{ id: 2 }] };
+  };
+  MaquinaModel.listPioresIntegridade = async ({ limit }) => {
+    chamadas.push(["maquinasCriticas", limit]);
+    return [{ id: 3 }];
+  };
+  MaquinaService.list = async () => [{ id: 4, manual: { textoExtraido: "privado", nomeArquivo: "manual.pdf" } }];
+  MaquinaService.sanitizeForResponse = (maquinas) => maquinas.map((maquina) => ({
+    id: maquina.id,
+    manual: { nomeArquivo: maquina.manual.nomeArquivo }
+  }));
+  SensorModel.listOfflineRecentes = async ({ limit }) => {
+    chamadas.push(["sensoresOffline", limit]);
+    return [{ id: 5 }];
+  };
+  SensorService.list = async () => [{ id: 6 }];
+  ManutencaoService.list = async ({ page, limit, usuario }) => {
+    chamadas.push(["manutencoes", page, limit, usuario.role]);
+    return { dados: [{ id: 7 }], total: 1, page, totalPages: 1 };
+  };
+
+  const result = await DashboardService.complete({
+    usuario: { id: 1, role: "ADMIN" },
+    limit: "999",
+    listasLimit: "12"
+  });
+
+  assert.equal(typeof result.generatedAt, "string");
+  assert.deepEqual(result.limites, { destaques: 20, listas: 12 });
+  assert.deepEqual(result.resumo, resumo);
+  assert.deepEqual(result.destaques, [
+    "2 alertas ativos no momento.",
+    "1 maquinas em alerta.",
+    "1 alertas sem atendimento."
+  ]);
+  assert.equal(result.alertas.topAtivos[0].sla.criticidade, "BAIXA");
+  assert.deepEqual(result.alertas.ativos, { total: 1, dados: [{ id: 2 }] });
+  assert.deepEqual(result.maquinas.criticas, [{ id: 3 }]);
+  assert.deepEqual(result.maquinas.lista, [{ id: 4, manual: { nomeArquivo: "manual.pdf" } }]);
+  assert.deepEqual(result.sensores.offline, [{ id: 5 }]);
+  assert.deepEqual(result.sensores.lista, [{ id: 6 }]);
+  assert.deepEqual(result.manutencoes, { dados: [{ id: 7 }], total: 1, page: 1, totalPages: 1 });
+  assert.deepEqual(chamadas, [
+    ["topAlertas", 20],
+    ["alertasAtivos", 12],
+    ["maquinasCriticas", 20],
+    ["sensoresOffline", 20],
+    ["manutencoes", 1, 12, "ADMIN"]
+  ]);
 });

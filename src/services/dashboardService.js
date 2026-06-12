@@ -2,6 +2,7 @@ const AlertaService = require("../services/alertaService");
 const MaquinaService = require("../services/maquinaService");
 const SensorService = require("../services/sensorService");
 const UsuarioService = require("../services/usuarioService");
+const ManutencaoService = require("../services/manutencaoService");
 const AlertaModel = require("../models/alertaModel");
 const MaquinaModel = require("../models/maquinaModel");
 const SensorModel = require("../models/sensorModel");
@@ -77,6 +78,57 @@ class DashboardService {
             maquinasCriticas,
             sensoresOffline,
             destaques: this.buildDestaquesFromResumo(resumo)
+        };
+    }
+
+    static async complete({ usuario, limit = 5, listasLimit = 20 } = {}) {
+        const safeLimit = normalizeLimit(limit, 5);
+        const safeListasLimit = normalizeLimit(listasLimit, 20);
+        const resumo = await this.resume();
+
+        const [
+            topAlertas,
+            alertasAtivos,
+            maquinasCriticas,
+            maquinas,
+            sensoresOffline,
+            sensores,
+            manutencoes
+        ] = await Promise.all([
+            this.getTopAlertas({ limit: safeLimit }),
+            AlertaService.findAtivos({ limit: safeListasLimit }),
+            this.getMaquinasCriticas({ limit: safeLimit }),
+            MaquinaService.list(),
+            this.getSensoresOffline({ limit: safeLimit }),
+            SensorService.list(),
+            ManutencaoService.list({
+                page: 1,
+                limit: safeListasLimit,
+                usuario
+            })
+        ]);
+
+        return {
+            generatedAt: new Date().toISOString(),
+            limites: {
+                destaques: safeLimit,
+                listas: safeListasLimit
+            },
+            resumo,
+            destaques: this.buildDestaquesFromResumo(resumo),
+            alertas: {
+                topAtivos: topAlertas,
+                ativos: alertasAtivos
+            },
+            maquinas: {
+                criticas: maquinasCriticas,
+                lista: MaquinaService.sanitizeForResponse(maquinas)
+            },
+            sensores: {
+                offline: sensoresOffline,
+                lista: sensores
+            },
+            manutencoes
         };
     }
 }

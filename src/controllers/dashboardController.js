@@ -9,6 +9,19 @@ class DashboardController {
             next(error);
         };
     };
+
+    static async complete(req, res, next) {
+        try {
+            const dashboard = await DashboardService.complete({
+                usuario: req.usuario,
+                limit: req.query?.limit,
+                listasLimit: req.query?.listasLimit
+            });
+            return res.status(200).json(dashboard);
+        } catch (error) {
+            next(error);
+        };
+    };
 };
 
 module.exports = DashboardController;

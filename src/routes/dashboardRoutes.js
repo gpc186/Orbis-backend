@@ -8,5 +8,6 @@ const router = express.Router();
 const cacheDashboard = createDashboardCacheMiddleware();
 
 router.get('/resumo', authMiddleware, roleMiddleware(...ADMIN_READ_ROLES), cacheDashboard, DashboardController.resume);
+router.get('/completo', authMiddleware, roleMiddleware(...ADMIN_READ_ROLES), cacheDashboard, DashboardController.complete);
 
 module.exports = router

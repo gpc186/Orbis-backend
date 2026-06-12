@@ -915,6 +915,71 @@ test("GET /dashboard/resumo usa cache curto preservando payload por usuario", as
   });
 });
 
+test("GET /dashboard/completo permite admin, bloqueia tecnico e usa cache curto", async () => {
+  mockAuthenticatedUsers();
+
+  let chamadas = 0;
+  const payload = {
+    generatedAt: "2026-06-12T19:00:00.000Z",
+    limites: { destaques: 5, listas: 20 },
+    resumo: { totalMaquinas: 10 },
+    destaques: ["10 maquinas cadastradas."],
+    alertas: {
+      topAtivos: [],
+      ativos: { total: 0, dados: [] }
+    },
+    maquinas: {
+      criticas: [],
+      lista: []
+    },
+    sensores: {
+      offline: [],
+      lista: []
+    },
+    manutencoes: {
+      dados: [],
+      total: 0,
+      page: 1,
+      totalPages: 0
+    }
+  };
+
+  patch(DashboardService, "complete", async ({ usuario, limit, listasLimit }) => {
+    chamadas += 1;
+    return {
+      ...payload,
+      usuarioId: usuario.id,
+      limit,
+      listasLimit,
+      chamadas
+    };
+  });
+
+  await withServer(async (baseUrl) => {
+    const tecnico = await request(baseUrl, "/dashboard/completo", {
+      token: tokenFor({ id: 2, role: "TECNICO" })
+    });
+    const token = tokenFor({ id: 1, role: "ADMIN" });
+    const primeira = await request(baseUrl, "/dashboard/completo?limit=4&listasLimit=12", { token });
+    const segunda = await request(baseUrl, "/dashboard/completo?limit=4&listasLimit=12", { token });
+
+    assert.equal(tecnico.status, 403);
+    assert.equal(primeira.status, 200);
+    assert.equal(segunda.status, 200);
+    assert.equal(primeira.headers["x-cache"], "MISS");
+    assert.equal(segunda.headers["x-cache"], "HIT");
+    assert.deepEqual(primeira.json, {
+      ...payload,
+      usuarioId: 1,
+      limit: "4",
+      listasLimit: "12",
+      chamadas: 1
+    });
+    assert.deepEqual(segunda.json, primeira.json);
+    assert.equal(chamadas, 1);
+  });
+});
+
 test("rotas publicas de senha repassam payloads ao ResetSenhaService", async () => {
   patch(ResetSenhaService, "esqueceuSenha", async ({ email, emailDestino }) => ({
     email,
