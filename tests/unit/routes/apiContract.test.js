@@ -23,6 +23,7 @@ const ContatoService = require("../../../src/services/contatoService");
 const PerfilService = require("../../../src/services/perfilService");
 const ResetSenhaService = require("../../../src/services/resetSenhaService");
 const DashboardService = require("../../../src/services/dashboardService");
+const { clearCache } = require("../../../src/middlewares/cacheMiddleware");
 const { generateAccessToken } = require("../../../src/utils/jwtUtils");
 
 const patches = [];
@@ -32,6 +33,8 @@ afterEach(() => {
     const { target, key, original } = patches.pop();
     target[key] = original;
   }
+
+  clearCache();
 });
 
 function patch(target, key, replacement) {
@@ -93,8 +96,9 @@ async function request(baseUrl, path, { method = "GET", token, body, headers = {
   });
   const text = await response.text();
   const json = text ? JSON.parse(text) : null;
+  const responseHeaders = Object.fromEntries(response.headers.entries());
 
-  return { status: response.status, json, text };
+  return { status: response.status, json, text, headers: responseHeaders };
 }
 
 function createPngBlob() {
@@ -115,6 +119,22 @@ test("GET /health responde com status basico da API", async () => {
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.json, { ok: true });
+  });
+});
+
+test("OPTIONS retorna Access-Control-Max-Age para cache de preflight", async () => {
+  await withServer(async (baseUrl) => {
+    const response = await request(baseUrl, "/maquinas", {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://www.orbis-3td.com.br",
+        "access-control-request-method": "GET",
+        "access-control-request-headers": "authorization"
+      }
+    });
+
+    assert.equal(response.status, 204);
+    assert.equal(response.headers["access-control-max-age"], "600");
   });
 });
 
@@ -865,6 +885,33 @@ test("GET /dashboard/resumo permite admin e bloqueia tecnico", async () => {
     assert.equal(tecnico.status, 403);
     assert.equal(admin.status, 200);
     assert.deepEqual(admin.json, resumo);
+  });
+});
+
+test("GET /dashboard/resumo usa cache curto preservando payload por usuario", async () => {
+  mockAuthenticatedUsers();
+
+  let chamadas = 0;
+  patch(DashboardService, "resume", async () => {
+    chamadas += 1;
+    return {
+      totalMaquinas: 10,
+      chamadas
+    };
+  });
+
+  await withServer(async (baseUrl) => {
+    const token = tokenFor({ id: 1, role: "ADMIN" });
+    const primeira = await request(baseUrl, "/dashboard/resumo", { token });
+    const segunda = await request(baseUrl, "/dashboard/resumo", { token });
+
+    assert.equal(primeira.status, 200);
+    assert.equal(segunda.status, 200);
+    assert.equal(primeira.headers["x-cache"], "MISS");
+    assert.equal(segunda.headers["x-cache"], "HIT");
+    assert.deepEqual(primeira.json, { totalMaquinas: 10, chamadas: 1 });
+    assert.deepEqual(segunda.json, primeira.json);
+    assert.equal(chamadas, 1);
   });
 });
 
