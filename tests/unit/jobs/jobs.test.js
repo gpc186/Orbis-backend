@@ -214,8 +214,12 @@ test("simuladorJob degrada maquinas linearmente pelas specs dos sensores", async
   const simulador = importFresh(simuladorJob);
 
   await simulador.simularCiclo();
+  for (const estado of simulador._internals.maquinasEmSimulacao.values()) {
+    estado.simulacaoIniciadaEm = new Date(Date.now() - 60000);
+  }
   await simulador.simularCiclo();
   simulador.resetarMaquinaSimulada(10);
+  simulador._internals.maquinasEmSimulacao.get(20).simulacaoIniciadaEm = new Date(Date.now() - 120000);
   await simulador.simularCiclo();
 
   assert.equal(leituras.length, 9);
@@ -234,6 +238,25 @@ test("simuladorJob degrada maquinas linearmente pelas specs dos sensores", async
     { sensorId: 2, temperatura: 40, vibracao: 2 },
     { sensorId: 3, temperatura: 51, vibracao: 3.2 }
   ]);
+});
+
+test("simuladorJob infere progresso por leituras persistidas ao reiniciar", () => {
+  process.env.SIMULADOR_DEGRADACAO_HORAS = "1";
+  const simulador = importFresh(simuladorJob);
+  const agora = new Date("2026-06-11T12:00:00.000Z");
+
+  const inicio = simulador._internals.inferirInicioSimulacao([
+    {
+      idealTemperatura: 60,
+      limiteTemperatura: 90,
+      ultimaTemperatura: 75,
+      idealVibracao: 5,
+      limiteVibracao: 11,
+      ultimaVibracao: 6
+    }
+  ], agora);
+
+  assert.equal(inicio.toISOString(), "2026-06-11T11:30:00.000Z");
 });
 
 test("tendenciaJob nao consulta banco fora de producao", async () => {
