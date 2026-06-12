@@ -199,11 +199,22 @@ function calculateSensorHealth(sensor, reading) {
   return round(clamp(100 - (Math.max(tempProgress, vibProgress) * 55), 35, 100));
 }
 
-function buildIntegrityRowsForMachine({ maquinaId, finalIntegrity, finalStability, config, now = new Date() }) {
+function buildIntegrityRowsForMachine({
+  maquinaId,
+  finalIntegrity,
+  finalStability,
+  latestHistoryDate,
+  config,
+  now = new Date()
+}) {
   const rows = [];
   const end = now;
   const start = new Date(end.getTime() - (config.integrityDays * 24 * 60 * 60 * 1000));
-  let cursor = start;
+  let cursor = nextSeedStart({
+    latestReadingDate: latestHistoryDate,
+    rangeStart: start,
+    intervalMs: config.integrityIntervalMs
+  });
 
   while (cursor <= end) {
     const progress = progressForDate(cursor, start, end);
@@ -220,18 +231,6 @@ function buildIntegrityRowsForMachine({ maquinaId, finalIntegrity, finalStabilit
     });
 
     cursor = new Date(cursor.getTime() + config.integrityIntervalMs);
-  }
-
-  const lastRow = rows[rows.length - 1];
-  if (!lastRow || lastRow.criadoEm.getTime() < end.getTime()) {
-    rows.push({
-      maquinaId,
-      integridade: finalIntegrity,
-      scoreEstabilidade: finalStability,
-      origem: "SEED_LEITURAS",
-      observacao: "Historico gerado pelo seed de leituras para demonstracao.",
-      criadoEm: end
-    });
   }
 
   return rows;
@@ -257,7 +256,21 @@ function groupLatestByMachine(sensors, latestReadingsBySensor) {
   return machines;
 }
 
-async function updateSensorsAndMachines({ sensors, latestReadingsBySensor, config }) {
+async function getLatestHistoryByMachine(maquinaIds) {
+  const latestRows = await prisma.historicoIntegridade.groupBy({
+    by: ["maquinaId"],
+    where: {
+      maquinaId: { in: maquinaIds }
+    },
+    _max: {
+      criadoEm: true
+    }
+  });
+
+  return new Map(latestRows.map((row) => [row.maquinaId, row._max.criadoEm]));
+}
+
+async function updateSensorsAndMachines({ sensors, latestReadingsBySensor, latestHistoryByMachine, config }) {
   let updatedSensors = 0;
   let updatedMachines = 0;
   const historicoRows = [];
@@ -303,6 +316,7 @@ async function updateSensorsAndMachines({ sensors, latestReadingsBySensor, confi
       maquinaId,
       finalIntegrity: integridade,
       finalStability: scoreEstabilidade,
+      latestHistoryDate: latestHistoryByMachine.get(maquinaId),
       config
     }));
     updatedMachines += 1;
@@ -414,9 +428,12 @@ async function main() {
   }
 
   const createdReadings = await createInBatches(prisma.leitura, allReadings, config.batchSize);
+  const maquinaIds = [...new Set(sensors.map((sensor) => sensor.maquinaId))];
+  const latestHistoryByMachine = await getLatestHistoryByMachine(maquinaIds);
   const { updatedSensors, updatedMachines, historicoRows } = await updateSensorsAndMachines({
     sensors,
     latestReadingsBySensor,
+    latestHistoryByMachine,
     config
   });
   const createdAlerts = await createSeedAlerts({ sensors, alertReadingsBySensor, config });

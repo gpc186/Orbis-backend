@@ -152,3 +152,31 @@ test("seed leituras cria historico de integridade em curva configuravel", () => 
     }
   ]);
 });
+
+test("seed leituras cria historico de integridade de forma incremental", () => {
+  const config = buildConfig({
+    SEED_INTEGRIDADE_DIAS_DEGRADACAO: "1",
+    SEED_INTEGRIDADE_INTERVALO_MINUTOS: "720",
+    SEED_INTEGRIDADE_FINAL_PERCENTUAL: "70"
+  });
+  const rows = buildIntegrityRowsForMachine({
+    maquinaId: 9,
+    finalIntegrity: 70,
+    finalStability: 75,
+    latestHistoryDate: new Date("2026-06-11T00:00:00.000Z"),
+    config,
+    now: new Date("2026-06-11T12:00:00.000Z")
+  });
+
+  assert.deepEqual(rows.map((row) => ({
+    integridade: row.integridade,
+    scoreEstabilidade: row.scoreEstabilidade,
+    criadoEm: row.criadoEm.toISOString()
+  })), [
+    {
+      integridade: 70,
+      scoreEstabilidade: 75,
+      criadoEm: "2026-06-11T12:00:00.000Z"
+    }
+  ]);
+});

@@ -389,6 +389,7 @@ A curva usa as specs de cada sensor: `idealTemperatura -> limiteTemperatura` e `
 Ao reiniciar a API, o simulador infere o progresso pelas ultimas leituras persistidas dos sensores, evitando voltar ao inicio apos redeploy.
 
 Para reduzir uso de network transfer no Neon, mantenha `SIMULADOR_JOB_ATIVO=false` fora da demonstracao e rode `npm run seed:leituras` para carregar historico em lote. Na demonstracao, ligue o simulador e/ou ESP32 para leituras em tempo real; o seed nao impede leituras novas.
+O seed e incremental: em novos redeploys, ele continua a partir da ultima leitura de cada sensor e do ultimo ponto de historico de cada maquina, sem recriar toda a janela configurada.
 Se voce estiver usando apenas seed, aumente `SENSOR_OFFLINE_INTERVAL_SECONDS` ou desabilite temporariamente `SENSOR_OFFLINE_JOB_ENABLED`, porque sem novas leituras reais o job de offline pode marcar sensores como `OFFLINE` novamente apos a janela configurada.
 
 ## Testes
