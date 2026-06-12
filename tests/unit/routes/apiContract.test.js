@@ -980,6 +980,89 @@ test("GET /dashboard/completo permite admin, bloqueia tecnico e usa cache curto"
   });
 });
 
+test("GET /dashboard/tecnico/completo permite tecnico, bloqueia admin e usa cache curto", async () => {
+  mockAuthenticatedUsers();
+
+  let chamadas = 0;
+  const payload = {
+    generatedAt: "2026-06-12T20:00:00.000Z",
+    limites: {
+      destaques: 5,
+      listas: 20,
+      usuarios: 100,
+      tecnicos: 10
+    },
+    tecnico: { id: 2, role: "TECNICO" },
+    resumo: {
+      manutencoesAbertas: 1,
+      manutencoesAgendadas: 1,
+      alertasAtivos: 2,
+      alertasDoTecnico: 1,
+      sensoresOffline: 1,
+      maquinasCriticas: 1,
+      sensoresTotal: 3,
+      leiturasRecentes: 4
+    },
+    alertas: {
+      ativos: { total: 2, dados: [] },
+      doTecnico: { total: 1, dados: [] }
+    },
+    manutencoes: { dados: [], total: 0, page: 1, totalPages: 0 },
+    maquinas: { criticas: [], lista: [] },
+    sensores: { offline: [], lista: [] },
+    leiturasRecentes: [],
+    usuarios: { dados: [], total: 0, page: 1, totalPages: 0 },
+    tecnicos: { dados: [], total: 0, page: 1, totalPages: 0 }
+  };
+
+  patch(DashboardService, "completeTecnico", async ({ usuario, limit, listasLimit, usuariosLimit, tecnicosLimit }) => {
+    chamadas += 1;
+    return {
+      ...payload,
+      usuarioId: usuario.id,
+      limit,
+      listasLimit,
+      usuariosLimit,
+      tecnicosLimit,
+      chamadas
+    };
+  });
+
+  await withServer(async (baseUrl) => {
+    const admin = await request(baseUrl, "/dashboard/tecnico/completo", {
+      token: tokenFor({ id: 1, role: "ADMIN" })
+    });
+    const token = tokenFor({ id: 2, role: "TECNICO" });
+    const primeira = await request(
+      baseUrl,
+      "/dashboard/tecnico/completo?limit=4&listasLimit=12&usuariosLimit=50&tecnicosLimit=8",
+      { token }
+    );
+    const segunda = await request(
+      baseUrl,
+      "/dashboard/tecnico/completo?limit=4&listasLimit=12&usuariosLimit=50&tecnicosLimit=8",
+      { token }
+    );
+
+    assert.equal(admin.status, 403);
+    assert.equal(primeira.status, 200);
+    assert.equal(segunda.status, 200);
+    assert.equal(primeira.headers["x-cache"], "MISS");
+    assert.equal(segunda.headers["x-cache"], "HIT");
+    assert.deepEqual(primeira.json, {
+      ...payload,
+      usuarioId: 2,
+      limit: "4",
+      listasLimit: "12",
+      usuariosLimit: "50",
+      tecnicosLimit: "8",
+      chamadas: 1
+    });
+    assert.deepEqual(segunda.json, primeira.json);
+    assert.equal(chamadas, 1);
+  });
+});
+
 test("rotas publicas de senha repassam payloads ao ResetSenhaService", async () => {
   patch(ResetSenhaService, "esqueceuSenha", async ({ email, emailDestino }) => ({
     email,

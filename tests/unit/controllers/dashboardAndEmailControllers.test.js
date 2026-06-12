@@ -11,6 +11,7 @@ const ContatoService = require("../../../src/services/contatoService");
 const originals = {
   dashboardResume: DashboardService.resume,
   dashboardComplete: DashboardService.complete,
+  dashboardCompleteTecnico: DashboardService.completeTecnico,
   dashboardAiAnswer: DashboardAiService.answer,
   enviarContato: ContatoService.enviarContato
 };
@@ -40,6 +41,7 @@ function captureNext() {
 afterEach(() => {
   DashboardService.resume = originals.dashboardResume;
   DashboardService.complete = originals.dashboardComplete;
+  DashboardService.completeTecnico = originals.dashboardCompleteTecnico;
   DashboardAiService.answer = originals.dashboardAiAnswer;
   ContatoService.enviarContato = originals.enviarContato;
 });
@@ -85,6 +87,43 @@ test("DashboardController.complete repassa usuario e limites ao service", async 
     usuario: { id: 1, role: "ADMIN" },
     limit: "4",
     listasLimit: "12"
+  });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, dashboard);
+  assert.deepEqual(next.calls, []);
+});
+
+test("DashboardController.completeTecnico repassa usuario e limites ao service", async () => {
+  let payloadRecebido;
+  const dashboard = {
+    tecnico: { id: 2, role: "TECNICO" },
+    manutencoes: { dados: [] }
+  };
+  DashboardService.completeTecnico = async (payload) => {
+    payloadRecebido = payload;
+    return dashboard;
+  };
+
+  const req = {
+    usuario: { id: 2, role: "TECNICO" },
+    query: {
+      limit: "4",
+      listasLimit: "12",
+      usuariosLimit: "50",
+      tecnicosLimit: "8"
+    }
+  };
+  const res = createResponse();
+  const next = captureNext();
+
+  await DashboardController.completeTecnico(req, res, next);
+
+  assert.deepEqual(payloadRecebido, {
+    usuario: { id: 2, role: "TECNICO" },
+    limit: "4",
+    listasLimit: "12",
+    usuariosLimit: "50",
+    tecnicosLimit: "8"
   });
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body, dashboard);
@@ -177,6 +216,15 @@ test("controllers pequenos encaminham erros para next", async () => {
   const completeNext = captureNext();
   await DashboardController.complete({ query: {}, usuario: { id: 1 } }, completeRes, completeNext);
 
+  const completeTecnicoError = new Error("dashboard tecnico completo falhou");
+  DashboardService.completeTecnico = async () => {
+    throw completeTecnicoError;
+  };
+
+  const completeTecnicoRes = createResponse();
+  const completeTecnicoNext = captureNext();
+  await DashboardController.completeTecnico({ query: {}, usuario: { id: 2 } }, completeTecnicoRes, completeTecnicoNext);
+
   const aiError = new Error("ia falhou");
   DashboardAiService.answer = async () => {
     throw aiError;
@@ -197,10 +245,12 @@ test("controllers pequenos encaminham erros para next", async () => {
 
   assert.deepEqual(dashboardNext.calls, [dashboardError]);
   assert.deepEqual(completeNext.calls, [completeError]);
+  assert.deepEqual(completeTecnicoNext.calls, [completeTecnicoError]);
   assert.deepEqual(aiNext.calls, [aiError]);
   assert.deepEqual(emailNext.calls, [emailError]);
   assert.equal(dashboardRes.statusCode, null);
   assert.equal(completeRes.statusCode, null);
+  assert.equal(completeTecnicoRes.statusCode, null);
   assert.equal(aiRes.statusCode, null);
   assert.equal(emailRes.statusCode, null);
 });

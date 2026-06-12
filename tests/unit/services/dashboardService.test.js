@@ -7,6 +7,7 @@ const MaquinaService = require("../../../src/services/maquinaService");
 const SensorService = require("../../../src/services/sensorService");
 const UsuarioService = require("../../../src/services/usuarioService");
 const ManutencaoService = require("../../../src/services/manutencaoService");
+const LeituraService = require("../../../src/services/leituraService");
 const AlertaModel = require("../../../src/models/alertaModel");
 const MaquinaModel = require("../../../src/models/maquinaModel");
 const SensorModel = require("../../../src/models/sensorModel");
@@ -28,6 +29,11 @@ const originals = {
   sanitizeForResponse: MaquinaService.sanitizeForResponse,
   listSensores: SensorService.list,
   listManutencoes: ManutencaoService.list,
+  listUsuarios: UsuarioService.list,
+  listAllTecnicos: UsuarioService.listAllTecnicos,
+  findTecnicoById: UsuarioService.findTecnicoById,
+  findAlertasByTecnicoId: UsuarioService.findAlertasByTecnicoId,
+  listLeituras: LeituraService.index,
   listTopAtivos: AlertaModel.listTopAtivos,
   listPioresIntegridade: MaquinaModel.listPioresIntegridade,
   listOfflineRecentes: SensorModel.listOfflineRecentes
@@ -50,6 +56,11 @@ afterEach(() => {
   MaquinaService.sanitizeForResponse = originals.sanitizeForResponse;
   SensorService.list = originals.listSensores;
   ManutencaoService.list = originals.listManutencoes;
+  UsuarioService.list = originals.listUsuarios;
+  UsuarioService.listAllTecnicos = originals.listAllTecnicos;
+  UsuarioService.findTecnicoById = originals.findTecnicoById;
+  UsuarioService.findAlertasByTecnicoId = originals.findAlertasByTecnicoId;
+  LeituraService.index = originals.listLeituras;
   AlertaModel.listTopAtivos = originals.listTopAtivos;
   MaquinaModel.listPioresIntegridade = originals.listPioresIntegridade;
   SensorModel.listOfflineRecentes = originals.listOfflineRecentes;
@@ -263,5 +274,108 @@ test("complete monta bootstrap do dashboard com listas limitadas e usuario", asy
     ["maquinasCriticas", 20],
     ["sensoresOffline", 20],
     ["manutencoes", 1, 12, "ADMIN"]
+  ]);
+});
+
+test("completeTecnico monta bootstrap especifico do tecnico", async () => {
+  const chamadas = [];
+
+  UsuarioService.findTecnicoById = async (id) => {
+    chamadas.push(["tecnico", id]);
+    return { id, nome: "Tecnico", role: "TECNICO", ativo: true, alertaEmAndamento: false };
+  };
+  UsuarioService.listAllTecnicos = async ({ page, limit }) => {
+    chamadas.push(["tecnicos", page, limit]);
+    return { dados: [{ id: 2 }], total: 1, page, totalPages: 1 };
+  };
+  UsuarioService.list = async ({ page, limit }) => {
+    chamadas.push(["usuarios", page, limit]);
+    return { dados: [{ id: 2 }], total: 1, page, totalPages: 1 };
+  };
+  AlertaService.findAtivos = async ({ limit }) => {
+    chamadas.push(["alertasAtivos", limit]);
+    return { total: 2, dados: [{ id: 10 }, { id: 11 }] };
+  };
+  UsuarioService.findAlertasByTecnicoId = async (id, { page, limit }) => {
+    chamadas.push(["alertasTecnico", id, page, limit]);
+    return { total: 1, dados: [{ id: 12, tecnicoId: id }], page, totalPages: 1 };
+  };
+  ManutencaoService.list = async ({ page, limit, usuario }) => {
+    chamadas.push(["manutencoes", page, limit, usuario.id]);
+    return {
+      dados: [
+        { id: 20, status: "AGENDADA" },
+        { id: 21, status: "EM_ANDAMENTO" },
+        { id: 22, status: "RESOLVIDO" }
+      ],
+      total: 3,
+      page,
+      totalPages: 1
+    };
+  };
+  MaquinaService.list = async () => [{ id: 30, manual: { textoExtraido: "privado", nomeArquivo: "manual.pdf" } }];
+  MaquinaService.sanitizeForResponse = (maquinas) => maquinas.map((maquina) => ({
+    id: maquina.id,
+    manual: { nomeArquivo: maquina.manual.nomeArquivo }
+  }));
+  MaquinaModel.listPioresIntegridade = async ({ limit }) => {
+    chamadas.push(["maquinasCriticas", limit]);
+    return [{ id: 31 }];
+  };
+  SensorService.list = async () => [{ id: 40 }, { id: 41 }];
+  SensorModel.listOfflineRecentes = async ({ limit }) => {
+    chamadas.push(["sensoresOffline", limit]);
+    return [{ id: 40 }];
+  };
+  LeituraService.index = async (limit) => {
+    chamadas.push(["leituras", limit]);
+    return [{ id: 50 }, { id: 51 }];
+  };
+
+  const result = await DashboardService.completeTecnico({
+    usuario: { id: 2, role: "TECNICO" },
+    limit: "999",
+    listasLimit: "12",
+    usuariosLimit: "150",
+    tecnicosLimit: "8"
+  });
+
+  assert.equal(typeof result.generatedAt, "string");
+  assert.deepEqual(result.limites, {
+    destaques: 20,
+    listas: 12,
+    usuarios: 100,
+    tecnicos: 8
+  });
+  assert.deepEqual(result.tecnico, {
+    id: 2,
+    nome: "Tecnico",
+    role: "TECNICO",
+    ativo: true,
+    alertaEmAndamento: false
+  });
+  assert.deepEqual(result.resumo, {
+    manutencoesAbertas: 2,
+    manutencoesAgendadas: 1,
+    alertasAtivos: 2,
+    alertasDoTecnico: 1,
+    sensoresOffline: 1,
+    maquinasCriticas: 1,
+    sensoresTotal: 2,
+    leiturasRecentes: 2
+  });
+  assert.deepEqual(result.alertas.doTecnico.dados, [{ id: 12, tecnicoId: 2 }]);
+  assert.deepEqual(result.maquinas.lista, [{ id: 30, manual: { nomeArquivo: "manual.pdf" } }]);
+  assert.deepEqual(result.leiturasRecentes, [{ id: 51 }, { id: 50 }]);
+  assert.deepEqual(chamadas, [
+    ["tecnico", 2],
+    ["tecnicos", 1, 8],
+    ["usuarios", 1, 100],
+    ["alertasAtivos", 12],
+    ["alertasTecnico", 2, 1, 12],
+    ["manutencoes", 1, 12, 2],
+    ["maquinasCriticas", 20],
+    ["sensoresOffline", 20],
+    ["leituras", 12]
   ]);
 });
