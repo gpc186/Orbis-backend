@@ -25,7 +25,39 @@ class MaquinaModel {
     static async findAll() {
         return await prisma.maquina.findMany({
             where: { ativo: true },
-            include: { sensores: true, manual: true }
+            select: {
+                id: true,
+                nome: true,
+                setor: true,
+                tipo: true,
+                criticidade: true,
+                ativo: true,
+                integridade: true,
+                scoreEstabilidade: true,
+                previsaoManutencao: true,
+                estadoPredicaoManutencao: true,
+                janelaManuInicio: true,
+                janelaManuFim: true,
+                imagem: true,
+                caminhoImagem: true,
+                criadoEm: true,
+                sensores: true,
+                manual: {
+                    select: {
+                        id: true,
+                        maquinaId: true,
+                        nomeArquivo: true,
+                        mimeType: true,
+                        tamanhoBytes: true,
+                        url: true,
+                        especificacoes: true,
+                        modeloEmbedding: true,
+                        modeloAnalise: true,
+                        criadoEm: true,
+                        atualizadoEm: true
+                    }
+                }
+            }
         });
     }
 
