@@ -1,5 +1,6 @@
 const { PrismaClient } = require("@prisma/client");
 const logger = require("../utils/logger");
+const { runQueryWithTiming } = require("../utils/prismaQueryTiming");
 
 const prismaRaw = new PrismaClient();
 
@@ -15,7 +16,7 @@ const prisma = prismaRaw.$extends({
 
         for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
           try {
-            return await query(args);
+            return await runQueryWithTiming({ model, operation, query, args });
           } catch (error) {
             lastError = error;
             const isConnectionError =

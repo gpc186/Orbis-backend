@@ -9,6 +9,13 @@ const ManutencaoService = require("../../../src/services/manutencaoService");
 
 const RealDate = Date;
 
+const PREDICAO_TEST_DEFAULTS = {
+  PREDICAO_MIN_PONTOS_REGRESSAO: "3",
+  PREDICAO_MIN_JANELA_REGRESSAO_HORAS: "0.05",
+  PREDICAO_MIN_INTERVALO_REGRESSAO_HORAS: "0.005",
+  PREDICAO_MAX_RAZAO_INTERVALO_REGRESSAO: "60"
+};
+
 function useFakeNow(isoString) {
   const fixedNow = new RealDate(isoString);
 
@@ -58,6 +65,10 @@ function withEnv(overrides, run) {
         }
       }
     });
+}
+
+function withPredicaoTestDefaults(run) {
+  return withEnv(PREDICAO_TEST_DEFAULTS, run);
 }
 
 function buildHistorico(valores, startIso = "2026-05-21T00:00:00.000Z", stepHours = 1) {
@@ -154,18 +165,20 @@ test("previsaoManutencao retorna SEM_DADOS quando nao ha historico suficiente", 
   });
 
   try {
-    const resultado = await PredicaoService.previsaoManutencao(1);
+    await withPredicaoTestDefaults(async () => {
+      const resultado = await PredicaoService.previsaoManutencao(1);
 
-    assert.equal(mocks.updateCalls.length, 1);
-    assert.deepEqual(mocks.updateCalls[0].data, {
-      previsaoManutencao: null,
-      janelaManuInicio: null,
-      janelaManuFim: null
+      assert.equal(mocks.updateCalls.length, 1);
+      assert.deepEqual(mocks.updateCalls[0].data, {
+        previsaoManutencao: null,
+        janelaManuInicio: null,
+        janelaManuFim: null
+      });
+      assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.SEM_DADOS);
+      assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.SEM_MODELO);
+      assert.equal(resultado.motivo, PredicaoService.MOTIVOS.HISTORICO_INSUFICIENTE);
+      assert.equal(mocks.syncCalls.length, 1);
     });
-    assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.SEM_DADOS);
-    assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.SEM_MODELO);
-    assert.equal(resultado.motivo, PredicaoService.MOTIVOS.HISTORICO_INSUFICIENTE);
-    assert.equal(mocks.syncCalls.length, 1);
   } finally {
     mocks.restore();
     restoreDate();
@@ -183,15 +196,17 @@ test("previsaoManutencao aceita serie de poucos minutos no fluxo normal", async 
   });
 
   try {
-    const resultado = await PredicaoService.previsaoManutencao(1);
+    await withPredicaoTestDefaults(async () => {
+      const resultado = await PredicaoService.previsaoManutencao(1);
 
-    assert.equal(mocks.updateCalls.length, 1);
-    assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.PREVISAO_VALIDA);
-    assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.REGRESSAO_LINEAR);
-    assert.equal(resultado.modeloIntegridade.pontosUsados, 3);
-    assert.equal(resultado.modeloIntegridade.janelaHorasCoberta, 0.05);
-    assert.equal(mocks.updateCalls[0].data.previsaoManutencao.toISOString(), "2026-05-21T01:45:00.000Z");
-    assert.equal(mocks.syncCalls.length, 1);
+      assert.equal(mocks.updateCalls.length, 1);
+      assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.PREVISAO_VALIDA);
+      assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.REGRESSAO_LINEAR);
+      assert.equal(resultado.modeloIntegridade.pontosUsados, 3);
+      assert.equal(resultado.modeloIntegridade.janelaHorasCoberta, 0.05);
+      assert.equal(mocks.updateCalls[0].data.previsaoManutencao.toISOString(), "2026-05-21T01:45:00.000Z");
+      assert.equal(mocks.syncCalls.length, 1);
+    });
   } finally {
     mocks.restore();
     restoreDate();
@@ -211,17 +226,19 @@ test("previsaoManutencao marca MANUTENCAO_IMEDIATA quando a integridade atual ja
   });
 
   try {
-    const resultado = await PredicaoService.previsaoManutencao(1);
+    await withPredicaoTestDefaults(async () => {
+      const resultado = await PredicaoService.previsaoManutencao(1);
 
-    assert.deepEqual(mocks.updateCalls[0].data, {
-      previsaoManutencao: null,
-      janelaManuInicio: null,
-      janelaManuFim: null
+      assert.deepEqual(mocks.updateCalls[0].data, {
+        previsaoManutencao: null,
+        janelaManuInicio: null,
+        janelaManuFim: null
+      });
+      assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.MANUTENCAO_IMEDIATA);
+      assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.HEURISTICA_CRITICA);
+      assert.equal(resultado.urgencia, PredicaoService.URGENCIAS.IMEDIATA);
+      assert.equal(resultado.motivo, PredicaoService.MOTIVOS.LIMIAR_MANUTENCAO_JA_CRUZADO);
     });
-    assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.MANUTENCAO_IMEDIATA);
-    assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.HEURISTICA_CRITICA);
-    assert.equal(resultado.urgencia, PredicaoService.URGENCIAS.IMEDIATA);
-    assert.equal(resultado.motivo, PredicaoService.MOTIVOS.LIMIAR_MANUTENCAO_JA_CRUZADO);
   } finally {
     mocks.restore();
     restoreDate();
@@ -241,11 +258,13 @@ test("previsaoManutencao marca FALHA_JA_CRUZADA quando a integridade atual ja cr
   });
 
   try {
-    const resultado = await PredicaoService.previsaoManutencao(1);
+    await withPredicaoTestDefaults(async () => {
+      const resultado = await PredicaoService.previsaoManutencao(1);
 
-    assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.FALHA_JA_CRUZADA);
-    assert.equal(resultado.motivo, PredicaoService.MOTIVOS.LIMIAR_FALHA_JA_CRUZADO);
-    assert.equal(resultado.urgencia, PredicaoService.URGENCIAS.IMEDIATA);
+      assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.FALHA_JA_CRUZADA);
+      assert.equal(resultado.motivo, PredicaoService.MOTIVOS.LIMIAR_FALHA_JA_CRUZADO);
+      assert.equal(resultado.urgencia, PredicaoService.URGENCIAS.IMEDIATA);
+    });
   } finally {
     mocks.restore();
     restoreDate();
@@ -275,11 +294,13 @@ test("previsaoManutencao usa fallback heuristico quando o modelo e invalido mas 
   });
 
   try {
-    const resultado = await PredicaoService.previsaoManutencao(1);
+    await withPredicaoTestDefaults(async () => {
+      const resultado = await PredicaoService.previsaoManutencao(1);
 
-    assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.MODELO_INVALIDO_COM_RISCO);
-    assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.HEURISTICA_CRITICA);
-    assert.equal(resultado.motivo, PredicaoService.MOTIVOS.RISCO_HEURISTICO_CRITICO);
+      assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.MODELO_INVALIDO_COM_RISCO);
+      assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.HEURISTICA_CRITICA);
+      assert.equal(resultado.motivo, PredicaoService.MOTIVOS.RISCO_HEURISTICO_CRITICO);
+    });
   } finally {
     mocks.restore();
     restoreDate();
@@ -293,17 +314,19 @@ test("previsaoManutencao gera janela futura quando a regressao linear permanece 
   });
 
   try {
-    const resultado = await PredicaoService.previsaoManutencao(1);
+    await withPredicaoTestDefaults(async () => {
+      const resultado = await PredicaoService.previsaoManutencao(1);
 
-    assert.equal(mocks.updateCalls.length, 1);
+      assert.equal(mocks.updateCalls.length, 1);
 
-    const payload = mocks.updateCalls[0].data;
-    assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.PREVISAO_VALIDA);
-    assert.equal(payload.previsaoManutencao.toISOString(), "2026-05-23T22:00:00.000Z");
-    assert.equal(payload.janelaManuInicio.toISOString(), "2026-05-22T06:00:00.000Z");
-    assert.equal(payload.janelaManuFim.toISOString(), "2026-05-22T06:00:00.000Z");
-    assert.equal(resultado.modeloIntegridade.janelaHorasCoberta, 7);
-    assert.equal(resultado.modeloIntegridade.ultimoPontoEm.toISOString(), "2026-05-21T07:00:00.000Z");
+      const payload = mocks.updateCalls[0].data;
+      assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.PREVISAO_VALIDA);
+      assert.equal(payload.previsaoManutencao.toISOString(), "2026-05-23T22:00:00.000Z");
+      assert.equal(payload.janelaManuInicio.toISOString(), "2026-05-22T06:00:00.000Z");
+      assert.equal(payload.janelaManuFim.toISOString(), "2026-05-22T06:00:00.000Z");
+      assert.equal(resultado.modeloIntegridade.janelaHorasCoberta, 7);
+      assert.equal(resultado.modeloIntegridade.ultimoPontoEm.toISOString(), "2026-05-21T07:00:00.000Z");
+    });
   } finally {
     mocks.restore();
     restoreDate();
@@ -320,11 +343,13 @@ test("avaliarModeloIntegridade invalida series temporais concentradas demais", a
   const mocks = mockPredicaoDependencies({ historico: historicoConcentrado });
 
   try {
-    const resultado = await PredicaoService.avaliarModeloIntegridade(1);
+    await withPredicaoTestDefaults(async () => {
+      const resultado = await PredicaoService.avaliarModeloIntegridade(1);
 
-    assert.equal(resultado.valido, false);
-    assert.equal(resultado.motivo, PredicaoService.MOTIVOS.JANELA_TEMPORAL_INSUFICIENTE);
-    assert.equal(PredicaoService.resumirModeloIntegridade(resultado).janelaHorasCoberta, 0.01);
+      assert.equal(resultado.valido, false);
+      assert.equal(resultado.motivo, PredicaoService.MOTIVOS.JANELA_TEMPORAL_INSUFICIENTE);
+      assert.equal(PredicaoService.resumirModeloIntegridade(resultado).janelaHorasCoberta, 0.01);
+    });
   } finally {
     mocks.restore();
     restoreDate();

@@ -9,6 +9,34 @@ class DashboardController {
             next(error);
         };
     };
+
+    static async complete(req, res, next) {
+        try {
+            const dashboard = await DashboardService.complete({
+                usuario: req.usuario,
+                limit: req.query?.limit,
+                listasLimit: req.query?.listasLimit
+            });
+            return res.status(200).json(dashboard);
+        } catch (error) {
+            next(error);
+        };
+    };
+
+    static async completeTecnico(req, res, next) {
+        try {
+            const dashboard = await DashboardService.completeTecnico({
+                usuario: req.usuario,
+                limit: req.query?.limit,
+                listasLimit: req.query?.listasLimit,
+                usuariosLimit: req.query?.usuariosLimit,
+                tecnicosLimit: req.query?.tecnicosLimit
+            });
+            return res.status(200).json(dashboard);
+        } catch (error) {
+            next(error);
+        };
+    };
 };
 
 module.exports = DashboardController;

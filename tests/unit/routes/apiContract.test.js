@@ -23,6 +23,7 @@ const ContatoService = require("../../../src/services/contatoService");
 const PerfilService = require("../../../src/services/perfilService");
 const ResetSenhaService = require("../../../src/services/resetSenhaService");
 const DashboardService = require("../../../src/services/dashboardService");
+const { clearCache } = require("../../../src/middlewares/cacheMiddleware");
 const { generateAccessToken } = require("../../../src/utils/jwtUtils");
 
 const patches = [];
@@ -32,6 +33,8 @@ afterEach(() => {
     const { target, key, original } = patches.pop();
     target[key] = original;
   }
+
+  clearCache();
 });
 
 function patch(target, key, replacement) {
@@ -93,8 +96,9 @@ async function request(baseUrl, path, { method = "GET", token, body, headers = {
   });
   const text = await response.text();
   const json = text ? JSON.parse(text) : null;
+  const responseHeaders = Object.fromEntries(response.headers.entries());
 
-  return { status: response.status, json, text };
+  return { status: response.status, json, text, headers: responseHeaders };
 }
 
 function createPngBlob() {
@@ -115,6 +119,22 @@ test("GET /health responde com status basico da API", async () => {
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.json, { ok: true });
+  });
+});
+
+test("OPTIONS retorna Access-Control-Max-Age para cache de preflight", async () => {
+  await withServer(async (baseUrl) => {
+    const response = await request(baseUrl, "/maquinas", {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://www.orbis-3td.com.br",
+        "access-control-request-method": "GET",
+        "access-control-request-headers": "authorization"
+      }
+    });
+
+    assert.equal(response.status, 204);
+    assert.equal(response.headers["access-control-max-age"], "600");
   });
 });
 
@@ -865,6 +885,181 @@ test("GET /dashboard/resumo permite admin e bloqueia tecnico", async () => {
     assert.equal(tecnico.status, 403);
     assert.equal(admin.status, 200);
     assert.deepEqual(admin.json, resumo);
+  });
+});
+
+test("GET /dashboard/resumo usa cache curto preservando payload por usuario", async () => {
+  mockAuthenticatedUsers();
+
+  let chamadas = 0;
+  patch(DashboardService, "resume", async () => {
+    chamadas += 1;
+    return {
+      totalMaquinas: 10,
+      chamadas
+    };
+  });
+
+  await withServer(async (baseUrl) => {
+    const token = tokenFor({ id: 1, role: "ADMIN" });
+    const primeira = await request(baseUrl, "/dashboard/resumo", { token });
+    const segunda = await request(baseUrl, "/dashboard/resumo", { token });
+
+    assert.equal(primeira.status, 200);
+    assert.equal(segunda.status, 200);
+    assert.equal(primeira.headers["x-cache"], "MISS");
+    assert.equal(segunda.headers["x-cache"], "HIT");
+    assert.deepEqual(primeira.json, { totalMaquinas: 10, chamadas: 1 });
+    assert.deepEqual(segunda.json, primeira.json);
+    assert.equal(chamadas, 1);
+  });
+});
+
+test("GET /dashboard/completo permite admin, bloqueia tecnico e usa cache curto", async () => {
+  mockAuthenticatedUsers();
+
+  let chamadas = 0;
+  const payload = {
+    generatedAt: "2026-06-12T19:00:00.000Z",
+    limites: { destaques: 5, listas: 20 },
+    resumo: { totalMaquinas: 10 },
+    destaques: ["10 maquinas cadastradas."],
+    alertas: {
+      topAtivos: [],
+      ativos: { total: 0, dados: [] }
+    },
+    maquinas: {
+      criticas: [],
+      lista: []
+    },
+    sensores: {
+      offline: [],
+      lista: []
+    },
+    manutencoes: {
+      dados: [],
+      total: 0,
+      page: 1,
+      totalPages: 0
+    }
+  };
+
+  patch(DashboardService, "complete", async ({ usuario, limit, listasLimit }) => {
+    chamadas += 1;
+    return {
+      ...payload,
+      usuarioId: usuario.id,
+      limit,
+      listasLimit,
+      chamadas
+    };
+  });
+
+  await withServer(async (baseUrl) => {
+    const tecnico = await request(baseUrl, "/dashboard/completo", {
+      token: tokenFor({ id: 2, role: "TECNICO" })
+    });
+    const token = tokenFor({ id: 1, role: "ADMIN" });
+    const primeira = await request(baseUrl, "/dashboard/completo?limit=4&listasLimit=12", { token });
+    const segunda = await request(baseUrl, "/dashboard/completo?limit=4&listasLimit=12", { token });
+
+    assert.equal(tecnico.status, 403);
+    assert.equal(primeira.status, 200);
+    assert.equal(segunda.status, 200);
+    assert.equal(primeira.headers["x-cache"], "MISS");
+    assert.equal(segunda.headers["x-cache"], "HIT");
+    assert.deepEqual(primeira.json, {
+      ...payload,
+      usuarioId: 1,
+      limit: "4",
+      listasLimit: "12",
+      chamadas: 1
+    });
+    assert.deepEqual(segunda.json, primeira.json);
+    assert.equal(chamadas, 1);
+  });
+});
+
+test("GET /dashboard/tecnico/completo permite tecnico, bloqueia admin e usa cache curto", async () => {
+  mockAuthenticatedUsers();
+
+  let chamadas = 0;
+  const payload = {
+    generatedAt: "2026-06-12T20:00:00.000Z",
+    limites: {
+      destaques: 5,
+      listas: 20,
+      usuarios: 100,
+      tecnicos: 10
+    },
+    tecnico: { id: 2, role: "TECNICO" },
+    resumo: {
+      manutencoesAbertas: 1,
+      manutencoesAgendadas: 1,
+      alertasAtivos: 2,
+      alertasDoTecnico: 1,
+      sensoresOffline: 1,
+      maquinasCriticas: 1,
+      sensoresTotal: 3,
+      leiturasRecentes: 4
+    },
+    alertas: {
+      ativos: { total: 2, dados: [] },
+      doTecnico: { total: 1, dados: [] }
+    },
+    manutencoes: { dados: [], total: 0, page: 1, totalPages: 0 },
+    maquinas: { criticas: [], lista: [] },
+    sensores: { offline: [], lista: [] },
+    leiturasRecentes: [],
+    usuarios: { dados: [], total: 0, page: 1, totalPages: 0 },
+    tecnicos: { dados: [], total: 0, page: 1, totalPages: 0 }
+  };
+
+  patch(DashboardService, "completeTecnico", async ({ usuario, limit, listasLimit, usuariosLimit, tecnicosLimit }) => {
+    chamadas += 1;
+    return {
+      ...payload,
+      usuarioId: usuario.id,
+      limit,
+      listasLimit,
+      usuariosLimit,
+      tecnicosLimit,
+      chamadas
+    };
+  });
+
+  await withServer(async (baseUrl) => {
+    const admin = await request(baseUrl, "/dashboard/tecnico/completo", {
+      token: tokenFor({ id: 1, role: "ADMIN" })
+    });
+    const token = tokenFor({ id: 2, role: "TECNICO" });
+    const primeira = await request(
+      baseUrl,
+      "/dashboard/tecnico/completo?limit=4&listasLimit=12&usuariosLimit=50&tecnicosLimit=8",
+      { token }
+    );
+    const segunda = await request(
+      baseUrl,
+      "/dashboard/tecnico/completo?limit=4&listasLimit=12&usuariosLimit=50&tecnicosLimit=8",
+      { token }
+    );
+
+    assert.equal(admin.status, 403);
+    assert.equal(primeira.status, 200);
+    assert.equal(segunda.status, 200);
+    assert.equal(primeira.headers["x-cache"], "MISS");
+    assert.equal(segunda.headers["x-cache"], "HIT");
+    assert.deepEqual(primeira.json, {
+      ...payload,
+      usuarioId: 2,
+      limit: "4",
+      listasLimit: "12",
+      usuariosLimit: "50",
+      tecnicosLimit: "8",
+      chamadas: 1
+    });
+    assert.deepEqual(segunda.json, primeira.json);
+    assert.equal(chamadas, 1);
   });
 });
 

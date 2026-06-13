@@ -26,7 +26,25 @@ class SensorModel {
         })
     }
     static async findAll() {
-        return await prisma.sensor.findMany({ include: { maquina: true } })
+        return await prisma.sensor.findMany({
+            select: {
+                id: true,
+                maquinaId: true,
+                tipo: true,
+                status: true,
+                limiteTemperatura: true,
+                idealTemperatura: true,
+                limiteVibracao: true,
+                idealVibracao: true,
+                desvioMaximoTemp: true,
+                desvioMaximoVibra: true,
+                ultimaTemperatura: true,
+                ultimaVibracao: true,
+                ultimaLeituraEm: true,
+                criadoEm: true,
+                maquina: true
+            }
+        })
     }
     static async delete(id) {
         return await prisma.sensor.delete({ where: { id: parseInt(id) } })
