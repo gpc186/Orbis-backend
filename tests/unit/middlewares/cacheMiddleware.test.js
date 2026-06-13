@@ -6,8 +6,16 @@ const {
   clearCache
 } = require("../../../src/middlewares/cacheMiddleware");
 
+const originalCacheMaxEntries = process.env.CACHE_MAX_ENTRIES;
+
 afterEach(() => {
   clearCache();
+
+  if (originalCacheMaxEntries === undefined) {
+    delete process.env.CACHE_MAX_ENTRIES;
+  } else {
+    process.env.CACHE_MAX_ENTRIES = originalCacheMaxEntries;
+  }
 });
 
 function buildReq({
@@ -111,4 +119,46 @@ test("cacheMiddleware nao cacheia status diferente de 200", async () => {
   assert.equal(second.handlerCalled, true);
   assert.equal(second.res.headers["x-cache"], "MISS");
   assert.deepEqual(second.res.body, { ok: true });
+});
+
+test("cacheMiddleware remove entradas expiradas antes de consultar o cache", async () => {
+  const middleware = createCacheMiddleware({ ttlMs: 1 });
+  const req = buildReq();
+
+  await runCached({ req, body: { items: [1] }, middleware });
+
+  await new Promise((resolve) => setTimeout(resolve, 5));
+
+  const second = await runCached({ req, body: { items: [2] }, middleware });
+
+  assert.equal(second.handlerCalled, true);
+  assert.equal(second.res.headers["x-cache"], "MISS");
+  assert.deepEqual(second.res.body, { items: [2] });
+});
+
+test("cacheMiddleware respeita limite maximo de entradas e descarta a mais antiga", async () => {
+  process.env.CACHE_MAX_ENTRIES = "2";
+  const middleware = createCacheMiddleware({ ttlMs: 1000 });
+
+  await runCached({ req: buildReq({ originalUrl: "/maquinas?pagina=1" }), body: { page: 1 }, middleware });
+  await runCached({ req: buildReq({ originalUrl: "/maquinas?pagina=2" }), body: { page: 2 }, middleware });
+  await runCached({ req: buildReq({ originalUrl: "/maquinas?pagina=3" }), body: { page: 3 }, middleware });
+
+  const firstAgain = await runCached({
+    req: buildReq({ originalUrl: "/maquinas?pagina=1" }),
+    body: { page: "reloaded" },
+    middleware
+  });
+  const latest = await runCached({
+    req: buildReq({ originalUrl: "/maquinas?pagina=3" }),
+    body: { page: "ignored" },
+    middleware
+  });
+
+  assert.equal(firstAgain.handlerCalled, true);
+  assert.equal(firstAgain.res.headers["x-cache"], "MISS");
+  assert.deepEqual(firstAgain.res.body, { page: "reloaded" });
+  assert.equal(latest.handlerCalled, false);
+  assert.equal(latest.res.headers["x-cache"], "HIT");
+  assert.deepEqual(latest.res.body, { page: 3 });
 });

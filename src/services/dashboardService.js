@@ -213,7 +213,7 @@ class DashboardService {
                 offline: sensoresOffline,
                 lista: sensores
             },
-            leiturasRecentes: Array.isArray(leituras) ? [...leituras].reverse() : [],
+            leiturasRecentes: Array.isArray(leituras) ? leituras : [],
             usuarios,
             tecnicos
         };

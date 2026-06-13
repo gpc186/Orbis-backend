@@ -1,5 +1,6 @@
 const DEFAULT_GET_TTL_MS = 5000;
 const DEFAULT_DASHBOARD_TTL_MS = 10000;
+const DEFAULT_MAX_ENTRIES = 500;
 
 const cache = new Map();
 
@@ -26,6 +27,30 @@ function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function getMaxEntries() {
+  return getEnvNumber("CACHE_MAX_ENTRIES", DEFAULT_MAX_ENTRIES, { min: 1 });
+}
+
+function pruneExpiredEntries(now = Date.now()) {
+  for (const [key, entry] of cache.entries()) {
+    if (entry.expiresAt <= now) {
+      cache.delete(key);
+    }
+  }
+}
+
+function enforceMaxEntries(maxEntries) {
+  while (cache.size > maxEntries) {
+    const oldestKey = cache.keys().next().value;
+
+    if (oldestKey === undefined) {
+      return;
+    }
+
+    cache.delete(oldestKey);
+  }
+}
+
 function createCacheMiddleware({ ttlMs } = {}) {
   return function cacheMiddleware(req, res, next) {
     if (req.method !== "GET") {
@@ -46,6 +71,7 @@ function createCacheMiddleware({ ttlMs } = {}) {
 
     const key = getCacheKey(req);
     const now = Date.now();
+    pruneExpiredEntries(now);
     const cached = cache.get(key);
 
     if (cached && cached.expiresAt > now) {
@@ -62,11 +88,13 @@ function createCacheMiddleware({ ttlMs } = {}) {
     const originalJson = res.json.bind(res);
     res.json = (body) => {
       if (res.statusCode === 200) {
+        cache.delete(key);
         cache.set(key, {
           statusCode: res.statusCode,
           body: cloneJson(body),
           expiresAt: Date.now() + effectiveTtlMs
         });
+        enforceMaxEntries(getMaxEntries());
       }
 
       return originalJson(body);
@@ -89,5 +117,6 @@ function clearCache() {
 module.exports = {
   createCacheMiddleware,
   createDashboardCacheMiddleware,
-  clearCache
+  clearCache,
+  pruneExpiredEntries
 };

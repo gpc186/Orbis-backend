@@ -366,7 +366,7 @@ test("completeTecnico monta bootstrap especifico do tecnico", async () => {
   });
   assert.deepEqual(result.alertas.doTecnico.dados, [{ id: 12, tecnicoId: 2 }]);
   assert.deepEqual(result.maquinas.lista, [{ id: 30, manual: { nomeArquivo: "manual.pdf" } }]);
-  assert.deepEqual(result.leiturasRecentes, [{ id: 51 }, { id: 50 }]);
+  assert.deepEqual(result.leiturasRecentes, [{ id: 50 }, { id: 51 }]);
   assert.deepEqual(chamadas, [
     ["tecnico", 2],
     ["tecnicos", 1, 8],

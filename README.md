@@ -117,6 +117,7 @@ SEED_INTEGRIDADE_FINAL_PERCENTUAL=70
 
 CACHE_GET_TTL_MS=5000
 CACHE_DASHBOARD_TTL_MS=10000
+CACHE_MAX_ENTRIES=500
 REQUEST_SLOW_MS=1000
 PRISMA_SLOW_QUERY_MS=250
 
@@ -146,6 +147,7 @@ Performance e observabilidade:
 
 - `CACHE_GET_TTL_MS`: TTL do cache em memória para GETs operacionais seguros como máquinas, sensores, alertas e manutenções.
 - `CACHE_DASHBOARD_TTL_MS`: TTL específico do cache de `GET /dashboard/resumo`.
+- `CACHE_MAX_ENTRIES`: limite global de entradas mantidas no cache em memória antes de descartar as mais antigas.
 - `REQUEST_SLOW_MS`: limiar para logar `request_slow` em requisições HTTP.
 - `PRISMA_SLOW_QUERY_MS`: limiar para logar `prisma_query_slow` sem argumentos sensíveis de query.
 
