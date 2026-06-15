@@ -104,7 +104,7 @@ class ManutecaoService {
       janelaHorasCoberta: Number.isFinite(Number(modelo.janelaHorasCoberta))
         ? Number(Number(modelo.janelaHorasCoberta).toFixed(2))
         : null,
-      ultimoPontoEm: modelo.ultimoPontoEm
+      ultimoPontoEm: this.toIsoOrNull(modelo.ultimoPontoEm)
     };
   }
 

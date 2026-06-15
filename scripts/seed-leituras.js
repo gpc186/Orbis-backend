@@ -268,6 +268,20 @@ function groupLatestByMachine(sensors, latestReadingsBySensor) {
   return machines;
 }
 
+function getLatestIntegrityRowsByMachine(rows) {
+  const latestRows = new Map();
+
+  for (const row of rows) {
+    const current = latestRows.get(row.maquinaId);
+
+    if (!current || row.criadoEm > current.criadoEm) {
+      latestRows.set(row.maquinaId, row);
+    }
+  }
+
+  return latestRows;
+}
+
 async function getLatestHistoryByMachine(maquinaIds) {
   const latestRows = await prisma.historicoIntegridade.groupBy({
     by: ["maquinaId"],
@@ -280,6 +294,22 @@ async function getLatestHistoryByMachine(maquinaIds) {
   });
 
   return new Map(latestRows.map((row) => [row.maquinaId, row._max.criadoEm]));
+}
+
+async function getLatestSeedIntegrityRow(maquinaId) {
+  return await prisma.historicoIntegridade.findFirst({
+    where: {
+      maquinaId,
+      origem: "SEED_LEITURAS"
+    },
+    orderBy: { criadoEm: "desc" },
+    select: {
+      maquinaId: true,
+      integridade: true,
+      scoreEstabilidade: true,
+      criadoEm: true
+    }
+  });
 }
 
 async function updateSensorsAndMachines({ sensors, latestReadingsBySensor, latestHistoryByMachine, config }) {
@@ -316,14 +346,38 @@ async function updateSensorsAndMachines({ sensors, latestReadingsBySensor, lates
       latestHistoryDate: latestHistoryByMachine.get(maquinaId),
       config
     }));
-
-    await PredicaoService.atualizarSaudeMaquina(maquinaId);
-    await PredicaoService.previsaoManutencao(maquinaId);
-    updatedMachines += 1;
   }
 
   if (historicoRows.length > 0) {
     await createInBatches(prisma.historicoIntegridade, historicoRows, config.batchSize);
+  }
+
+  const latestIntegrityRowsByMachine = getLatestIntegrityRowsByMachine(historicoRows);
+
+  for (const maquinaId of latestByMachine.keys()) {
+    const latestIntegrityRow = latestIntegrityRowsByMachine.get(maquinaId)
+      || await getLatestSeedIntegrityRow(maquinaId);
+
+    if (latestIntegrityRow) {
+      await prisma.maquina.update({
+        where: { id: maquinaId },
+        data: {
+          integridade: latestIntegrityRow.integridade,
+          scoreEstabilidade: latestIntegrityRow.scoreEstabilidade
+        }
+      });
+    }
+
+    try {
+      await PredicaoService.previsaoManutencao(maquinaId);
+    } catch (error) {
+      console.warn("seed_leituras_prediction_failed", {
+        maquinaId,
+        message: error.message
+      });
+    }
+
+    updatedMachines += 1;
   }
 
   return { updatedSensors, updatedMachines, historicoRows };
@@ -407,7 +461,9 @@ module.exports = {
   buildReading,
   buildReadingsForSensor,
   calculateSensorHealth,
+  getLatestIntegrityRowsByMachine,
   getRange,
+  main,
   nextSeedStart,
   progressForDate
 };

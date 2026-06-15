@@ -7,6 +7,7 @@ const {
   buildReading,
   buildReadingsForSensor,
   calculateSensorHealth,
+  getLatestIntegrityRowsByMachine,
   nextSeedStart,
   progressForDate
 } = require("../../../scripts/seed-leituras");
@@ -167,4 +168,17 @@ test("seed leituras cria historico de integridade de forma incremental", () => {
     scoreEstabilidade: row.scoreEstabilidade,
     criadoEm: row.criadoEm.toISOString()
   })), []);
+});
+
+test("seed leituras seleciona ultimo ponto sintetico por maquina para atualizar saude", () => {
+  const rows = [
+    { maquinaId: 1, integridade: 82, criadoEm: new Date("2026-06-11T10:00:00.000Z") },
+    { maquinaId: 2, integridade: 91, criadoEm: new Date("2026-06-11T10:30:00.000Z") },
+    { maquinaId: 1, integridade: 80, criadoEm: new Date("2026-06-11T11:00:00.000Z") }
+  ];
+
+  const latest = getLatestIntegrityRowsByMachine(rows);
+
+  assert.equal(latest.get(1).integridade, 80);
+  assert.equal(latest.get(2).integridade, 91);
 });
