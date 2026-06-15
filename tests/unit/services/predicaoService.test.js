@@ -13,7 +13,8 @@ const PREDICAO_TEST_DEFAULTS = {
   PREDICAO_MIN_PONTOS_REGRESSAO: "3",
   PREDICAO_MIN_JANELA_REGRESSAO_HORAS: "0.05",
   PREDICAO_MIN_INTERVALO_REGRESSAO_HORAS: "0.005",
-  PREDICAO_MAX_RAZAO_INTERVALO_REGRESSAO: "60"
+  PREDICAO_MAX_RAZAO_INTERVALO_REGRESSAO: "60",
+  PREDICAO_MAX_PONTOS_DESCARTE_REGRESSAO: "1"
 };
 
 function useFakeNow(isoString) {
@@ -147,13 +148,15 @@ test("obterConfigPredicao permite calibrar velocidade por variaveis de ambiente"
     PREDICAO_MIN_PONTOS_REGRESSAO: "4",
     PREDICAO_MIN_JANELA_REGRESSAO_HORAS: "0.1",
     PREDICAO_MIN_INTERVALO_REGRESSAO_HORAS: "0.01",
-    PREDICAO_MAX_RAZAO_INTERVALO_REGRESSAO: "30"
+    PREDICAO_MAX_RAZAO_INTERVALO_REGRESSAO: "30",
+    PREDICAO_MAX_PONTOS_DESCARTE_REGRESSAO: "2"
   }, () => {
     assert.deepEqual(PredicaoService.obterConfigPredicao(), {
       minPontosRegressao: 4,
       minJanelaRegressaoHoras: 0.1,
       minIntervaloRegressaoHoras: 0.01,
-      maxRazaoIntervaloRegressao: 30
+      maxRazaoIntervaloRegressao: 30,
+      maxPontosDescarteRegressao: 2
     });
   });
 });
@@ -326,6 +329,42 @@ test("previsaoManutencao gera janela futura quando a regressao linear permanece 
       assert.equal(payload.janelaManuFim.toISOString(), "2026-05-22T06:00:00.000Z");
       assert.equal(resultado.modeloIntegridade.janelaHorasCoberta, 7);
       assert.equal(resultado.modeloIntegridade.ultimoPontoEm.toISOString(), "2026-05-21T07:00:00.000Z");
+    });
+  } finally {
+    mocks.restore();
+    restoreDate();
+  }
+});
+
+test("avaliarModeloIntegridade tolera ultimo ponto discrepante sem depender da origem dos dados", async () => {
+  const restoreDate = useFakeNow("2026-05-21T08:00:00.000Z");
+  const historicoBase = buildHistorico(
+    [100, 99, 98, 97, 96, 95, 94, 93],
+    "2026-05-21T00:00:00.000Z",
+    1
+  );
+  const historicoComOutlier = [
+    ...historicoBase,
+    {
+      id: 99,
+      maquinaId: 1,
+      integridade: 70,
+      scoreEstabilidade: 100,
+      origem: "QUALQUER_ORIGEM",
+      criadoEm: "2026-05-21T08:00:00.000Z"
+    }
+  ];
+  const mocks = mockPredicaoDependencies({ historico: historicoComOutlier });
+
+  try {
+    await withPredicaoTestDefaults(async () => {
+      const resultado = await PredicaoService.avaliarModeloIntegridade(1);
+      const resumo = PredicaoService.resumirModeloIntegridade(resultado);
+
+      assert.equal(resultado.valido, true);
+      assert.equal(resumo.pontosUsados, 8);
+      assert.equal(resumo.r2, 1);
+      assert.equal(resumo.ultimoPontoEm.toISOString(), "2026-05-21T07:00:00.000Z");
     });
   } finally {
     mocks.restore();
