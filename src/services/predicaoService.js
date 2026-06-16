@@ -4,7 +4,7 @@ const PredicaoRiscoService = require("./predicaoRiscoService");
 
 class PredicaoService {
   static MIN_PONTOS_REGRESSAO = 3;
-  static LIMITE_PONTOS_REGRESSAO = 30;
+  static LIMITE_PONTOS_REGRESSAO = 336;
   static LOOKBACK_DIAS_REGRESSAO = 7;
   static R2_MINIMO = 0.6;
   static LIMIAR_MANUTENCAO = 70;
@@ -99,6 +99,16 @@ class PredicaoService {
         "PREDICAO_MAX_PONTOS_DESCARTE_REGRESSAO",
         this.MAX_PONTOS_DESCARTE_REGRESSAO,
         { min: 0, integer: true }
+      ),
+      limitePontosRegressao: this.getEnvNumber(
+        "PREDICAO_LIMITE_PONTOS_REGRESSAO",
+        this.LIMITE_PONTOS_REGRESSAO,
+        { min: 2, integer: true }
+      ),
+      lookbackDiasRegressao: this.getEnvNumber(
+        "PREDICAO_LOOKBACK_DIAS_REGRESSAO",
+        this.LOOKBACK_DIAS_REGRESSAO,
+        { min: 1, integer: true }
       )
     };
   }
@@ -427,10 +437,10 @@ class PredicaoService {
   static async avaliarModeloIntegridade(maquinaId) {
     const HistoricoIntegridadeModel = require("../models/historicoIntegridadeModel");
     const config = this.obterConfigPredicao();
-    const dataInicio = new Date(Date.now() - (this.LOOKBACK_DIAS_REGRESSAO * 24 * 60 * 60 * 1000));
+    const dataInicio = new Date(Date.now() - (config.lookbackDiasRegressao * 24 * 60 * 60 * 1000));
 
     const historico = await HistoricoIntegridadeModel.findSerieByMaquina(maquinaId, {
-      limite: this.LIMITE_PONTOS_REGRESSAO,
+      limite: config.limitePontosRegressao,
       dataInicio
     });
 
