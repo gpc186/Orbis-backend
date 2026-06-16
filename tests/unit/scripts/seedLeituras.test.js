@@ -6,8 +6,10 @@ const {
   buildIntegrityRowsForMachine,
   buildReading,
   buildReadingsForSensor,
+  buildSeedAlertRowsForMachine,
   calculateSensorHealth,
   getLatestIntegrityRowsByMachine,
+  integrityTargetForProgress,
   nextSeedStart,
   progressForDate
 } = require("../../../scripts/seed-leituras");
@@ -35,7 +37,12 @@ test("seed leituras normaliza configuracao com defaults seguros", () => {
     SEED_LEITURAS_CRIAR_ALERTAS: "true",
     SEED_INTEGRIDADE_DIAS_DEGRADACAO: "30",
     SEED_INTEGRIDADE_INTERVALO_MINUTOS: "30",
-    SEED_INTEGRIDADE_FINAL_PERCENTUAL: "70"
+    SEED_INTEGRIDADE_FINAL_PERCENTUAL: "70",
+    SEED_INTEGRIDADE_JANELA_RECENTE_DIAS: "7",
+    SEED_INTEGRIDADE_INICIO_JANELA_RECENTE_PERCENTUAL: "91",
+    SEED_INTEGRIDADE_CURVA_POTENCIA: "1.2",
+    SEED_INTEGRIDADE_OSCILACAO_PERCENTUAL: "0.5",
+    SEED_LEITURAS_CURVA_POTENCIA: "1.1"
   });
 
   assert.equal(config.days, 3);
@@ -47,6 +54,11 @@ test("seed leituras normaliza configuracao com defaults seguros", () => {
   assert.equal(config.integrityDays, 30);
   assert.equal(config.integrityIntervalMinutes, 30);
   assert.equal(config.integrityFinalPercent, 70);
+  assert.equal(config.integrityRecentWindowDays, 7);
+  assert.equal(config.integrityRecentStartPercent, 91);
+  assert.equal(config.integrityCurvePower, 1.2);
+  assert.equal(config.integrityOscillationPercent, 0.5);
+  assert.equal(config.sensorCurvePower, 1.1);
 });
 
 test("seed leituras calcula progresso e proximo inicio sem duplicar leitura existente", () => {
@@ -142,11 +154,61 @@ test("seed leituras cria historico de integridade em curva configuravel", () => 
       criadoEm: "2026-06-10T12:00:00.000Z"
     },
     {
-      integridade: 85,
-      scoreEstabilidade: 90,
+      integridade: 88.46,
+      scoreEstabilidade: 92.03,
       criadoEm: "2026-06-11T00:00:00.000Z"
     }
   ]);
+});
+
+test("seed leituras concentra degradacao na janela recente usada pela predicao", () => {
+  const config = buildConfig({
+    SEED_INTEGRIDADE_DIAS_DEGRADACAO: "30",
+    SEED_INTEGRIDADE_FINAL_PERCENTUAL: "80",
+    SEED_INTEGRIDADE_JANELA_RECENTE_DIAS: "7",
+    SEED_INTEGRIDADE_INICIO_JANELA_RECENTE_PERCENTUAL: "92",
+    SEED_INTEGRIDADE_OSCILACAO_PERCENTUAL: "0"
+  });
+
+  assert.equal(integrityTargetForProgress(0, config), 100);
+  assert.equal(Number(integrityTargetForProgress(23 / 30, config).toFixed(2)), 92);
+  assert.equal(Number(integrityTargetForProgress(0.95, config).toFixed(2)), 82.91);
+  assert.equal(Number(integrityTargetForProgress(1, config).toFixed(2)), 80);
+});
+
+test("seed leituras monta alertas sinteticos para alimentar features de risco", () => {
+  const config = buildConfig({
+    SEED_LEITURAS_RUIDO_PERCENTUAL: "0",
+    SEED_LEITURAS_CRIAR_ALERTAS: "true",
+    SEED_INTEGRIDADE_DIAS_DEGRADACAO: "1",
+    SEED_INTEGRIDADE_INTERVALO_MINUTOS: "720",
+    SEED_INTEGRIDADE_FINAL_PERCENTUAL: "40"
+  });
+  const historicoRows = buildIntegrityRowsForMachine({
+    maquinaId: 2,
+    sensors: [sensor],
+    config,
+    now: new Date("2026-06-11T12:00:00.000Z")
+  });
+  const latestReadingsBySensor = new Map([
+    [sensor.id, buildReading(sensor, new Date("2026-06-11T12:00:00.000Z"), {
+      start: new Date("2026-06-10T12:00:00.000Z"),
+      end: new Date("2026-06-11T12:00:00.000Z")
+    }, config)]
+  ]);
+
+  const alertas = buildSeedAlertRowsForMachine({
+    maquina: sensor.maquina,
+    sensors: [sensor],
+    latestReadingsBySensor,
+    historicoRows,
+    config
+  });
+
+  assert.equal(alertas.some((alerta) => alerta.tipo === "TENDENCIA_LONGA"), true);
+  assert.equal(alertas.some((alerta) => alerta.tipo === "TENDENCIA_CURTA"), true);
+  assert.equal(alertas.some((alerta) => alerta.tipo === "INSTABILIDADE"), true);
+  assert.equal(alertas.every((alerta) => alerta.mensagem.includes("[SEED_LEITURAS]")), true);
 });
 
 test("seed leituras cria historico de integridade de forma incremental", () => {
