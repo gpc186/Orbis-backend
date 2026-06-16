@@ -102,6 +102,7 @@ SIMULADOR_JOB_ATIVO=false
 SIMULADOR_INTERVALO_MS=5000
 SIMULADOR_DEGRADACAO_HORAS=24
 SIMULADOR_RUIDO_PERCENTUAL=0.01
+HISTORICO_INTEGRIDADE_INTERVALO_MS=60000
 
 SEED_LEITURAS_DIAS=7
 SEED_LEITURAS_INTERVALO_MINUTOS=5
@@ -201,7 +202,7 @@ tests/
   - `desvioMaximoVibra > 0`
 - `POST /leituras` é usado por integrações ESP32 e exige `x-api-key`.
 - `GET /leituras` exige autenticação.
-- Leituras atualizam sensor, integridade da máquina, histórico e podem gerar alertas.
+- Leituras atualizam sensor, integridade da máquina e podem gerar alertas. O histórico de integridade é amostrado por máquina para evitar um ponto a cada leitura bruta.
 
 ### Alertas e Manutenções
 
@@ -233,6 +234,7 @@ A velocidade/sensibilidade da predição pode ser calibrada pelo ambiente:
 - `PREDICAO_MIN_JANELA_REGRESSAO_HORAS`: janela temporal mínima da regressão. `0.05` equivale a cerca de 3 minutos.
 - `PREDICAO_LIMITE_PONTOS_REGRESSAO`: quantidade maxima de pontos recentes usados no modelo. Com o seed a cada 30 minutos, `336` cobre 7 dias.
 - `PREDICAO_LOOKBACK_DIAS_REGRESSAO`: janela de dias buscada no historico de integridade.
+- `HISTORICO_INTEGRIDADE_INTERVALO_MS`: intervalo minimo entre pontos automaticos de historico por maquina. Leituras continuam no intervalo do sensor/simulador; apenas o historico usado pela regressao e amostrado. Use `0` para registrar toda atualizacao.
 - `PREDICAO_AUTO_AGENDAR_ENABLED`: habilita a criação automática de preventiva por predição. Quando `false`, apenas o estado preditivo da máquina é atualizado.
 - `PREDICAO_AUTO_AGENDAR_MIN_CONFIRMACOES`: quantidade de previsões válidas consecutivas necessárias antes de criar ou reagendar preventiva preditiva.
 - `PREDICAO_AUTO_AGENDAR_R2_MINIMO` e `PREDICAO_AUTO_AGENDAR_PONTOS_MINIMOS`: qualidade mínima do modelo para considerar a predição estável.
@@ -421,6 +423,7 @@ O `simuladorJob` degrada cada máquina linearmente pelo tempo decorrido, gerando
 A curva usa as specs de cada sensor: `idealTemperatura -> limiteTemperatura` e `idealVibracao -> limiteVibracao`.
 `SIMULADOR_DEGRADACAO_HORAS` controla em quantas horas a leitura chega do ideal ao limite, e `SIMULADOR_RUIDO_PERCENTUAL` adiciona uma pequena variação percentual sobre a amplitude.
 Ao reiniciar a API, o simulador infere o progresso pelas ultimas leituras persistidas dos sensores, evitando voltar ao inicio apos redeploy.
+As leituras em tempo real nao precisam ter o mesmo intervalo do historico de integridade: `HISTORICO_INTEGRIDADE_INTERVALO_MS` controla a amostragem dos pontos usados pela regressao.
 
 Para reduzir uso de network transfer no Neon, mantenha `SIMULADOR_JOB_ATIVO=false` fora da demonstracao e rode `npm run seed:leituras` para carregar historico em lote. Na demonstracao, ligue o simulador e/ou ESP32 para leituras em tempo real; o seed nao impede leituras novas.
 O seed e incremental: em novos redeploys, ele continua a partir da ultima leitura de cada sensor e do ultimo ponto de historico de cada maquina, sem recriar toda a janela configurada.

@@ -1,6 +1,34 @@
 const prisma = require('../prisma/prisma');
 
+const intervaloHistoricoConfigurado = Number(process.env.HISTORICO_INTEGRIDADE_INTERVALO_MS);
+const HISTORICO_INTEGRIDADE_INTERVALO_MS = Number.isFinite(intervaloHistoricoConfigurado) && intervaloHistoricoConfigurado >= 0
+    ? intervaloHistoricoConfigurado
+    : 60000;
+
 class MaquinaModel {
+    static async deveRegistrarHistoricoIntegridade(tx, maquinaId, agora = new Date()) {
+        if (HISTORICO_INTEGRIDADE_INTERVALO_MS === 0) {
+            return true;
+        }
+
+        const ultimoRegistro = await tx.historicoIntegridade.findFirst({
+            where: { maquinaId },
+            orderBy: { criadoEm: "desc" },
+            select: { criadoEm: true }
+        });
+
+        if (!ultimoRegistro?.criadoEm) {
+            return true;
+        }
+
+        const ultimaData = new Date(ultimoRegistro.criadoEm);
+        if (Number.isNaN(ultimaData.getTime())) {
+            return true;
+        }
+
+        return agora.getTime() - ultimaData.getTime() >= HISTORICO_INTEGRIDADE_INTERVALO_MS;
+    }
+
     static async create(data) {
         return await prisma.$transaction(async (tx) => {
             const maquina = await tx.maquina.create({
@@ -104,14 +132,18 @@ class MaquinaModel {
             const maquina = await tx.maquina.update({ where: { id: parseInt(id) }, data });
 
             if (data.integridade !== undefined || data.scoreEstabilidade !== undefined) {
-                await tx.historicoIntegridade.create({
-                    data: {
-                        maquinaId: maquina.id,
-                        integridade: maquina.integridade,
-                        scoreEstabilidade: maquina.scoreEstabilidade,
-                        origem: "ATUALIZACAO_MAQUINA"
-                    }
-                });
+                const deveRegistrar = await this.deveRegistrarHistoricoIntegridade(tx, maquina.id);
+
+                if (deveRegistrar) {
+                    await tx.historicoIntegridade.create({
+                        data: {
+                            maquinaId: maquina.id,
+                            integridade: maquina.integridade,
+                            scoreEstabilidade: maquina.scoreEstabilidade,
+                            origem: "ATUALIZACAO_MAQUINA"
+                        }
+                    });
+                }
             }
 
             return maquina;
