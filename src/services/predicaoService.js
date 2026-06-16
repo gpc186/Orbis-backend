@@ -4,7 +4,7 @@ const PredicaoRiscoService = require("./predicaoRiscoService");
 
 class PredicaoService {
   static MIN_PONTOS_REGRESSAO = 3;
-  static LIMITE_PONTOS_REGRESSAO = 30;
+  static LIMITE_PONTOS_REGRESSAO = 336;
   static LOOKBACK_DIAS_REGRESSAO = 7;
   static R2_MINIMO = 0.6;
   static LIMIAR_MANUTENCAO = 70;
@@ -14,6 +14,7 @@ class PredicaoService {
   static MIN_JANELA_REGRESSAO_HORAS = 0.05;
   static MIN_INTERVALO_REGRESSAO_HORAS = 0.005;
   static MAX_RAZAO_INTERVALO_REGRESSAO = 60;
+  static MAX_PONTOS_DESCARTE_REGRESSAO = 1;
   static LIMIAR_SENSOR_CRITICO = 40;
   static PENALIDADE_SENSOR_CRITICO_MAX = 20;
 
@@ -93,6 +94,21 @@ class PredicaoService {
         "PREDICAO_MAX_RAZAO_INTERVALO_REGRESSAO",
         this.MAX_RAZAO_INTERVALO_REGRESSAO,
         { min: 1 }
+      ),
+      maxPontosDescarteRegressao: this.getEnvNumber(
+        "PREDICAO_MAX_PONTOS_DESCARTE_REGRESSAO",
+        this.MAX_PONTOS_DESCARTE_REGRESSAO,
+        { min: 0, integer: true }
+      ),
+      limitePontosRegressao: this.getEnvNumber(
+        "PREDICAO_LIMITE_PONTOS_REGRESSAO",
+        this.LIMITE_PONTOS_REGRESSAO,
+        { min: 2, integer: true }
+      ),
+      lookbackDiasRegressao: this.getEnvNumber(
+        "PREDICAO_LOOKBACK_DIAS_REGRESSAO",
+        this.LOOKBACK_DIAS_REGRESSAO,
+        { min: 1, integer: true }
       )
     };
   }
@@ -187,6 +203,91 @@ class PredicaoService {
       slope: modelo.slope,
       intercept: modelo.intercept
     };
+  }
+
+  static modeloPassaCriterios({ serieTemporal, regressao }) {
+    return Boolean(
+      serieTemporal?.valida
+      && regressao
+      && regressao.slope < 0
+      && regressao.score.r2 >= this.R2_MINIMO
+    );
+  }
+
+  static avaliarCandidatoRegressao(pontos, config = this.obterConfigPredicao()) {
+    const serieTemporal = this.analisarSerieTemporal(pontos, config);
+    const regressao = this.criarModeloRegressao(pontos);
+
+    return {
+      pontos,
+      serieTemporal,
+      regressao,
+      valido: this.modeloPassaCriterios({ serieTemporal, regressao })
+    };
+  }
+
+  static removerPontoEm(pontos, index) {
+    return pontos.filter((_, pointIndex) => pointIndex !== index);
+  }
+
+  static compararCandidatosRegressao(left, right) {
+    if (!left) return right;
+    if (!right) return left;
+
+    const leftR2 = Number(left.regressao?.score?.r2);
+    const rightR2 = Number(right.regressao?.score?.r2);
+
+    if (!Number.isFinite(leftR2)) return right;
+    if (!Number.isFinite(rightR2)) return left;
+
+    if (rightR2 > leftR2) return right;
+    if (rightR2 === leftR2 && right.pontos.length > left.pontos.length) return right;
+
+    return left;
+  }
+
+  static selecionarCandidatoRegressao(pontos, config = this.obterConfigPredicao()) {
+    const candidatoCompleto = this.avaliarCandidatoRegressao(pontos, config);
+
+    if (candidatoCompleto.valido) {
+      return candidatoCompleto;
+    }
+
+    const maxDescartes = Math.min(
+      config.maxPontosDescarteRegressao,
+      Math.max(0, pontos.length - config.minPontosRegressao)
+    );
+    let bases = [pontos];
+
+    for (let descartes = 1; descartes <= maxDescartes; descartes += 1) {
+      const proximasBases = [];
+      let melhorValido = null;
+
+      for (const base of bases) {
+        for (let index = 0; index < base.length; index += 1) {
+          const pontosCandidato = this.removerPontoEm(base, index);
+
+          if (pontosCandidato.length < config.minPontosRegressao) {
+            continue;
+          }
+
+          proximasBases.push(pontosCandidato);
+          const candidato = this.avaliarCandidatoRegressao(pontosCandidato, config);
+
+          if (candidato.valido) {
+            melhorValido = this.compararCandidatosRegressao(melhorValido, candidato);
+          }
+        }
+      }
+
+      if (melhorValido) {
+        return melhorValido;
+      }
+
+      bases = proximasBases;
+    }
+
+    return candidatoCompleto;
   }
 
   static analisarSerieTemporal(pontos, config = this.obterConfigPredicao()) {
@@ -336,10 +437,10 @@ class PredicaoService {
   static async avaliarModeloIntegridade(maquinaId) {
     const HistoricoIntegridadeModel = require("../models/historicoIntegridadeModel");
     const config = this.obterConfigPredicao();
-    const dataInicio = new Date(Date.now() - (this.LOOKBACK_DIAS_REGRESSAO * 24 * 60 * 60 * 1000));
+    const dataInicio = new Date(Date.now() - (config.lookbackDiasRegressao * 24 * 60 * 60 * 1000));
 
     const historico = await HistoricoIntegridadeModel.findSerieByMaquina(maquinaId, {
-      limite: this.LIMITE_PONTOS_REGRESSAO,
+      limite: config.limitePontosRegressao,
       dataInicio
     });
 
@@ -353,8 +454,8 @@ class PredicaoService {
     }
 
     const pontos = this.criarPontosRegressao(historico);
-    const serieTemporal = this.analisarSerieTemporal(pontos, config);
-    const regressao = this.criarModeloRegressao(pontos);
+    const candidato = this.selecionarCandidatoRegressao(pontos, config);
+    const { serieTemporal, regressao } = candidato;
 
     if (!regressao) {
       return {
@@ -370,9 +471,9 @@ class PredicaoService {
       score: regressao.score,
       slope: regressao.slope,
       intercept: regressao.intercept,
-      dataBase: pontos[0].criadoEm,
-      referenciaTemporal: this.obterReferenciaTemporal(pontos),
-      pontosUsados: pontos.length,
+      dataBase: candidato.pontos[0].criadoEm,
+      referenciaTemporal: this.obterReferenciaTemporal(candidato.pontos),
+      pontosUsados: candidato.pontos.length,
       janelaHorasCoberta: serieTemporal.janelaHorasCoberta,
       ultimoPontoEm: serieTemporal.ultimoPontoEm,
       intervaloMedioHoras: serieTemporal.intervaloMedioHoras,
