@@ -201,13 +201,25 @@ class AlertaPreditivoService {
     };
   }
 
-  static montarRespostaBase({ maquinaId, estadoPredicao, fonteDecisao, urgencia, motivo, modeloIntegridade }) {
+  static montarRespostaBase({
+    maquinaId,
+    estadoPredicao,
+    fonteDecisao,
+    urgencia,
+    motivo,
+    modeloIntegridade,
+    dataInicioManutencao = null,
+    dataFalha = null
+  }) {
     return {
       maquinaId,
       estadoPredicao,
       fonteDecisao,
       urgencia,
       motivo,
+      previsaoManutencao: dataInicioManutencao || dataFalha || null,
+      dataInicioManutencao,
+      dataFalha,
       modeloIntegridade
     };
   }
@@ -272,7 +284,16 @@ class AlertaPreditivoService {
       throw new AppError("Maquina nao encontrada.", 404);
     }
 
-    const { maquina, avaliacaoModelo, estadoPredicao, fonteDecisao, urgencia, motivo } = diagnostico;
+    const {
+      maquina,
+      avaliacaoModelo,
+      estadoPredicao,
+      fonteDecisao,
+      urgencia,
+      motivo,
+      dataInicioManutencao,
+      dataFalha
+    } = diagnostico;
     const modeloIntegridade = this.resumirModeloIntegridade(avaliacaoModelo);
 
     if (estadoPredicao !== PredicaoService.ESTADOS.PREVISAO_VALIDA) {
@@ -283,7 +304,9 @@ class AlertaPreditivoService {
           fonteDecisao,
           urgencia,
           motivo,
-          modeloIntegridade
+          modeloIntegridade,
+          dataInicioManutencao,
+          dataFalha
         }),
         proximoAlerta: null,
         ausenciaProximoAlerta: this.criarAusenciaPrevisao(motivo),
@@ -327,7 +350,9 @@ class AlertaPreditivoService {
         fonteDecisao,
         urgencia,
         motivo,
-        modeloIntegridade
+        modeloIntegridade,
+        dataInicioManutencao,
+        dataFalha
       }),
       proximoAlerta,
       ausenciaProximoAlerta,

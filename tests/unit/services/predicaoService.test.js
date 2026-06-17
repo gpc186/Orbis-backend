@@ -213,7 +213,9 @@ test("previsaoManutencao aceita serie de poucos minutos no fluxo normal", async 
       assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.REGRESSAO_LINEAR);
       assert.equal(resultado.modeloIntegridade.pontosUsados, 3);
       assert.equal(resultado.modeloIntegridade.janelaHorasCoberta, 0.05);
-      assert.equal(mocks.updateCalls[0].data.previsaoManutencao.toISOString(), "2026-05-21T01:45:00.000Z");
+      assert.equal(mocks.updateCalls[0].data.previsaoManutencao.toISOString(), "2026-05-21T00:45:00.000Z");
+      assert.equal(resultado.dataInicioManutencao.toISOString(), "2026-05-21T00:45:00.000Z");
+      assert.equal(resultado.dataFalha.toISOString(), "2026-05-21T01:45:00.000Z");
       assert.equal(mocks.syncCalls.length, 1);
     });
   } finally {
@@ -330,7 +332,9 @@ test("previsaoManutencao gera janela futura quando a regressao linear permanece 
 
       const payload = mocks.updateCalls[0].data;
       assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.PREVISAO_VALIDA);
-      assert.equal(payload.previsaoManutencao.toISOString(), "2026-05-23T22:00:00.000Z");
+      assert.equal(payload.previsaoManutencao.toISOString(), "2026-05-22T06:00:00.000Z");
+      assert.equal(resultado.dataInicioManutencao.toISOString(), "2026-05-22T06:00:00.000Z");
+      assert.equal(resultado.dataFalha.toISOString(), "2026-05-23T22:00:00.000Z");
       assert.equal(payload.janelaManuInicio.toISOString(), "2026-05-22T06:00:00.000Z");
       assert.equal(payload.janelaManuFim.toISOString(), "2026-05-22T06:00:00.000Z");
       assert.equal(resultado.modeloIntegridade.janelaHorasCoberta, 7);
