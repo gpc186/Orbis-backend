@@ -556,6 +556,7 @@ class PredicaoService {
     maquina,
     avaliacaoModelo,
     riscoAtual,
+    dataInicioManutencao,
     dataFalha,
     previsaoValida
   }) {
@@ -579,11 +580,11 @@ class PredicaoService {
       );
     }
 
-    if (previsaoValida && dataFalha && avaliacaoModelo?.modeloIntegridade?.referenciaTemporal) {
+    if (previsaoValida && avaliacaoModelo?.modeloIntegridade?.referenciaTemporal) {
       return this.buildEstadoPreditivo(
         this.ESTADOS.PREVISAO_VALIDA,
         this.FONTES.REGRESSAO_LINEAR,
-        this.calcularUrgenciaPorData(dataFalha, avaliacaoModelo.modeloIntegridade.referenciaTemporal),
+        this.calcularUrgenciaPorData(dataInicioManutencao || dataFalha, avaliacaoModelo.modeloIntegridade.referenciaTemporal),
         this.MOTIVOS.PREVISAO_LINEAR_VALIDA
       );
     }
@@ -669,13 +670,18 @@ class PredicaoService {
 
         janelaManuInicio = janela.janelaManuInicio;
         janelaManuFim = janela.janelaManuFim;
+      } else if (dataInicioManutencao && dataInicioManutencao > avaliacaoModelo.modeloIntegridade.referenciaTemporal) {
+        janelaManuInicio = dataInicioManutencao;
+        janelaManuFim = dataInicioManutencao;
       }
     }
 
     const previsaoValida = Boolean(
-      dataFalha
-      && avaliacaoModelo?.modeloIntegridade?.referenciaTemporal
-      && dataFalha > avaliacaoModelo.modeloIntegridade.referenciaTemporal
+      avaliacaoModelo?.modeloIntegridade?.referenciaTemporal
+      && (
+        (dataInicioManutencao && dataInicioManutencao > avaliacaoModelo.modeloIntegridade.referenciaTemporal)
+        || (dataFalha && dataFalha > avaliacaoModelo.modeloIntegridade.referenciaTemporal)
+      )
     );
 
     const precisaRiscoFallback = !previsaoValida;
@@ -687,6 +693,7 @@ class PredicaoService {
       maquina,
       avaliacaoModelo,
       riscoAtual,
+      dataInicioManutencao,
       dataFalha,
       previsaoValida
     });
@@ -716,11 +723,13 @@ class PredicaoService {
         console.log(
           `[PREDICAO] Maquina ${maquinaId}: inclinacao=${diagnostico.avaliacaoModelo.modeloIntegridade.slope.toFixed(4)} ` +
           `intercepto=${diagnostico.avaliacaoModelo.modeloIntegridade.intercept.toFixed(4)} ` +
-          `r2=${diagnostico.avaliacaoModelo.modeloIntegridade.score.r2.toFixed(4)} falha=${diagnostico.dataFalha.toISOString()}`
+          `r2=${diagnostico.avaliacaoModelo.modeloIntegridade.score.r2.toFixed(4)} ` +
+          `manutencao=${diagnostico.dataInicioManutencao?.toISOString() || null} ` +
+          `falha=${diagnostico.dataFalha?.toISOString() || null}`
         );
 
         persisted = await MaquinaModel.update(maquinaId, {
-          previsaoManutencao: diagnostico.dataFalha,
+          previsaoManutencao: diagnostico.dataInicioManutencao || diagnostico.dataFalha,
           janelaManuInicio: diagnostico.janelaManuInicio,
           janelaManuFim: diagnostico.janelaManuFim
         });
@@ -738,6 +747,8 @@ class PredicaoService {
         urgencia: diagnostico.urgencia,
         motivo: diagnostico.motivo,
         previsaoManutencao: persisted?.previsaoManutencao || null,
+        dataInicioManutencao: diagnostico.dataInicioManutencao,
+        dataFalha: diagnostico.dataFalha,
         janelaManuInicio: persisted?.janelaManuInicio || null,
         janelaManuFim: persisted?.janelaManuFim || null,
         modeloIntegridade: this.resumirModeloIntegridade(diagnostico.avaliacaoModelo),

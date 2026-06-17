@@ -253,7 +253,7 @@ class ManutecaoService {
       invalidasConsecutivas,
       ultimaPredicaoEm: new Date().toISOString(),
       ultimaDataAgendada: this.toIsoOrNull(dataAgendada),
-      ultimaPrevisaoManutencao: this.toIsoOrNull(diagnostico.dataFalha),
+      ultimaPrevisaoManutencao: this.toIsoOrNull(diagnostico.dataInicioManutencao || diagnostico.dataFalha),
       ultimoEstadoPredicao: diagnostico.estadoPredicao,
       ultimoMotivo: resetMotivo || diagnostico.motivo || null,
       criterios: {
@@ -282,7 +282,8 @@ class ManutecaoService {
       fonteDecisao: diagnostico.fonteDecisao,
       urgencia: diagnostico.urgencia,
       motivo: diagnostico.motivo,
-      previsaoManutencao: this.toIsoOrNull(diagnostico.dataFalha),
+      previsaoManutencao: this.toIsoOrNull(diagnostico.dataInicioManutencao || diagnostico.dataFalha),
+      dataFalha: this.toIsoOrNull(diagnostico.dataFalha),
       modeloIntegridade: modeloPredicao,
       confirmacoesValidas: estadoPredicaoManutencao.validasConsecutivas,
       scoreConfianca: estadoPredicaoManutencao.scoreConfianca,
