@@ -23,6 +23,12 @@ class HistoricoIntegridadeService {
         return Number(numero.toFixed(2));
     }
 
+    static normalizarBooleano(valor) {
+        return [true, "true", "1", "sim", "yes"].includes(
+            typeof valor === "string" ? valor.trim().toLowerCase() : valor
+        );
+    }
+
     static normalizarData(valor, campo) {
         if (!valor) {
             return undefined;
@@ -85,7 +91,8 @@ class HistoricoIntegridadeService {
             maquinaId: filtros.maquinaId,
             dataInicio,
             dataFim,
-            limite
+            limite,
+            aposUltimaManutencao: this.normalizarBooleano(filtros.aposUltimaManutencao)
         });
     }
 
@@ -98,7 +105,8 @@ class HistoricoIntegridadeService {
 
         return await this.list({
             ...filtros,
-            maquinaId
+            maquinaId,
+            aposUltimaManutencao: !this.normalizarBooleano(filtros.incluirAntesManutencao)
         });
     }
 

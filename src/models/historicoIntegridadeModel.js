@@ -1,6 +1,41 @@
 const prisma = require('../prisma/prisma');
 
 class HistoricoIntegridadeModel {
+    static ORIGENS_REPARO = ["MANUTENCAO_RESOLVIDA", "MANUTENCAO_PREVENTIVA_RESOLVIDA"];
+
+    static aplicarDataMinima(where, dataMinima) {
+        if (!dataMinima) return;
+
+        where.criadoEm = where.criadoEm || {};
+        const atual = where.criadoEm.gte ? new Date(where.criadoEm.gte) : null;
+        const candidata = new Date(dataMinima);
+
+        if (Number.isNaN(candidata.getTime())) return;
+
+        if (!atual || Number.isNaN(atual.getTime()) || candidata > atual) {
+            where.criadoEm.gte = candidata;
+        }
+    }
+
+    static async findLatestRepairByMaquina(maquinaId) {
+        return await prisma.historicoIntegridade.findFirst({
+            where: {
+                maquinaId: Number(maquinaId),
+                origem: { in: this.ORIGENS_REPARO }
+            },
+            orderBy: { criadoEm: 'desc' },
+            select: {
+                id: true,
+                maquinaId: true,
+                integridade: true,
+                scoreEstabilidade: true,
+                origem: true,
+                observacao: true,
+                criadoEm: true
+            }
+        });
+    }
+
     static async create(data) {
         return await prisma.historicoIntegridade.create({ data });
     }
@@ -26,7 +61,7 @@ class HistoricoIntegridadeModel {
         });
     }
 
-    static async findSerieByMaquina(maquinaId, { limite = 30, dataInicio, dataFim } = {}) {
+    static async findSerieByMaquina(maquinaId, { limite = 30, dataInicio, dataFim, aposUltimaManutencao = false } = {}) {
         const where = {
             maquinaId: Number(maquinaId)
         };
@@ -41,6 +76,11 @@ class HistoricoIntegridadeModel {
             if (dataFim) {
                 where.criadoEm.lte = new Date(dataFim);
             }
+        }
+
+        if (aposUltimaManutencao) {
+            const ultimoReparo = await this.findLatestRepairByMaquina(maquinaId);
+            this.aplicarDataMinima(where, ultimoReparo?.criadoEm);
         }
 
         const historico = await prisma.historicoIntegridade.findMany({
@@ -61,7 +101,7 @@ class HistoricoIntegridadeModel {
         return historico.reverse();
     }
 
-    static async findAll({ maquinaId, dataInicio, dataFim, limite = 100 } = {}) {
+    static async findAll({ maquinaId, dataInicio, dataFim, limite = 100, aposUltimaManutencao = false } = {}) {
         const where = {};
 
         if (maquinaId !== undefined) {
@@ -78,6 +118,11 @@ class HistoricoIntegridadeModel {
             if (dataFim) {
                 where.criadoEm.lte = new Date(dataFim);
             }
+        }
+
+        if (aposUltimaManutencao && maquinaId !== undefined) {
+            const ultimoReparo = await this.findLatestRepairByMaquina(maquinaId);
+            this.aplicarDataMinima(where, ultimoReparo?.criadoEm);
         }
 
         return await prisma.historicoIntegridade.findMany({

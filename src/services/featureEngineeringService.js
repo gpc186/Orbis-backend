@@ -279,7 +279,8 @@ class FeatureEngineeringService {
     const [historico, leituras7d, alertas7d, alertasAtivos] = await Promise.all([
       HistoricoIntegridadeModel.findSerieByMaquina(maquinaId, {
         limite: 200,
-        dataInicio: sevenDaysAgo
+        dataInicio: sevenDaysAgo,
+        aposUltimaManutencao: true
       }),
       LeituraModel.findByMaquinaPeriodo(maquinaId, {
         dataInicio: sevenDaysAgo

@@ -116,6 +116,10 @@ test("listByMaquina valida existencia da maquina e delega filtros para list", as
   assert.deepEqual(result, [{ id: 2 }]);
   assert.equal(filtrosRecebidos.maquinaId, 8);
   assert.equal(filtrosRecebidos.limite, 5);
+  assert.equal(filtrosRecebidos.aposUltimaManutencao, true);
+
+  await HistoricoIntegridadeService.listByMaquina(8, { limite: 5, incluirAntesManutencao: "true" });
+  assert.equal(filtrosRecebidos.aposUltimaManutencao, false);
 
   MaquinaModel.findById = async () => null;
   await assert.rejects(() => HistoricoIntegridadeService.listByMaquina(99), /Maquina nao encontrada/);
