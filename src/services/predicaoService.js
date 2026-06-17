@@ -113,15 +113,31 @@ class PredicaoService {
     };
   }
 
-  static calcularHealthScore(sensor) {
+  static parseIdsEnv(value) {
+    return String(value || "")
+      .split(",")
+      .map((id) => Number(id.trim()))
+      .filter((id) => Number.isInteger(id) && id > 0);
+  }
+
+  static obterMultiplicadorIntegridade(maquinaId) {
+    const maquinasDemo = this.parseIdsEnv(process.env.INTEGRIDADE_DEMO_MAQUINAS_IDS);
+    if (!maquinasDemo.includes(Number(maquinaId))) {
+      return 1;
+    }
+
+    return this.getEnvNumber("INTEGRIDADE_DEMO_MULTIPLICADOR_DESVIO", 1, { min: 0 });
+  }
+
+  static calcularHealthScore(sensor, { multiplicadorDesvio = 1 } = {}) {
     const temp = sensor.temperatura || sensor.ultimaTemperatura || 0;
     const vibra = sensor.vibracao || sensor.ultimaVibracao || 0;
 
     const diffTemp = (sensor.limiteTemperatura - sensor.idealTemperatura) || 1;
     const diffVibra = (sensor.limiteVibracao - sensor.idealVibracao) || 1;
 
-    let scoreTemp = 1 - ((temp - sensor.idealTemperatura) / diffTemp);
-    let scoreVibra = 1 - ((vibra - sensor.idealVibracao) / diffVibra);
+    let scoreTemp = 1 - (((temp - sensor.idealTemperatura) / diffTemp) * multiplicadorDesvio);
+    let scoreVibra = 1 - (((vibra - sensor.idealVibracao) / diffVibra) * multiplicadorDesvio);
 
     scoreTemp = Math.max(0, Math.min(1, scoreTemp));
     scoreVibra = Math.max(0, Math.min(1, scoreVibra));
@@ -154,7 +170,8 @@ class PredicaoService {
 
       if (!maquina || !maquina.sensores || maquina.sensores.length === 0) return 100;
 
-      const scores = maquina.sensores.map((sensor) => this.calcularHealthScore(sensor));
+      const multiplicadorDesvio = this.obterMultiplicadorIntegridade(maquinaId);
+      const scores = maquina.sensores.map((sensor) => this.calcularHealthScore(sensor, { multiplicadorDesvio }));
       const integridadeAgregada = this.calcularIntegridadeAgregada(scores);
 
       console.log(`--- ATUALIZANDO MAQUINA ${maquinaId} | SCORE: ${integridadeAgregada} ---`);

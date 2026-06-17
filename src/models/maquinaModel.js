@@ -4,10 +4,30 @@ const intervaloHistoricoConfigurado = Number(process.env.HISTORICO_INTEGRIDADE_I
 const HISTORICO_INTEGRIDADE_INTERVALO_MS = Number.isFinite(intervaloHistoricoConfigurado) && intervaloHistoricoConfigurado >= 0
     ? intervaloHistoricoConfigurado
     : 60000;
+const intervaloHistoricoDemoConfigurado = Number(process.env.HISTORICO_INTEGRIDADE_DEMO_INTERVALO_MS);
+const HISTORICO_INTEGRIDADE_DEMO_INTERVALO_MS = Number.isFinite(intervaloHistoricoDemoConfigurado) && intervaloHistoricoDemoConfigurado >= 0
+    ? intervaloHistoricoDemoConfigurado
+    : HISTORICO_INTEGRIDADE_INTERVALO_MS;
+
+function parseIdsEnv(value) {
+    return String(value || "")
+        .split(",")
+        .map((id) => Number(id.trim()))
+        .filter((id) => Number.isInteger(id) && id > 0);
+}
 
 class MaquinaModel {
+    static obterIntervaloHistoricoIntegridade(maquinaId) {
+        const maquinasDemo = parseIdsEnv(process.env.HISTORICO_INTEGRIDADE_DEMO_MAQUINAS_IDS);
+        return maquinasDemo.includes(Number(maquinaId))
+            ? HISTORICO_INTEGRIDADE_DEMO_INTERVALO_MS
+            : HISTORICO_INTEGRIDADE_INTERVALO_MS;
+    }
+
     static async deveRegistrarHistoricoIntegridade(tx, maquinaId, agora = new Date()) {
-        if (HISTORICO_INTEGRIDADE_INTERVALO_MS === 0) {
+        const intervaloMs = this.obterIntervaloHistoricoIntegridade(maquinaId);
+
+        if (intervaloMs === 0) {
             return true;
         }
 
@@ -26,7 +46,7 @@ class MaquinaModel {
             return true;
         }
 
-        return agora.getTime() - ultimaData.getTime() >= HISTORICO_INTEGRIDADE_INTERVALO_MS;
+        return agora.getTime() - ultimaData.getTime() >= intervaloMs;
     }
 
     static async create(data) {

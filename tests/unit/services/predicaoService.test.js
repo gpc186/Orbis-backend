@@ -150,6 +150,23 @@ test("calcularIntegridadeAgregada reduz a media quando existe sensor em estado c
   assert.equal(resultado, 47.33);
 });
 
+test("calcularHealthScore permite amplificar desvio para maquina de demo", async () => {
+  const sensor = {
+    idealTemperatura: 60,
+    limiteTemperatura: 100,
+    ultimaTemperatura: 62,
+    idealVibracao: 4,
+    limiteVibracao: 12,
+    ultimaVibracao: 4.4
+  };
+
+  const normal = PredicaoService.calcularHealthScore(sensor);
+  const demo = PredicaoService.calcularHealthScore(sensor, { multiplicadorDesvio: 8 });
+
+  assert.equal(normal, 95);
+  assert.equal(demo, 60);
+});
+
 test("obterConfigPredicao permite calibrar velocidade por variaveis de ambiente", async () => {
   await withEnv({
     PREDICAO_MIN_PONTOS_REGRESSAO: "4",
