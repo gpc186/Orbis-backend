@@ -441,7 +441,8 @@ class PredicaoService {
 
     const historico = await HistoricoIntegridadeModel.findSerieByMaquina(maquinaId, {
       limite: config.limitePontosRegressao,
-      dataInicio
+      dataInicio,
+      aposUltimaManutencao: true
     });
 
     if (historico.length < config.minPontosRegressao) {
@@ -580,7 +581,27 @@ class PredicaoService {
       );
     }
 
-    if (previsaoValida && avaliacaoModelo?.modeloIntegridade?.referenciaTemporal) {
+    const referenciaTemporal = avaliacaoModelo?.modeloIntegridade?.referenciaTemporal;
+
+    if (referenciaTemporal && dataFalha && dataFalha <= referenciaTemporal) {
+      return this.buildEstadoPreditivo(
+        this.ESTADOS.FALHA_JA_CRUZADA,
+        this.FONTES.HEURISTICA_CRITICA,
+        this.URGENCIAS.IMEDIATA,
+        this.MOTIVOS.LIMIAR_FALHA_JA_CRUZADO
+      );
+    }
+
+    if (referenciaTemporal && dataInicioManutencao && dataInicioManutencao <= referenciaTemporal) {
+      return this.buildEstadoPreditivo(
+        this.ESTADOS.MANUTENCAO_IMEDIATA,
+        this.FONTES.HEURISTICA_CRITICA,
+        this.URGENCIAS.IMEDIATA,
+        this.MOTIVOS.LIMIAR_MANUTENCAO_JA_CRUZADO
+      );
+    }
+
+    if (previsaoValida && referenciaTemporal) {
       return this.buildEstadoPreditivo(
         this.ESTADOS.PREVISAO_VALIDA,
         this.FONTES.REGRESSAO_LINEAR,

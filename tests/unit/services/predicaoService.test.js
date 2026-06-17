@@ -113,13 +113,17 @@ function mockPredicaoDependencies({
 
   const updateCalls = [];
   const syncCalls = [];
+  const serieCalls = [];
 
   MaquinaModel.findById = async () => machine;
   MaquinaModel.update = async (id, data) => {
     updateCalls.push({ id, data });
     return { id, ...data };
   };
-  HistoricoIntegridadeModel.findSerieByMaquina = async () => historico;
+  HistoricoIntegridadeModel.findSerieByMaquina = async (maquinaId, options) => {
+    serieCalls.push({ maquinaId, options });
+    return historico;
+  };
   PredicaoRiscoService.preverPorMaquina = async () => riskResult;
   ManutencaoService.syncPreventivaPreditiva = async (diagnostico) => {
     syncCalls.push(diagnostico);
@@ -129,6 +133,7 @@ function mockPredicaoDependencies({
   return {
     updateCalls,
     syncCalls,
+    serieCalls,
     restore() {
       MaquinaModel.findById = originalFindById;
       MaquinaModel.update = originalUpdate;
@@ -213,10 +218,42 @@ test("previsaoManutencao aceita serie de poucos minutos no fluxo normal", async 
       assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.REGRESSAO_LINEAR);
       assert.equal(resultado.modeloIntegridade.pontosUsados, 3);
       assert.equal(resultado.modeloIntegridade.janelaHorasCoberta, 0.05);
+      assert.equal(mocks.serieCalls[0].options.aposUltimaManutencao, true);
       assert.equal(mocks.updateCalls[0].data.previsaoManutencao.toISOString(), "2026-05-21T00:45:00.000Z");
       assert.equal(resultado.dataInicioManutencao.toISOString(), "2026-05-21T00:45:00.000Z");
       assert.equal(resultado.dataFalha.toISOString(), "2026-05-21T01:45:00.000Z");
       assert.equal(mocks.syncCalls.length, 1);
+    });
+  } finally {
+    mocks.restore();
+    restoreDate();
+  }
+});
+
+test("previsaoManutencao marca MANUTENCAO_IMEDIATA quando o modelo ja cruzou o limiar de manutencao", async () => {
+  const restoreDate = useFakeNow("2026-05-21T07:00:00.000Z");
+  const mocks = mockPredicaoDependencies({
+    historico: buildHistorico([100, 90, 80, 70, 60, 50, 40, 35]),
+    machine: {
+      id: 1,
+      nome: "Maquina com limiar cruzado pelo modelo",
+      integridade: 82,
+      scoreEstabilidade: 82
+    }
+  });
+
+  try {
+    await withPredicaoTestDefaults(async () => {
+      const resultado = await PredicaoService.previsaoManutencao(1);
+
+      assert.deepEqual(mocks.updateCalls[0].data, {
+        previsaoManutencao: null,
+        janelaManuInicio: null,
+        janelaManuFim: null
+      });
+      assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.MANUTENCAO_IMEDIATA);
+      assert.equal(resultado.motivo, PredicaoService.MOTIVOS.LIMIAR_MANUTENCAO_JA_CRUZADO);
+      assert.ok(resultado.dataFalha > new Date("2026-05-21T07:00:00.000Z"));
     });
   } finally {
     mocks.restore();
