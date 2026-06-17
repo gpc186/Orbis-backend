@@ -259,6 +259,28 @@ test("simuladorJob infere progresso por leituras persistidas ao reiniciar", () =
   assert.equal(inicio.toISOString(), "2026-06-11T11:30:00.000Z");
 });
 
+test("simuladorJob exclui maquinas configuradas do ciclo automatico", async () => {
+  process.env.SIMULADOR_JOB_ATIVO = "true";
+  process.env.SIMULADOR_EXCLUIR_MAQUINAS_IDS = "10, 99";
+
+  silenceLogger();
+
+  let whereRecebido = null;
+  patch(prisma.sensor, "findMany", async (payload) => {
+    whereRecebido = payload.where;
+    return [];
+  });
+
+  const simulador = importFresh(simuladorJob);
+
+  await simulador.simularCiclo();
+
+  assert.deepEqual(whereRecebido, {
+    status: { not: "INATIVO" },
+    maquinaId: { notIn: [10, 99] }
+  });
+});
+
 test("tendenciaJob nao consulta banco fora de producao", async () => {
   process.env.NODE_ENV = "TEST";
 

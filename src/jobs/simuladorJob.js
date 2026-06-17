@@ -18,6 +18,7 @@ const ruidoPercentualConfigurado = Number(process.env.SIMULADOR_RUIDO_PERCENTUAL
 const RUIDO_PERCENTUAL = Number.isFinite(ruidoPercentualConfigurado) && ruidoPercentualConfigurado >= 0
   ? ruidoPercentualConfigurado
   : 0.01;
+const MAQUINAS_EXCLUIDAS_SIMULADOR = parseIdsEnv(process.env.SIMULADOR_EXCLUIR_MAQUINAS_IDS);
 
 const maquinasEmSimulacao = new Map();
 let cicloEmAndamento = false;
@@ -35,6 +36,13 @@ function criarExpressaoCron(intervaloSegundos) {
 
 function simuladorEstaAtivo() {
   return process.env.SIMULADOR_JOB_ATIVO !== "false";
+}
+
+function parseIdsEnv(value) {
+  return String(value || "")
+    .split(",")
+    .map((id) => Number(id.trim()))
+    .filter((id) => Number.isInteger(id) && id > 0);
 }
 
 function resetarMaquinaSimulada(maquinaId) {
@@ -188,8 +196,14 @@ function gerarLeituraComAlerta(sensor) {
 }
 
 async function buscarSensoresDisponiveis() {
+  const where = { status: { not: "INATIVO" } };
+
+  if (MAQUINAS_EXCLUIDAS_SIMULADOR.length > 0) {
+    where.maquinaId = { notIn: MAQUINAS_EXCLUIDAS_SIMULADOR };
+  }
+
   return prisma.sensor.findMany({
-    where: { status: { not: "INATIVO" } },
+    where,
     include: { maquina: true },
     orderBy: { id: "asc" }
   });
@@ -367,6 +381,7 @@ module.exports = {
     calcularProgressoPorTempo,
     inferirInicioSimulacao,
     gerarLeitura,
+    parseIdsEnv,
     maquinasEmSimulacao
   }
 };
