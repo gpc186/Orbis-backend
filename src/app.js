@@ -1,6 +1,5 @@
 const express = require("express");
 const cors = require("cors");
-const client = require('prom-client');
 
 const errorMiddleware = require("./middlewares/errorMiddleware");
 const requestContextMiddleware = require("./middlewares/requestContextMiddleware");
@@ -23,9 +22,6 @@ const alertaRoutes = require("./routes/alertaRoutes");
 const historicoIntegridadeRoutes = require("./routes/historicoIntegridadeRoutes");
 const ReadinessService = require("./services/readinessService");
 
-client.register.clear();
-client.collectDefaultMetrics();
-
 function createApp({ io = null } = {}) {
   const app = express();
 
@@ -43,15 +39,6 @@ function createApp({ io = null } = {}) {
 
   app.get("/", (req, res) => res.send("Orbis API - Online"));
   app.get("/health", (req, res) => res.status(200).json({ ok: true }));
-  app.get("/metrics", async (req, res) => {
-    try {
-      const metrics = await client.register.metrics();
-      res.set("Content-Type", client.register.contentType);
-      return res.status(200).send(metrics); // Envia como send() para garantir o corpo da resposta
-    } catch (err) {
-      return res.status(500).send(err.message);
-    }
-  });
   app.get("/ready", async (req, res, next) => {
     try {
       const readiness = await ReadinessService.check();

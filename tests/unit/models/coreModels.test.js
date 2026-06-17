@@ -79,7 +79,6 @@ test("MaquinaModel.update registra historico apenas quando saude muda", async ()
       }
     },
     historicoIntegridade: {
-      findFirst: async () => ({ criadoEm: new Date(Date.now() - 120000) }),
       create: async (payload) => {
         historicos.push(payload);
       }
@@ -99,36 +98,6 @@ test("MaquinaModel.update registra historico apenas quando saude muda", async ()
       origem: "ATUALIZACAO_MAQUINA"
     }
   });
-});
-
-test("MaquinaModel.update limita historico automatico por intervalo", async () => {
-  const historicos = [];
-  let consultasHistorico = 0;
-
-  patch(prisma, "$transaction", async (callback) => callback({
-    maquina: {
-      update: async (payload) => ({
-        id: payload.where.id,
-        integridade: payload.data.integridade ?? 90,
-        scoreEstabilidade: payload.data.scoreEstabilidade ?? 80
-      })
-    },
-    historicoIntegridade: {
-      findFirst: async (payload) => {
-        consultasHistorico += 1;
-        assert.deepEqual(payload.where, { maquinaId: 4 });
-        return { criadoEm: new Date() };
-      },
-      create: async (payload) => {
-        historicos.push(payload);
-      }
-    }
-  }));
-
-  await MaquinaModel.update("4", { integridade: 87 });
-
-  assert.equal(consultasHistorico, 1);
-  assert.equal(historicos.length, 0);
 });
 
 test("SensorModel.create normaliza numeros e conecta maquina", async () => {

@@ -12,12 +12,6 @@ const DEFAULT_ENSURE_CURRENT_READING = true;
 const DEFAULT_INTEGRITY_DAYS = 30;
 const DEFAULT_INTEGRITY_INTERVAL_MINUTES = 30;
 const DEFAULT_INTEGRITY_FINAL_PERCENT = 70;
-const DEFAULT_INTEGRITY_RECENT_WINDOW_DAYS = 7;
-const DEFAULT_INTEGRITY_RECENT_START_PERCENT = 92;
-const DEFAULT_INTEGRITY_CURVE_POWER = 1.15;
-const DEFAULT_INTEGRITY_OSCILLATION_PERCENT = 0.9;
-const DEFAULT_SENSOR_CURVE_POWER = 1.12;
-const SEED_ALERT_MESSAGE_PREFIX = "[SEED_LEITURAS]";
 
 function parsePositiveNumber(value, fallback) {
   const parsed = Number(value);
@@ -71,22 +65,7 @@ function buildConfig(env = process.env) {
       parseNonNegativeNumber(env.SEED_INTEGRIDADE_FINAL_PERCENTUAL, DEFAULT_INTEGRITY_FINAL_PERCENT),
       0,
       100
-    ),
-    integrityRecentWindowDays: parsePositiveNumber(
-      env.SEED_INTEGRIDADE_JANELA_RECENTE_DIAS,
-      Math.min(DEFAULT_INTEGRITY_RECENT_WINDOW_DAYS, integrityDays)
-    ),
-    integrityRecentStartPercent: clamp(
-      parseNonNegativeNumber(env.SEED_INTEGRIDADE_INICIO_JANELA_RECENTE_PERCENTUAL, DEFAULT_INTEGRITY_RECENT_START_PERCENT),
-      0,
-      100
-    ),
-    integrityCurvePower: parsePositiveNumber(env.SEED_INTEGRIDADE_CURVA_POTENCIA, DEFAULT_INTEGRITY_CURVE_POWER),
-    integrityOscillationPercent: parseNonNegativeNumber(
-      env.SEED_INTEGRIDADE_OSCILACAO_PERCENTUAL,
-      DEFAULT_INTEGRITY_OSCILLATION_PERCENT
-    ),
-    sensorCurvePower: parsePositiveNumber(env.SEED_LEITURAS_CURVA_POTENCIA, DEFAULT_SENSOR_CURVE_POWER)
+    )
   };
 }
 
@@ -107,51 +86,13 @@ function wave(sensorId, timestamp, multiplier = 1) {
   return Math.sin((minutes / 17) + (sensorId * 1.37) + multiplier);
 }
 
-function easedProgress(progress, power = 1) {
-  return Math.pow(clamp(progress, 0, 1), power);
-}
-
-function degradationProgress(progress, config) {
-  return easedProgress(progress, config.sensorCurvePower);
-}
-
-function integrityTargetForProgress(progress, config) {
-  const safeProgress = clamp(progress, 0, 1);
-  const recentWindowRatio = clamp(config.integrityRecentWindowDays / config.integrityDays, 0.01, 1);
-  const recentStartProgress = clamp(1 - recentWindowRatio, 0, 0.99);
-  const finalPercent = clamp(config.integrityFinalPercent, 0, 100);
-  const configuredRecentStartPercent = clamp(
-    Math.max(config.integrityRecentStartPercent, finalPercent),
-    finalPercent,
-    100
-  );
-  const recentStartPercent = recentStartProgress === 0 ? 100 : configuredRecentStartPercent;
-
-  if (safeProgress < recentStartProgress) {
-    const earlyProgress = recentStartProgress > 0 ? safeProgress / recentStartProgress : 1;
-    return 100 - ((100 - recentStartPercent) * easedProgress(earlyProgress, 0.85));
-  }
-
-  const recentProgress = (safeProgress - recentStartProgress) / (1 - recentStartProgress);
-  const base = recentStartPercent - ((recentStartPercent - finalPercent) * easedProgress(
-    recentProgress,
-    config.integrityCurvePower
-  ));
-  const envelope = recentProgress * (1 - recentProgress);
-  const oscillation = Math.sin((recentProgress * Math.PI * 6) + 0.35)
-    * config.integrityOscillationPercent
-    * envelope;
-
-  return clamp(base + oscillation, finalPercent, 100);
-}
-
 function valueFromRange({ ideal, limit, progress, noisePercent, noiseFactor, allowLimitSpike, config }) {
   const safeIdeal = Number.isFinite(ideal) ? ideal : 0;
   const safeLimit = Number.isFinite(limit) && limit > safeIdeal ? limit : safeIdeal;
   const amplitude = Math.max(safeLimit - safeIdeal, 0);
-  const finalSensorProgress = clamp((100 - integrityTargetForProgress(progress, config)) / 100, 0, 1);
+  const finalSensorProgress = clamp((100 - config.integrityFinalPercent) / 100, 0, 1);
   const baseProgress = allowLimitSpike ? 1.05 : finalSensorProgress;
-  const base = safeIdeal + (amplitude * degradationProgress(progress, config) * baseProgress);
+  const base = safeIdeal + (amplitude * progress * baseProgress);
   const noise = amplitude * noisePercent * noiseFactor;
 
   return round(clamp(base + noise, safeIdeal, allowLimitSpike ? safeLimit * 1.12 : safeLimit));
@@ -278,8 +219,6 @@ function buildIntegrityRowsForMachine({
   });
 
   while (cursor < end) {
-    const progress = progressForDate(cursor, start, end);
-    const integridadeAlvo = integrityTargetForProgress(progress, config);
     const scores = sensors.map((sensor) => {
       const reading = buildReading(sensor, new Date(cursor), { start, end }, {
         ...config,
@@ -289,10 +228,8 @@ function buildIntegrityRowsForMachine({
 
       return calculateSensorHealth(sensor, reading);
     });
-    const integridadeSensores = PredicaoService.calcularIntegridadeAgregada(scores);
-    const integridade = round(clamp((integridadeAlvo * 0.72) + (integridadeSensores * 0.28), 0, 100));
-    const stabilityPenalty = Math.abs(wave(maquinaId, cursor.getTime(), 2.4)) * config.integrityOscillationPercent;
-    const scoreEstabilidade = round(clamp(integridade + 4 - stabilityPenalty, 35, 100));
+    const integridade = PredicaoService.calcularIntegridadeAgregada(scores);
+    const scoreEstabilidade = round(clamp(integridade + 5, 35, 100));
 
     rows.push({
       maquinaId,
@@ -307,146 +244,6 @@ function buildIntegrityRowsForMachine({
   }
 
   return rows;
-}
-
-function chooseSeedAlertTypes({ maquina, reading, sensor, integridade, criadoEm }) {
-  const tipos = [];
-  const temperatura = Number(reading?.temperatura);
-  const vibracao = Number(reading?.vibracao);
-  const limiteTemperatura = Number(sensor?.limiteTemperatura);
-  const limiteVibracao = Number(sensor?.limiteVibracao);
-  const idealTemperatura = Number(sensor?.idealTemperatura);
-  const idealVibracao = Number(sensor?.idealVibracao);
-  const desvioMaximoTemp = Number(sensor?.desvioMaximoTemp ?? 5);
-  const desvioMaximoVibra = Number(sensor?.desvioMaximoVibra ?? 5);
-  const hourBucket = Math.floor(criadoEm.getTime() / (60 * 60 * 1000));
-
-  if (
-    (Number.isFinite(temperatura) && Number.isFinite(limiteTemperatura) && temperatura > limiteTemperatura)
-    || (Number.isFinite(vibracao) && Number.isFinite(limiteVibracao) && vibracao > limiteVibracao)
-    || (maquina?.criticidade === "ALTA" && integridade <= 78 && hourBucket % 17 === 0)
-  ) {
-    tipos.push("LIMITE_ULTRAPASSADO");
-  }
-
-  if (
-    Math.abs(temperatura - idealTemperatura) > desvioMaximoTemp
-    || Math.abs(vibracao - idealVibracao) > desvioMaximoVibra
-    || integridade <= 82
-  ) {
-    tipos.push("INSTABILIDADE");
-  }
-
-  if (integridade <= 88) {
-    tipos.push("TENDENCIA_CURTA");
-  }
-
-  if (integridade <= 92) {
-    tipos.push("TENDENCIA_LONGA");
-  }
-
-  return [...new Set(tipos)];
-}
-
-function buildSeedAlertRowsForMachine({ maquina, sensors, latestReadingsBySensor, historicoRows, config }) {
-  const sensor = sensors[0];
-  if (!sensor) return [];
-
-  const latestReading = latestReadingsBySensor.get(sensor.id);
-  if (!latestReading) return [];
-
-  const rows = [];
-  const checkpoints = historicoRows
-    .filter((row) => row.maquinaId === maquina.id)
-    .filter((row, index) => index % 16 === 0 || index === historicoRows.length - 1);
-
-  for (const row of checkpoints) {
-    const reading = buildReading(sensor, row.criadoEm, {
-      start: historicoRows[0]?.criadoEm || row.criadoEm,
-      end: historicoRows[historicoRows.length - 1]?.criadoEm || row.criadoEm
-    }, {
-      ...config,
-      createAlerts: false
-    });
-    const tipos = chooseSeedAlertTypes({
-      maquina,
-      reading,
-      sensor,
-      integridade: row.integridade,
-      criadoEm: row.criadoEm
-    });
-
-    for (const tipo of tipos) {
-      rows.push({
-        sensorId: sensor.id,
-        maquinaId: maquina.id,
-        tipo,
-        status: tipo === "LIMITE_ULTRAPASSADO" ? "EM_ANDAMENTO" : "ATIVO",
-        mensagem: `${SEED_ALERT_MESSAGE_PREFIX} ${tipo} sintetico para alimentar predicao e demonstracao.`,
-        criadoEm: row.criadoEm
-      });
-    }
-  }
-
-  return rows;
-}
-
-async function getExistingSeedAlertKeys(maquinaIds, rangeStart) {
-  const alertas = await prisma.alerta.findMany({
-    where: {
-      maquinaId: { in: maquinaIds },
-      mensagem: { contains: SEED_ALERT_MESSAGE_PREFIX },
-      criadoEm: { gte: rangeStart }
-    },
-    select: {
-      maquinaId: true,
-      tipo: true,
-      criadoEm: true
-    }
-  });
-
-  return new Set(alertas.map((alerta) => [
-    alerta.maquinaId,
-    alerta.tipo,
-    new Date(alerta.criadoEm).toISOString().slice(0, 13)
-  ].join(":")));
-}
-
-async function createSeedAlerts(alertRows, batchSize, rangeStart) {
-  if (!alertRows.length) return 0;
-
-  const maquinaIds = [...new Set(alertRows.map((row) => row.maquinaId))];
-  const existingKeys = await getExistingSeedAlertKeys(maquinaIds, rangeStart);
-  let created = 0;
-
-  for (let index = 0; index < alertRows.length; index += batchSize) {
-    const batch = alertRows.slice(index, index + batchSize);
-
-    for (const row of batch) {
-      const key = [row.maquinaId, row.tipo, row.criadoEm.toISOString().slice(0, 13)].join(":");
-      if (existingKeys.has(key)) continue;
-
-      const alerta = await prisma.alerta.create({
-        data: row
-      });
-
-      await prisma.alertaEvento.create({
-        data: {
-          alertaId: alerta.id,
-          tipo: "CRIADO",
-          statusNovo: row.status,
-          mensagem: row.mensagem,
-          descricao: "Alerta sintetico criado pelo seed de leituras",
-          criadoEm: row.criadoEm
-        }
-      });
-
-      existingKeys.add(key);
-      created += 1;
-    }
-  }
-
-  return created;
 }
 
 function groupLatestByMachine(sensors, latestReadingsBySensor) {
@@ -519,7 +316,6 @@ async function updateSensorsAndMachines({ sensors, latestReadingsBySensor, lates
   let updatedSensors = 0;
   let updatedMachines = 0;
   const historicoRows = [];
-  const alertRows = [];
 
   for (const sensor of sensors) {
     const latestReading = latestReadingsBySensor.get(sensor.id);
@@ -538,43 +334,23 @@ async function updateSensorsAndMachines({ sensors, latestReadingsBySensor, lates
   }
 
   if (!config.updateMachines) {
-    return { updatedSensors, updatedMachines, historicoRows, createdAlerts: 0 };
+    return { updatedSensors, updatedMachines, historicoRows };
   }
 
   const latestByMachine = groupLatestByMachine(sensors, latestReadingsBySensor);
 
   for (const [maquinaId, data] of latestByMachine.entries()) {
-    const rows = buildIntegrityRowsForMachine({
+    historicoRows.push(...buildIntegrityRowsForMachine({
       maquinaId,
       sensors: data.sensors,
       latestHistoryDate: latestHistoryByMachine.get(maquinaId),
       config
-    });
-
-    historicoRows.push(...rows);
-
-    if (config.createAlerts) {
-      alertRows.push(...buildSeedAlertRowsForMachine({
-        maquina: data.maquina,
-        sensors: data.sensors,
-        latestReadingsBySensor,
-        historicoRows: rows,
-        config
-      }));
-    }
+    }));
   }
 
   if (historicoRows.length > 0) {
     await createInBatches(prisma.historicoIntegridade, historicoRows, config.batchSize);
   }
-
-  const createdAlerts = config.createAlerts
-    ? await createSeedAlerts(
-        alertRows,
-        config.batchSize,
-        alertRows[0]?.criadoEm || new Date(Date.now() - (7 * 24 * 60 * 60 * 1000))
-      )
-    : 0;
 
   const latestIntegrityRowsByMachine = getLatestIntegrityRowsByMachine(historicoRows);
 
@@ -604,7 +380,7 @@ async function updateSensorsAndMachines({ sensors, latestReadingsBySensor, lates
     updatedMachines += 1;
   }
 
-  return { updatedSensors, updatedMachines, historicoRows, createdAlerts };
+  return { updatedSensors, updatedMachines, historicoRows };
 }
 
 async function main() {
@@ -646,7 +422,7 @@ async function main() {
   const createdReadings = await createInBatches(prisma.leitura, allReadings, config.batchSize);
   const maquinaIds = [...new Set(sensors.map((sensor) => sensor.maquinaId))];
   const latestHistoryByMachine = await getLatestHistoryByMachine(maquinaIds);
-  const { updatedSensors, updatedMachines, historicoRows, createdAlerts } = await updateSensorsAndMachines({
+  const { updatedSensors, updatedMachines, historicoRows } = await updateSensorsAndMachines({
     sensors,
     latestReadingsBySensor,
     latestHistoryByMachine,
@@ -659,7 +435,6 @@ async function main() {
     sensoresAtualizados: updatedSensors,
     maquinasAtualizadas: updatedMachines,
     historicosCriados: historicoRows.length,
-    alertasCriados: createdAlerts,
     periodoInicio: range.start.toISOString(),
     periodoFim: range.end.toISOString(),
     intervaloMinutos: config.intervalMinutes,
@@ -685,13 +460,9 @@ module.exports = {
   buildIntegrityRowsForMachine,
   buildReading,
   buildReadingsForSensor,
-  buildSeedAlertRowsForMachine,
   calculateSensorHealth,
-  chooseSeedAlertTypes,
-  degradationProgress,
   getLatestIntegrityRowsByMachine,
   getRange,
-  integrityTargetForProgress,
   main,
   nextSeedStart,
   progressForDate

@@ -14,9 +14,7 @@ const PREDICAO_TEST_DEFAULTS = {
   PREDICAO_MIN_JANELA_REGRESSAO_HORAS: "0.05",
   PREDICAO_MIN_INTERVALO_REGRESSAO_HORAS: "0.005",
   PREDICAO_MAX_RAZAO_INTERVALO_REGRESSAO: "60",
-  PREDICAO_MAX_PONTOS_DESCARTE_REGRESSAO: "1",
-  PREDICAO_LIMITE_PONTOS_REGRESSAO: "30",
-  PREDICAO_LOOKBACK_DIAS_REGRESSAO: "7"
+  PREDICAO_MAX_PONTOS_DESCARTE_REGRESSAO: "1"
 };
 
 function useFakeNow(isoString) {
@@ -151,18 +149,14 @@ test("obterConfigPredicao permite calibrar velocidade por variaveis de ambiente"
     PREDICAO_MIN_JANELA_REGRESSAO_HORAS: "0.1",
     PREDICAO_MIN_INTERVALO_REGRESSAO_HORAS: "0.01",
     PREDICAO_MAX_RAZAO_INTERVALO_REGRESSAO: "30",
-    PREDICAO_MAX_PONTOS_DESCARTE_REGRESSAO: "2",
-    PREDICAO_LIMITE_PONTOS_REGRESSAO: "120",
-    PREDICAO_LOOKBACK_DIAS_REGRESSAO: "14"
+    PREDICAO_MAX_PONTOS_DESCARTE_REGRESSAO: "2"
   }, () => {
     assert.deepEqual(PredicaoService.obterConfigPredicao(), {
       minPontosRegressao: 4,
       minJanelaRegressaoHoras: 0.1,
       minIntervaloRegressaoHoras: 0.01,
       maxRazaoIntervaloRegressao: 30,
-      maxPontosDescarteRegressao: 2,
-      limitePontosRegressao: 120,
-      lookbackDiasRegressao: 14
+      maxPontosDescarteRegressao: 2
     });
   });
 });

@@ -102,24 +102,18 @@ SIMULADOR_JOB_ATIVO=false
 SIMULADOR_INTERVALO_MS=5000
 SIMULADOR_DEGRADACAO_HORAS=24
 SIMULADOR_RUIDO_PERCENTUAL=0.01
-HISTORICO_INTEGRIDADE_INTERVALO_MS=60000
 
 SEED_LEITURAS_DIAS=7
 SEED_LEITURAS_INTERVALO_MINUTOS=5
 SEED_LEITURAS_BATCH_SIZE=1000
 SEED_LEITURAS_MAX_POR_SENSOR=5000
 SEED_LEITURAS_RUIDO_PERCENTUAL=0.015
-SEED_LEITURAS_CRIAR_ALERTAS=true
+SEED_LEITURAS_CRIAR_ALERTAS=false
 SEED_LEITURAS_ATUALIZAR_MAQUINAS=true
 SEED_LEITURAS_GARANTIR_LEITURA_ATUAL=true
-SEED_LEITURAS_CURVA_POTENCIA=1.12
 SEED_INTEGRIDADE_DIAS_DEGRADACAO=30
 SEED_INTEGRIDADE_INTERVALO_MINUTOS=30
-SEED_INTEGRIDADE_FINAL_PERCENTUAL=80
-SEED_INTEGRIDADE_JANELA_RECENTE_DIAS=7
-SEED_INTEGRIDADE_INICIO_JANELA_RECENTE_PERCENTUAL=92
-SEED_INTEGRIDADE_CURVA_POTENCIA=1.15
-SEED_INTEGRIDADE_OSCILACAO_PERCENTUAL=0.9
+SEED_INTEGRIDADE_FINAL_PERCENTUAL=70
 
 CACHE_GET_TTL_MS=5000
 CACHE_DASHBOARD_TTL_MS=10000
@@ -129,8 +123,6 @@ PRISMA_SLOW_QUERY_MS=250
 
 PREDICAO_MIN_PONTOS_REGRESSAO=3
 PREDICAO_MIN_JANELA_REGRESSAO_HORAS=0.05
-PREDICAO_LIMITE_PONTOS_REGRESSAO=336
-PREDICAO_LOOKBACK_DIAS_REGRESSAO=7
 PREDICAO_AUTO_AGENDAR_ENABLED=true
 PREDICAO_AUTO_AGENDAR_MIN_CONFIRMACOES=3
 PREDICAO_AUTO_AGENDAR_R2_MINIMO=0.75
@@ -202,7 +194,7 @@ tests/
   - `desvioMaximoVibra > 0`
 - `POST /leituras` é usado por integrações ESP32 e exige `x-api-key`.
 - `GET /leituras` exige autenticação.
-- Leituras atualizam sensor, integridade da máquina e podem gerar alertas. O histórico de integridade é amostrado por máquina para evitar um ponto a cada leitura bruta.
+- Leituras atualizam sensor, integridade da máquina, histórico e podem gerar alertas.
 
 ### Alertas e Manutenções
 
@@ -232,9 +224,6 @@ A velocidade/sensibilidade da predição pode ser calibrada pelo ambiente:
 
 - `PREDICAO_MIN_PONTOS_REGRESSAO`: pontos mínimos de integridade para regressão.
 - `PREDICAO_MIN_JANELA_REGRESSAO_HORAS`: janela temporal mínima da regressão. `0.05` equivale a cerca de 3 minutos.
-- `PREDICAO_LIMITE_PONTOS_REGRESSAO`: quantidade maxima de pontos recentes usados no modelo. Com o seed a cada 30 minutos, `336` cobre 7 dias.
-- `PREDICAO_LOOKBACK_DIAS_REGRESSAO`: janela de dias buscada no historico de integridade.
-- `HISTORICO_INTEGRIDADE_INTERVALO_MS`: intervalo minimo entre pontos automaticos de historico por maquina. Leituras continuam no intervalo do sensor/simulador; apenas o historico usado pela regressao e amostrado. Use `0` para registrar toda atualizacao.
 - `PREDICAO_AUTO_AGENDAR_ENABLED`: habilita a criação automática de preventiva por predição. Quando `false`, apenas o estado preditivo da máquina é atualizado.
 - `PREDICAO_AUTO_AGENDAR_MIN_CONFIRMACOES`: quantidade de previsões válidas consecutivas necessárias antes de criar ou reagendar preventiva preditiva.
 - `PREDICAO_AUTO_AGENDAR_R2_MINIMO` e `PREDICAO_AUTO_AGENDAR_PONTOS_MINIMOS`: qualidade mínima do modelo para considerar a predição estável.
@@ -423,7 +412,6 @@ O `simuladorJob` degrada cada máquina linearmente pelo tempo decorrido, gerando
 A curva usa as specs de cada sensor: `idealTemperatura -> limiteTemperatura` e `idealVibracao -> limiteVibracao`.
 `SIMULADOR_DEGRADACAO_HORAS` controla em quantas horas a leitura chega do ideal ao limite, e `SIMULADOR_RUIDO_PERCENTUAL` adiciona uma pequena variação percentual sobre a amplitude.
 Ao reiniciar a API, o simulador infere o progresso pelas ultimas leituras persistidas dos sensores, evitando voltar ao inicio apos redeploy.
-As leituras em tempo real nao precisam ter o mesmo intervalo do historico de integridade: `HISTORICO_INTEGRIDADE_INTERVALO_MS` controla a amostragem dos pontos usados pela regressao.
 
 Para reduzir uso de network transfer no Neon, mantenha `SIMULADOR_JOB_ATIVO=false` fora da demonstracao e rode `npm run seed:leituras` para carregar historico em lote. Na demonstracao, ligue o simulador e/ou ESP32 para leituras em tempo real; o seed nao impede leituras novas.
 O seed e incremental: em novos redeploys, ele continua a partir da ultima leitura de cada sensor e do ultimo ponto de historico de cada maquina, sem recriar toda a janela configurada.
