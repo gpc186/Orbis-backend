@@ -243,6 +243,13 @@ class AlertaPreditivoService {
     }
 
     const modeloIntegridade = modeloResultado.modeloIntegridade;
+    if (!modeloIntegridade.modelo || typeof modeloIntegridade.modelo.computeX !== "function") {
+      return {
+        predicao: null,
+        ausencia: this.criarAusenciaPrevisao(this.MOTIVOS.REGRESSAO_INDISPONIVEL, { tipo })
+      };
+    }
+
     const horasAteLimiar = modeloIntegridade.modelo.computeX(limiarHistorico.integridadeLimiar);
 
     if (!Number.isFinite(horasAteLimiar) || horasAteLimiar <= 0) {

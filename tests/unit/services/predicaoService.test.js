@@ -316,11 +316,9 @@ test("previsaoManutencao marca MANUTENCAO_IMEDIATA quando o modelo ja cruzou o l
     await withPredicaoTestDefaults(async () => {
       const resultado = await PredicaoService.previsaoManutencao(1);
 
-      assert.deepEqual(mocks.updateCalls[0].data, {
-        previsaoManutencao: null,
-        janelaManuInicio: null,
-        janelaManuFim: null
-      });
+      assert.equal(mocks.updateCalls[0].data.previsaoManutencao.toISOString(), "2026-05-21T07:00:00.000Z");
+      assert.equal(mocks.updateCalls[0].data.janelaManuInicio.toISOString(), "2026-05-21T07:00:00.000Z");
+      assert.equal(mocks.updateCalls[0].data.janelaManuFim.toISOString(), "2026-05-21T07:00:00.000Z");
       assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.MANUTENCAO_IMEDIATA);
       assert.equal(resultado.motivo, PredicaoService.MOTIVOS.LIMIAR_MANUTENCAO_JA_CRUZADO);
       assert.ok(resultado.dataFalha > new Date("2026-05-21T07:00:00.000Z"));
@@ -347,11 +345,9 @@ test("previsaoManutencao marca MANUTENCAO_IMEDIATA quando a integridade atual ja
     await withPredicaoTestDefaults(async () => {
       const resultado = await PredicaoService.previsaoManutencao(1);
 
-      assert.deepEqual(mocks.updateCalls[0].data, {
-        previsaoManutencao: null,
-        janelaManuInicio: null,
-        janelaManuFim: null
-      });
+      assert.equal(mocks.updateCalls[0].data.previsaoManutencao.toISOString(), "2026-05-21T07:00:00.000Z");
+      assert.equal(mocks.updateCalls[0].data.janelaManuInicio.toISOString(), "2026-05-21T07:00:00.000Z");
+      assert.equal(mocks.updateCalls[0].data.janelaManuFim.toISOString(), "2026-05-21T07:00:00.000Z");
       assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.MANUTENCAO_IMEDIATA);
       assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.HEURISTICA_CRITICA);
       assert.equal(resultado.urgencia, PredicaoService.URGENCIAS.IMEDIATA);
@@ -379,6 +375,9 @@ test("previsaoManutencao marca FALHA_JA_CRUZADA quando a integridade atual ja cr
     await withPredicaoTestDefaults(async () => {
       const resultado = await PredicaoService.previsaoManutencao(1);
 
+      assert.equal(mocks.updateCalls[0].data.previsaoManutencao.toISOString(), "2026-05-21T08:00:00.000Z");
+      assert.equal(mocks.updateCalls[0].data.janelaManuInicio.toISOString(), "2026-05-21T08:00:00.000Z");
+      assert.equal(mocks.updateCalls[0].data.janelaManuFim.toISOString(), "2026-05-21T08:00:00.000Z");
       assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.FALHA_JA_CRUZADA);
       assert.equal(resultado.motivo, PredicaoService.MOTIVOS.LIMIAR_FALHA_JA_CRUZADO);
       assert.equal(resultado.urgencia, PredicaoService.URGENCIAS.IMEDIATA);
