@@ -125,6 +125,7 @@ test("relatorioJob so agenda quando habilitado e processa agendamentos vencidos"
 test("sensorOfflineJob respeita flag de ambiente e atualiza sensores vencidos quando habilitado", async () => {
   process.env.SENSOR_OFFLINE_JOB_ENABLED = "false";
   process.env.SENSOR_OFFLINE_INTERVAL_SECONDS = "30";
+  process.env.SIMULADOR_JOB_ATIVO = "false";
 
   const scheduled = captureCronSchedule();
   const logs = silenceLogger();
@@ -154,6 +155,36 @@ test("sensorOfflineJob respeita flag de ambiente e atualiza sensores vencidos qu
   const segundosAtras = (Date.now() - limiteRecebido.getTime()) / 1000;
   assert.ok(segundosAtras >= 29 && segundosAtras <= 31);
   assert.ok(logs.some((log) => log.message === "sensor_offline_job_finished" && log.context.sensoresAtualizados === 3));
+});
+
+test("sensorOfflineJob aplica folga minima quando simulador esta ativo", async () => {
+  process.env.SENSOR_OFFLINE_JOB_ENABLED = "true";
+  process.env.SENSOR_OFFLINE_INTERVAL_SECONDS = "30";
+  process.env.SIMULADOR_JOB_ATIVO = "true";
+  process.env.SIMULADOR_INTERVALO_MS = "15000";
+  process.env.SENSOR_OFFLINE_SIMULADOR_GRACE_MULTIPLIER = "4";
+
+  const scheduled = captureCronSchedule();
+  const logs = silenceLogger();
+  let limiteRecebido = null;
+
+  patch(SensorModel, "updateStatus", async (limiteOffline) => {
+    limiteRecebido = limiteOffline;
+    return { count: 1 };
+  });
+
+  importFresh(sensorOfflineJob);
+
+  assert.equal(scheduled.length, 1);
+
+  await scheduled[0].callback();
+
+  assert.ok(limiteRecebido instanceof Date);
+  const segundosAtras = (Date.now() - limiteRecebido.getTime()) / 1000;
+  assert.ok(segundosAtras >= 59 && segundosAtras <= 61);
+  assert.ok(logs.some((log) => log.message === "sensor_offline_job_started"
+    && log.context.intervaloSegundos === 60
+    && log.context.intervaloConfiguradoSegundos === 30));
 });
 
 test("simuladorJob degrada maquinas linearmente pelas specs dos sensores", async () => {

@@ -4,10 +4,10 @@
   "description": "",
   "main": "src/server.js",
   "scripts": {
-    "test": "node --test --experimental-test-isolation=none \"tests/ci/*.test.js\" \"tests/unit/**/*.test.js\"",
-    "test:coverage": "node --test --experimental-test-isolation=none --experimental-test-coverage \"tests/ci/*.test.js\" \"tests/unit/**/*.test.js\"",
+    "test": "node --test tests/ci tests/unit",
+    "test:coverage": "node --test --experimental-test-coverage tests/ci tests/unit",
     "test:ci": "npm test && npm run test:coverage",
-    "test:integration": "node --test --experimental-test-isolation=none \"tests/integration/*.integration.test.js\"",
+    "test:integration": "node --test tests/integration",
     "smoke:health": "node scripts/smoke-health.js",
     "seed:leituras": "node scripts/seed-leituras.js",
     "seed:visitor": "node scripts/create-visitor-user.js",
