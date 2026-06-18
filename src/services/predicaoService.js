@@ -1,6 +1,7 @@
 const { SimpleLinearRegression } = require("ml-regression-simple-linear");
 const AppError = require("../utils/appErrorUtils");
 const PredicaoRiscoService = require("./predicaoRiscoService");
+const PredicaoServiceAntigo = require("./predicaoServiceAntigo");
 
 class PredicaoService {
   static MIN_PONTOS_REGRESSAO = 3;
@@ -28,6 +29,7 @@ class PredicaoService {
 
   static FONTES = {
     REGRESSAO_LINEAR: "REGRESSAO_LINEAR",
+    HEURISTICA_ANTIGA: "HEURISTICA_ANTIGA",
     HEURISTICA_CRITICA: "HEURISTICA_CRITICA",
     SEM_MODELO: "SEM_MODELO"
   };
@@ -41,6 +43,7 @@ class PredicaoService {
 
   static MOTIVOS = {
     PREVISAO_LINEAR_VALIDA: "previsao_linear_valida",
+    PREVISAO_FALLBACK_ANTIGO: "previsao_fallback_antigo",
     LIMIAR_MANUTENCAO_JA_CRUZADO: "limiar_manutencao_ja_cruzado",
     LIMIAR_FALHA_JA_CRUZADO: "limiar_falha_ja_cruzado",
     RISCO_HEURISTICO_CRITICO: "risco_heuristico_critico",
@@ -551,6 +554,17 @@ class PredicaoService {
     }
   }
 
+  static async obterFallbackAntigo(maquinaId, { maquina, referenciaTemporal }) {
+    try {
+      return await PredicaoServiceAntigo.diagnosticarFallback(maquinaId, {
+        maquina,
+        referenciaTemporal
+      });
+    } catch (error) {
+      return null;
+    }
+  }
+
   static deveAcionarFallbackCritico(maquina, riscoAtual) {
     const riscoManutencao = riscoAtual?.riscos?.manutencao;
     const prob24h = Number(riscoManutencao?.["24h"]);
@@ -680,11 +694,12 @@ class PredicaoService {
       return null;
     }
 
-    const avaliacaoModelo = await this.avaliarModeloIntegridade(maquinaId);
+    let avaliacaoModelo = await this.avaliarModeloIntegridade(maquinaId);
     let dataInicioManutencao = null;
     let dataFalha = null;
     let janelaManuInicio = null;
     let janelaManuFim = null;
+    let fallbackAntigoAplicado = false;
 
     if (avaliacaoModelo?.valido && avaliacaoModelo.modeloIntegridade) {
       dataInicioManutencao = this.projetarDataLimiar(
@@ -714,7 +729,7 @@ class PredicaoService {
       }
     }
 
-    const previsaoValida = Boolean(
+    let previsaoValida = Boolean(
       avaliacaoModelo?.modeloIntegridade?.referenciaTemporal
       && (
         (dataInicioManutencao && dataInicioManutencao > avaliacaoModelo.modeloIntegridade.referenciaTemporal)
@@ -722,19 +737,47 @@ class PredicaoService {
       )
     );
 
+    if (!previsaoValida) {
+      const referenciaFallback = avaliacaoModelo?.modeloIntegridade?.referenciaTemporal || new Date();
+      const fallbackAntigo = await this.obterFallbackAntigo(maquinaId, {
+        maquina,
+        referenciaTemporal: referenciaFallback
+      });
+
+      if (fallbackAntigo) {
+        fallbackAntigoAplicado = true;
+        avaliacaoModelo = fallbackAntigo.avaliacaoModelo;
+        dataInicioManutencao = fallbackAntigo.dataInicioManutencao;
+        dataFalha = fallbackAntigo.dataFalha;
+        janelaManuInicio = fallbackAntigo.janelaManuInicio;
+        janelaManuFim = fallbackAntigo.janelaManuFim;
+        previsaoValida = true;
+      }
+    }
+
     const precisaRiscoFallback = !previsaoValida;
     const riscoAtual = precisaRiscoFallback
       ? await this.obterRiscoFallback(maquinaId)
       : null;
 
-    const estado = this.resolverEstadoPreditivo({
-      maquina,
-      avaliacaoModelo,
-      riscoAtual,
-      dataInicioManutencao,
-      dataFalha,
-      previsaoValida
-    });
+    const estado = fallbackAntigoAplicado
+      ? this.buildEstadoPreditivo(
+          this.ESTADOS.PREVISAO_VALIDA,
+          this.FONTES.HEURISTICA_ANTIGA,
+          this.calcularUrgenciaPorData(
+            dataInicioManutencao || dataFalha,
+            avaliacaoModelo.modeloIntegridade.referenciaTemporal
+          ),
+          this.MOTIVOS.PREVISAO_FALLBACK_ANTIGO
+        )
+      : this.resolverEstadoPreditivo({
+          maquina,
+          avaliacaoModelo,
+          riscoAtual,
+          dataInicioManutencao,
+          dataFalha,
+          previsaoValida
+        });
 
     return {
       maquina,
