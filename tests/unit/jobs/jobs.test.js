@@ -10,6 +10,7 @@ const MaquinaService = require("../../../src/services/maquinaService");
 const leituraService = require("../../../src/services/leituraService");
 const prisma = require("../../../src/prisma/prisma");
 const logger = require("../../../src/utils/logger");
+const cacheMiddleware = require("../../../src/middlewares/cacheMiddleware");
 const { REPORT_TIMEZONE } = require("../../../src/utils/reportScheduleUtils");
 
 const patches = [];
@@ -139,9 +140,13 @@ test("sensorOfflineJob respeita flag de ambiente e atualiza sensores vencidos qu
   delete require.cache[require.resolve(sensorOfflineJob)];
 
   let limiteRecebido = null;
+  let cacheLimpo = 0;
   patch(SensorModel, "updateStatus", async (limiteOffline) => {
     limiteRecebido = limiteOffline;
     return { count: 3 };
+  });
+  patch(cacheMiddleware, "clearCache", () => {
+    cacheLimpo += 1;
   });
 
   importFresh(sensorOfflineJob);
@@ -154,6 +159,7 @@ test("sensorOfflineJob respeita flag de ambiente e atualiza sensores vencidos qu
   assert.ok(limiteRecebido instanceof Date);
   const segundosAtras = (Date.now() - limiteRecebido.getTime()) / 1000;
   assert.ok(segundosAtras >= 29 && segundosAtras <= 31);
+  assert.equal(cacheLimpo, 1);
   assert.ok(logs.some((log) => log.message === "sensor_offline_job_finished" && log.context.sensoresAtualizados === 3));
 });
 

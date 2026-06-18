@@ -4,6 +4,7 @@ const AppError = require("../utils/appErrorUtils");
 const AlertaService = require("../services/alertaService");
 const PredicaoService = require("./predicaoService");
 const logger = require("../utils/logger");
+const cacheMiddleware = require("../middlewares/cacheMiddleware");
 
 class leituraService {
   static async processarNovaLeitura(dadosLeitura) {
@@ -44,6 +45,7 @@ class leituraService {
       }
 
       const novaLeitura = await leituraModel.store(dadosLeitura);
+      cacheMiddleware.clearCache();
 
       try {
         await PredicaoService.atualizarSaudeMaquina(sensor.maquinaId);

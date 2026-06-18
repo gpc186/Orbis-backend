@@ -6,6 +6,7 @@ const AlertaService = require("../../../src/services/alertaService");
 const PredicaoService = require("../../../src/services/predicaoService");
 const leituraModel = require("../../../src/models/leituraModel");
 const SensorModel = require("../../../src/models/sensorModel");
+const cacheMiddleware = require("../../../src/middlewares/cacheMiddleware");
 
 const originals = {
   sensorFindById: SensorModel.findById,
@@ -13,7 +14,8 @@ const originals = {
   store: leituraModel.store,
   index: leituraModel.index,
   atualizarSaudeMaquina: PredicaoService.atualizarSaudeMaquina,
-  previsaoManutencao: PredicaoService.previsaoManutencao
+  previsaoManutencao: PredicaoService.previsaoManutencao,
+  clearCache: cacheMiddleware.clearCache
 };
 
 afterEach(() => {
@@ -23,6 +25,7 @@ afterEach(() => {
   leituraModel.index = originals.index;
   PredicaoService.atualizarSaudeMaquina = originals.atualizarSaudeMaquina;
   PredicaoService.previsaoManutencao = originals.previsaoManutencao;
+  cacheMiddleware.clearCache = originals.clearCache;
 });
 
 function buildSensor(overrides = {}) {
@@ -51,6 +54,10 @@ test("processarNovaLeitura gera alertas, salva leitura e executa predicao", asyn
   leituraModel.store = async (dados) => ({ id: 11, ...dados });
 
   const predicaoChamadas = [];
+  let cacheLimpo = 0;
+  cacheMiddleware.clearCache = () => {
+    cacheLimpo += 1;
+  };
   PredicaoService.atualizarSaudeMaquina = async (maquinaId) => {
     predicaoChamadas.push(["saude", maquinaId]);
   };
@@ -77,6 +84,7 @@ test("processarNovaLeitura gera alertas, salva leitura e executa predicao", asyn
     ["saude", 5],
     ["previsao", 5]
   ]);
+  assert.equal(cacheLimpo, 1);
 });
 
 test("processarNovaLeitura nao gera alerta quando leitura esta dentro dos parametros", async () => {
