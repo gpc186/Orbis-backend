@@ -289,6 +289,68 @@ test("LeituraController.store valida payload, salva leitura e emite socket", asy
   ]);
 });
 
+test("LeituraController.store emite eventos de maquina e historico quando leitura possui contexto realtime", async () => {
+  const historicoIntegridade = {
+    id: 44,
+    maquinaId: 8,
+    integridade: 72,
+    scoreEstabilidade: 80,
+    origem: "ATUALIZACAO_MAQUINA"
+  };
+  const maquina = {
+    id: 8,
+    integridade: 72,
+    scoreEstabilidade: 80
+  };
+
+  LeituraService.processarNovaLeitura = async (payload) => {
+    const leitura = { id: 10, ...payload };
+
+    Object.defineProperty(leitura, "_realtime", {
+      value: {
+        maquinaId: 8,
+        integridade: 72,
+        maquina,
+        historicoIntegridade
+      },
+      enumerable: false
+    });
+
+    return leitura;
+  };
+
+  const emits = [];
+  const req = {
+    body: { sensorId: 1, temperatura: 31, vibracao: 4 },
+    app: {
+      get() {
+        return {
+          emit(event, payload) {
+            emits.push([event, payload]);
+          }
+        };
+      }
+    }
+  };
+  const res = createResponse();
+
+  await LeituraController.store(req, res, captureNext());
+
+  assert.deepEqual(res.body, { id: 10, sensorId: 1, temperatura: 31, vibracao: 4 });
+  assert.deepEqual(emits.map(([event]) => event), [
+    "nova-leitura",
+    "novaLeitura",
+    "maquina-atualizada",
+    "maquinaAtualizada",
+    "historico-integridade-atualizado",
+    "historicoIntegridadeAtualizado",
+    "dashboard-maquina-atualizado",
+    "dashboardMaquinaAtualizado"
+  ]);
+  assert.equal(emits[0][1].maquinaId, 8);
+  assert.deepEqual(emits[4][1], { maquinaId: 8, historico: historicoIntegridade });
+});
+
 test("LeituraController.index retorna leituras em ordem cronologica reversa do service", async () => {
   LeituraService.index = async () => [{ id: 3 }, { id: 2 }, { id: 1 }];
 

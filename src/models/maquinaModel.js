@@ -147,15 +147,16 @@ class MaquinaModel {
         });
     }
 
-    static async update(id, data) {
+    static async update(id, data, options = {}) {
         return await prisma.$transaction(async (tx) => {
             const maquina = await tx.maquina.update({ where: { id: parseInt(id) }, data });
+            let historicoIntegridade = null;
 
             if (data.integridade !== undefined || data.scoreEstabilidade !== undefined) {
                 const deveRegistrar = await this.deveRegistrarHistoricoIntegridade(tx, maquina.id);
 
                 if (deveRegistrar) {
-                    await tx.historicoIntegridade.create({
+                    historicoIntegridade = await tx.historicoIntegridade.create({
                         data: {
                             maquinaId: maquina.id,
                             integridade: maquina.integridade,
@@ -164,6 +165,13 @@ class MaquinaModel {
                         }
                     });
                 }
+            }
+
+            if (options.includeHistoricoIntegridade) {
+                return {
+                    maquina,
+                    historicoIntegridade
+                };
             }
 
             return maquina;

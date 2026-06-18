@@ -55,11 +55,24 @@ test("processarNovaLeitura gera alertas, salva leitura e executa predicao", asyn
 
   const predicaoChamadas = [];
   let cacheLimpo = 0;
+  const maquinaAtualizada = { id: 5, integridade: 74, scoreEstabilidade: 81 };
+  const historicoIntegridade = {
+    id: 30,
+    maquinaId: 5,
+    integridade: 74,
+    scoreEstabilidade: 81,
+    origem: "ATUALIZACAO_MAQUINA"
+  };
   cacheMiddleware.clearCache = () => {
     cacheLimpo += 1;
   };
-  PredicaoService.atualizarSaudeMaquina = async (maquinaId) => {
-    predicaoChamadas.push(["saude", maquinaId]);
+  PredicaoService.atualizarSaudeMaquina = async (maquinaId, options) => {
+    predicaoChamadas.push(["saude", maquinaId, options]);
+    return {
+      integridade: 74,
+      maquina: maquinaAtualizada,
+      historicoIntegridade
+    };
   };
   PredicaoService.previsaoManutencao = async (maquinaId) => {
     predicaoChamadas.push(["previsao", maquinaId]);
@@ -81,9 +94,15 @@ test("processarNovaLeitura gera alertas, salva leitura e executa predicao", asyn
     "INSTABILIDADE"
   ]);
   assert.deepEqual(predicaoChamadas, [
-    ["saude", 5],
+    ["saude", 5, { detalhado: true }],
     ["previsao", 5]
   ]);
+  assert.deepEqual(result._realtime, {
+    maquinaId: 5,
+    integridade: 74,
+    maquina: maquinaAtualizada,
+    historicoIntegridade
+  });
   assert.equal(cacheLimpo, 1);
 });
 

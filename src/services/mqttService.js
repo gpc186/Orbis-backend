@@ -1,6 +1,7 @@
 const mqtt = require("mqtt");
 const leituraService = require("./leituraService");
 const logger = require("../utils/logger");
+const { emitLeituraRealtime } = require("../utils/realtimeEvents");
 
 const MQTT_TOPIC = "orbis/leituras";
 
@@ -66,8 +67,7 @@ function createConnectMQTT({
 
         const io = app.get("io");
         if (io) {
-          io.emit("nova-leitura", novaLeitura);
-          io.emit("novaLeitura", novaLeitura);
+          emitLeituraRealtime(io, novaLeitura);
 
           log.info("mqtt_websocket_forwarded", {
             topic,

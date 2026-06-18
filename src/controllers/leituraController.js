@@ -1,5 +1,6 @@
 const leituraService = require("../services/leituraService");
 const logger = require("../utils/logger");
+const { emitLeituraRealtime } = require("../utils/realtimeEvents");
 
 class LeituraController {
   static async store(req, res, next) {
@@ -18,10 +19,7 @@ class LeituraController {
       const novaLeitura = await leituraService.processarNovaLeitura({ sensorId, temperatura, vibracao });
       const io = req.app.get("io");
 
-      if (io) {
-        io.emit("nova-leitura", novaLeitura);
-        io.emit("novaLeitura", novaLeitura);
-      }
+      emitLeituraRealtime(io, novaLeitura);
 
       return res.status(201).json(novaLeitura);
     } catch (error) {

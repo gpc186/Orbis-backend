@@ -46,9 +46,19 @@ class leituraService {
 
       const novaLeitura = await leituraModel.store(dadosLeitura);
       cacheMiddleware.clearCache();
+      const realtime = {
+        maquinaId: sensor.maquinaId,
+        integridade: null,
+        maquina: null,
+        historicoIntegridade: null
+      };
 
       try {
-        await PredicaoService.atualizarSaudeMaquina(sensor.maquinaId);
+        const resultadoSaude = await PredicaoService.atualizarSaudeMaquina(sensor.maquinaId, { detalhado: true });
+        realtime.integridade = resultadoSaude?.integridade ?? null;
+        realtime.maquina = resultadoSaude?.maquina || null;
+        realtime.historicoIntegridade = resultadoSaude?.historicoIntegridade || null;
+
         const resultadoPredicao = await PredicaoService.previsaoManutencao(sensor.maquinaId);
 
         if (resultadoPredicao && resultadoPredicao.fonteDecisao !== PredicaoService.FONTES.REGRESSAO_LINEAR) {
@@ -68,6 +78,11 @@ class leituraService {
           error
         });
       }
+
+      Object.defineProperty(novaLeitura, "_realtime", {
+        value: realtime,
+        enumerable: false
+      });
 
       return novaLeitura;
     } catch (error) {
