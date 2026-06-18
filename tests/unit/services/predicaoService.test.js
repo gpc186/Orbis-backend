@@ -3,6 +3,7 @@ const test = require("node:test");
 
 const MaquinaModel = require("../../../src/models/maquinaModel");
 const HistoricoIntegridadeModel = require("../../../src/models/historicoIntegridadeModel");
+const LeituraModel = require("../../../src/models/leituraModel");
 const PredicaoRiscoService = require("../../../src/services/predicaoRiscoService");
 const PredicaoService = require("../../../src/services/predicaoService");
 const ManutencaoService = require("../../../src/services/manutencaoService");
@@ -94,6 +95,7 @@ function mockPredicaoDependencies({
     integridade: 82,
     scoreEstabilidade: 76
   },
+  leituraFallback = null,
   riskResult = {
     riscos: {
       manutencao: {
@@ -108,6 +110,7 @@ function mockPredicaoDependencies({
   const originalFindById = MaquinaModel.findById;
   const originalUpdate = MaquinaModel.update;
   const originalFindSerieByMaquina = HistoricoIntegridadeModel.findSerieByMaquina;
+  const originalLeituraFindUnique = LeituraModel.findUnique;
   const originalPreverPorMaquina = PredicaoRiscoService.preverPorMaquina;
   const originalSyncPreventivaPreditiva = ManutencaoService.syncPreventivaPreditiva;
 
@@ -124,6 +127,7 @@ function mockPredicaoDependencies({
     serieCalls.push({ maquinaId, options });
     return historico;
   };
+  LeituraModel.findUnique = async () => leituraFallback;
   PredicaoRiscoService.preverPorMaquina = async () => riskResult;
   ManutencaoService.syncPreventivaPreditiva = async (diagnostico) => {
     syncCalls.push(diagnostico);
@@ -138,6 +142,7 @@ function mockPredicaoDependencies({
       MaquinaModel.findById = originalFindById;
       MaquinaModel.update = originalUpdate;
       HistoricoIntegridadeModel.findSerieByMaquina = originalFindSerieByMaquina;
+      LeituraModel.findUnique = originalLeituraFindUnique;
       PredicaoRiscoService.preverPorMaquina = originalPreverPorMaquina;
       ManutencaoService.syncPreventivaPreditiva = originalSyncPreventivaPreditiva;
     }
@@ -208,6 +213,54 @@ test("previsaoManutencao retorna SEM_DADOS quando nao ha historico suficiente", 
       assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.SEM_DADOS);
       assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.SEM_MODELO);
       assert.equal(resultado.motivo, PredicaoService.MOTIVOS.HISTORICO_INSUFICIENTE);
+      assert.equal(mocks.syncCalls.length, 1);
+    });
+  } finally {
+    mocks.restore();
+    restoreDate();
+  }
+});
+
+test("previsaoManutencao usa algoritmo antigo como fallback quando a regressao nao esta disponivel", async () => {
+  const restoreDate = useFakeNow("2026-05-21T07:00:00.000Z");
+  const mocks = mockPredicaoDependencies({
+    historico: buildHistorico([100, 99]),
+    machine: {
+      id: 1,
+      nome: "Maquina com historico curto",
+      integridade: 80,
+      scoreEstabilidade: 76
+    },
+    leituraFallback: {
+      id: 55,
+      sensorId: 9,
+      temperatura: 10,
+      vibracao: 10,
+      criadoEm: "2026-05-20T07:00:00.000Z",
+      sensor: {
+        id: 9,
+        maquinaId: 1,
+        idealTemperatura: 0,
+        limiteTemperatura: 100,
+        idealVibracao: 0,
+        limiteVibracao: 100
+      }
+    }
+  });
+
+  try {
+    await withPredicaoTestDefaults(async () => {
+      const resultado = await PredicaoService.previsaoManutencao(1);
+
+      assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.PREVISAO_VALIDA);
+      assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.HEURISTICA_ANTIGA);
+      assert.equal(resultado.motivo, PredicaoService.MOTIVOS.PREVISAO_FALLBACK_ANTIGO);
+      assert.equal(resultado.previsaoManutencao.toISOString(), "2026-05-22T07:00:00.000Z");
+      assert.equal(resultado.dataInicioManutencao.toISOString(), "2026-05-22T07:00:00.000Z");
+      assert.equal(resultado.dataFalha.toISOString(), "2026-05-26T07:00:00.000Z");
+      assert.equal(resultado.modeloIntegridade.r2, 0.7);
+      assert.equal(resultado.modeloIntegridade.pontosUsados, 2);
+      assert.equal(mocks.updateCalls[0].data.previsaoManutencao.toISOString(), "2026-05-22T07:00:00.000Z");
       assert.equal(mocks.syncCalls.length, 1);
     });
   } finally {
