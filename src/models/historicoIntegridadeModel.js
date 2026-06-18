@@ -1,3 +1,4 @@
+const { Prisma } = require("@prisma/client");
 const prisma = require('../prisma/prisma');
 
 class HistoricoIntegridadeModel {
@@ -141,6 +142,34 @@ class HistoricoIntegridadeModel {
                 }
             }
         });
+    }
+
+    static async findAggregatedByMaquina(maquinaId, { dataInicio, dataFim, bucketMinutes }) {
+        const bucketSeconds = Number(bucketMinutes) * 60;
+
+        return await prisma.$queryRaw`
+            SELECT
+                "maquinaId",
+                AVG("integridade")::float AS "integridade",
+                AVG("scoreEstabilidade")::float AS "scoreEstabilidade",
+                to_timestamp("bucketEpoch") AS "criadoEm",
+                ${Prisma.raw(`'AGREGADO_${bucketMinutes}M'`)} AS "origem"
+            FROM (
+                SELECT
+                    "maquinaId",
+                    "integridade",
+                    "scoreEstabilidade",
+                    floor(extract(epoch from "criadoEm") / ${bucketSeconds}) * ${bucketSeconds} AS "bucketEpoch"
+                FROM "HistoricoIntegridade"
+                WHERE "maquinaId" = ${Number(maquinaId)}
+                  AND "criadoEm" >= ${dataInicio}
+                  AND "criadoEm" <= ${dataFim}
+            ) AS buckets
+            GROUP BY "maquinaId", "bucketEpoch"
+            HAVING to_timestamp("bucketEpoch") >= ${dataInicio}
+               AND to_timestamp("bucketEpoch") <= ${dataFim}
+            ORDER BY "criadoEm" ASC
+        `;
     }
 
     static async findById(id) {
