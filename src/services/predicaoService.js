@@ -435,6 +435,44 @@ class PredicaoService {
     });
   }
 
+  static montarPersistenciaPredicao(diagnostico) {
+    if (!diagnostico) return null;
+
+    if (diagnostico.estadoPredicao === this.ESTADOS.PREVISAO_VALIDA) {
+      const previsaoManutencao = diagnostico.dataInicioManutencao || diagnostico.dataFalha;
+
+      if (!previsaoManutencao) return null;
+
+      return {
+        previsaoManutencao,
+        janelaManuInicio: diagnostico.janelaManuInicio,
+        janelaManuFim: diagnostico.janelaManuFim
+      };
+    }
+
+    if (![this.ESTADOS.MANUTENCAO_IMEDIATA, this.ESTADOS.FALHA_JA_CRUZADA].includes(diagnostico.estadoPredicao)) {
+      return null;
+    }
+
+    const referenciaTemporal = diagnostico.avaliacaoModelo?.modeloIntegridade?.referenciaTemporal || new Date();
+    const inicioCandidato = [
+      diagnostico.janelaManuInicio,
+      diagnostico.dataInicioManutencao,
+      diagnostico.dataFalha
+    ].find((data) => data && data >= referenciaTemporal);
+    const janelaManuInicio = inicioCandidato || referenciaTemporal;
+    const fimCandidato = diagnostico.janelaManuFim && diagnostico.janelaManuFim >= janelaManuInicio
+      ? diagnostico.janelaManuFim
+      : null;
+    const janelaManuFim = fimCandidato || janelaManuInicio;
+
+    return {
+      previsaoManutencao: janelaManuInicio,
+      janelaManuInicio,
+      janelaManuFim
+    };
+  }
+
   static obterReferenciaTemporal(pontos) {
     const ultimoPonto = pontos[pontos.length - 1]?.criadoEm;
     const agora = new Date();
@@ -816,20 +854,22 @@ class PredicaoService {
 
       let persisted = null;
 
-      if (diagnostico.estadoPredicao === this.ESTADOS.PREVISAO_VALIDA) {
-        console.log(
-          `[PREDICAO] Maquina ${maquinaId}: inclinacao=${diagnostico.avaliacaoModelo.modeloIntegridade.slope.toFixed(4)} ` +
-          `intercepto=${diagnostico.avaliacaoModelo.modeloIntegridade.intercept.toFixed(4)} ` +
-          `r2=${diagnostico.avaliacaoModelo.modeloIntegridade.score.r2.toFixed(4)} ` +
-          `manutencao=${diagnostico.dataInicioManutencao?.toISOString() || null} ` +
-          `falha=${diagnostico.dataFalha?.toISOString() || null}`
-        );
+      const dadosPersistencia = this.montarPersistenciaPredicao(diagnostico);
 
-        persisted = await MaquinaModel.update(maquinaId, {
-          previsaoManutencao: diagnostico.dataInicioManutencao || diagnostico.dataFalha,
-          janelaManuInicio: diagnostico.janelaManuInicio,
-          janelaManuFim: diagnostico.janelaManuFim
-        });
+      if (dadosPersistencia) {
+        const modeloIntegridade = diagnostico.avaliacaoModelo?.modeloIntegridade;
+
+        if (modeloIntegridade) {
+          console.log(
+            `[PREDICAO] Maquina ${maquinaId}: inclinacao=${modeloIntegridade.slope.toFixed(4)} ` +
+            `intercepto=${modeloIntegridade.intercept.toFixed(4)} ` +
+            `r2=${modeloIntegridade.score.r2.toFixed(4)} ` +
+            `manutencao=${diagnostico.dataInicioManutencao?.toISOString() || null} ` +
+            `falha=${diagnostico.dataFalha?.toISOString() || null}`
+          );
+        }
+
+        persisted = await MaquinaModel.update(maquinaId, dadosPersistencia);
       } else {
         persisted = await this.limparPrevisao(maquinaId, MaquinaModel);
       }

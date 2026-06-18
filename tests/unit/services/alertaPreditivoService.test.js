@@ -263,6 +263,38 @@ test("preverPorMaquina usa limiares operacionais quando nao ha historico de aler
   }
 });
 
+test("preverPorMaquina nao quebra quando a previsao valida vem do fallback antigo", async () => {
+  const avaliacaoModelo = createModelResult();
+  avaliacaoModelo.modeloIntegridade.modelo = null;
+
+  const mocks = mockServiceDependencies({
+    diagnostico: {
+      maquina: { id: 1, tipo: "CNC", nome: "Maquina teste" },
+      avaliacaoModelo,
+      estadoPredicao: PredicaoService.ESTADOS.PREVISAO_VALIDA,
+      fonteDecisao: PredicaoService.FONTES.HEURISTICA_ANTIGA,
+      urgencia: PredicaoService.URGENCIAS.ALTA,
+      motivo: PredicaoService.MOTIVOS.PREVISAO_FALLBACK_ANTIGO,
+      dataInicioManutencao: new Date("2026-05-21T08:00:00.000Z"),
+      dataFalha: new Date("2026-05-22T08:00:00.000Z")
+    }
+  });
+
+  try {
+    const resultado = await AlertaPreditivoService.preverPorMaquina(1);
+
+    assert.equal(resultado.estadoPredicao, PredicaoService.ESTADOS.PREVISAO_VALIDA);
+    assert.equal(resultado.fonteDecisao, PredicaoService.FONTES.HEURISTICA_ANTIGA);
+    assert.equal(resultado.previsaoManutencao.toISOString(), "2026-05-21T08:00:00.000Z");
+    assert.equal(resultado.dataFalha.toISOString(), "2026-05-22T08:00:00.000Z");
+    assert.equal(resultado.proximoAlerta, null);
+    assert.equal(resultado.instabilidade, null);
+    assert.equal(resultado.ausenciaInstabilidade.motivo, AlertaPreditivoService.MOTIVOS.REGRESSAO_INDISPONIVEL);
+  } finally {
+    mocks.restore();
+  }
+});
+
 test("preverPorMaquina faz fallback para tipo da maquina e escolhe o menor candidato como proximo alerta", async () => {
   const inst1 = createAlert(1, 2, "INSTABILIDADE", "2026-05-20T01:00:00.000Z");
   const inst2 = createAlert(2, 3, "INSTABILIDADE", "2026-05-20T02:00:00.000Z");
