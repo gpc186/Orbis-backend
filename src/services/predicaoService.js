@@ -166,12 +166,16 @@ class PredicaoService {
     return this.round(Math.max(0, Math.min(100, mediaBase - penalidade)));
   }
 
-  static async atualizarSaudeMaquina(maquinaId) {
+  static async atualizarSaudeMaquina(maquinaId, options = {}) {
     try {
       const MaquinaModel = require("../models/maquinaModel");
       const maquina = await MaquinaModel.findById(maquinaId, { include: { sensores: true } });
 
-      if (!maquina || !maquina.sensores || maquina.sensores.length === 0) return 100;
+      if (!maquina || !maquina.sensores || maquina.sensores.length === 0) {
+        return options.detalhado
+          ? { integridade: 100, maquina: maquina || null, historicoIntegridade: null }
+          : 100;
+      }
 
       const multiplicadorDesvio = this.obterMultiplicadorIntegridade(maquinaId);
       const scores = maquina.sensores.map((sensor) => this.calcularHealthScore(sensor, { multiplicadorDesvio }));
@@ -179,7 +183,19 @@ class PredicaoService {
 
       console.log(`--- ATUALIZANDO MAQUINA ${maquinaId} | SCORE: ${integridadeAgregada} ---`);
 
-      await MaquinaModel.update(maquinaId, { integridade: integridadeAgregada });
+      const resultadoAtualizacao = await MaquinaModel.update(
+        maquinaId,
+        { integridade: integridadeAgregada },
+        { includeHistoricoIntegridade: options.detalhado }
+      );
+
+      if (options.detalhado) {
+        return {
+          integridade: integridadeAgregada,
+          maquina: resultadoAtualizacao?.maquina || resultadoAtualizacao,
+          historicoIntegridade: resultadoAtualizacao?.historicoIntegridade || null
+        };
+      }
 
       return integridadeAgregada;
     } catch (error) {

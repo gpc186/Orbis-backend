@@ -2,6 +2,7 @@ const cron = require("node-cron");
 const prisma = require("../prisma/prisma");
 const leituraService = require("../services/leituraService");
 const logger = require("../utils/logger");
+const { emitLeituraRealtime } = require("../utils/realtimeEvents");
 
 const intervaloConfigurado = Number(process.env.SIMULADOR_INTERVALO_MS);
 const INTERVALO_MS = Number.isFinite(intervaloConfigurado) && intervaloConfigurado > 0
@@ -255,10 +256,7 @@ async function processarLeituraSimulada(sensor, estadoMaquina, forcarAlerta = fa
   const dadosLeitura = forcarAlerta ? gerarLeituraComAlerta(sensor) : gerarLeitura(sensor, estadoMaquina);
   const novaLeitura = await leituraService.processarNovaLeitura(dadosLeitura);
 
-  if (ioServer) {
-    ioServer.emit("nova-leitura", novaLeitura);
-    ioServer.emit("novaLeitura", novaLeitura);
-  }
+  emitLeituraRealtime(ioServer, novaLeitura);
 
   logger.info("simulador_leitura_generated", {
     sensorId: sensor.id,
