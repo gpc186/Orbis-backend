@@ -3,6 +3,12 @@ const MaquinaModel = require('../models/maquinaModel');
 const AppError = require('../utils/appErrorUtils');
 
 class HistoricoIntegridadeService {
+    static PERIODOS_AGREGADOS = {
+        "1d": { horas: 24, bucketMinutes: 5 },
+        "3d": { horas: 72, bucketMinutes: 15 },
+        "7d": { horas: 168, bucketMinutes: 60 }
+    };
+
     static normalizarLimite(limite) {
         const valor = Number(limite);
 
@@ -11,6 +17,20 @@ class HistoricoIntegridadeService {
         }
 
         return Math.min(Math.trunc(valor), 500);
+    }
+
+    static normalizarPeriodo(periodo) {
+        if (periodo === undefined || periodo === null || periodo === "") {
+            return null;
+        }
+
+        const normalizado = String(periodo).trim().toLowerCase();
+
+        if (!this.PERIODOS_AGREGADOS[normalizado]) {
+            throw new AppError("periodo deve ser 1d, 3d ou 7d.", 400);
+        }
+
+        return normalizado;
     }
 
     static normalizarPercentual(valor, campo) {
@@ -43,6 +63,30 @@ class HistoricoIntegridadeService {
         return data;
     }
 
+    static calcularIntervaloPeriodo(periodo, { dataInicio, dataFim } = {}) {
+        const config = this.PERIODOS_AGREGADOS[periodo];
+        const fim = dataFim || new Date();
+        const inicio = dataInicio || new Date(fim.getTime() - (config.horas * 60 * 60 * 1000));
+
+        return {
+            dataInicio: inicio,
+            dataFim: fim,
+            bucketMinutes: config.bucketMinutes
+        };
+    }
+
+    static normalizarAgregado(row, bucketMinutes) {
+        return {
+            maquinaId: Number(row.maquinaId),
+            integridade: Number(Number(row.integridade).toFixed(2)),
+            scoreEstabilidade: row.scoreEstabilidade === null || row.scoreEstabilidade === undefined
+                ? null
+                : Number(Number(row.scoreEstabilidade).toFixed(2)),
+            criadoEm: row.criadoEm,
+            origem: row.origem || `AGREGADO_${bucketMinutes}M`
+        };
+    }
+
     static async create(dados) {
         const maquinaId = Number(dados.maquinaId);
 
@@ -71,7 +115,8 @@ class HistoricoIntegridadeService {
     }
 
     static async list(filtros = {}) {
-        const limite = this.normalizarLimite(filtros.limite);
+        const periodo = this.normalizarPeriodo(filtros.periodo);
+        const limite = this.normalizarLimite(filtros.limite ?? filtros.limit);
         const dataInicio = this.normalizarData(filtros.dataInicio, "dataInicio");
         const dataFim = this.normalizarData(filtros.dataFim, "dataFim");
 
@@ -85,6 +130,17 @@ class HistoricoIntegridadeService {
             if (!Number.isInteger(maquinaId) || maquinaId <= 0) {
                 throw new AppError("maquinaId invalido.", 400);
             }
+        }
+
+        if (periodo) {
+            if (filtros.maquinaId === undefined) {
+                throw new AppError("maquinaId invalido.", 400);
+            }
+
+            const intervalo = this.calcularIntervaloPeriodo(periodo, { dataInicio, dataFim });
+            const agregados = await HistoricoIntegridadeModel.findAggregatedByMaquina(filtros.maquinaId, intervalo);
+
+            return agregados.map((row) => this.normalizarAgregado(row, intervalo.bucketMinutes));
         }
 
         return await HistoricoIntegridadeModel.findAll({

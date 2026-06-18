@@ -8,6 +8,7 @@ const MaquinaModel = require("../../../src/models/maquinaModel");
 const originals = {
   createHistorico: HistoricoIntegridadeModel.create,
   findAllHistorico: HistoricoIntegridadeModel.findAll,
+  findAggregatedByMaquina: HistoricoIntegridadeModel.findAggregatedByMaquina,
   findHistoricoById: HistoricoIntegridadeModel.findById,
   findMaquinaById: MaquinaModel.findById
 };
@@ -15,6 +16,7 @@ const originals = {
 afterEach(() => {
   HistoricoIntegridadeModel.create = originals.createHistorico;
   HistoricoIntegridadeModel.findAll = originals.findAllHistorico;
+  HistoricoIntegridadeModel.findAggregatedByMaquina = originals.findAggregatedByMaquina;
   HistoricoIntegridadeModel.findById = originals.findHistoricoById;
   MaquinaModel.findById = originals.findMaquinaById;
 });
@@ -23,6 +25,7 @@ test("normalizadores validam limite, percentual e data", () => {
   assert.equal(HistoricoIntegridadeService.normalizarLimite(undefined), 100);
   assert.equal(HistoricoIntegridadeService.normalizarLimite("1000"), 500);
   assert.equal(HistoricoIntegridadeService.normalizarLimite("12.8"), 12);
+  assert.equal(HistoricoIntegridadeService.normalizarPeriodo("7D"), "7d");
   assert.equal(HistoricoIntegridadeService.normalizarPercentual("87.456", "integridade"), 87.46);
   assert.equal(HistoricoIntegridadeService.normalizarData("2026-06-04", "dataInicio").toISOString(), "2026-06-04T00:00:00.000Z");
 
@@ -31,6 +34,7 @@ test("normalizadores validam limite, percentual e data", () => {
     /integridade deve ser um numero entre 0 e 100/
   );
   assert.throws(() => HistoricoIntegridadeService.normalizarData("invalida", "dataFim"), /dataFim invalida/);
+  assert.throws(() => HistoricoIntegridadeService.normalizarPeriodo("30d"), /periodo deve ser 1d, 3d ou 7d/);
 });
 
 test("create valida maquina, normaliza dados e persiste historico", async () => {
@@ -101,6 +105,74 @@ test("list normaliza filtros e valida intervalo de datas", async () => {
     /dataInicio nao pode ser maior que dataFim/
   );
   await assert.rejects(() => HistoricoIntegridadeService.list({ maquinaId: "0" }), /maquinaId invalido/);
+});
+
+test("list aceita limit como alias em chamadas legadas", async () => {
+  let filtrosRecebidos;
+  HistoricoIntegridadeModel.findAll = async (filtros) => {
+    filtrosRecebidos = filtros;
+    return [{ id: 1 }];
+  };
+
+  await HistoricoIntegridadeService.list({ maquinaId: "3", limit: "1000" });
+
+  assert.equal(filtrosRecebidos.limite, 500);
+});
+
+test("list com periodo usa agregacao por janela de tempo e ignora limite", async () => {
+  let filtrosRecebidos;
+  HistoricoIntegridadeModel.findAggregatedByMaquina = async (maquinaId, filtros) => {
+    filtrosRecebidos = { maquinaId, filtros };
+    return [
+      {
+        maquinaId: 8,
+        integridade: 84.234,
+        scoreEstabilidade: 87.145,
+        criadoEm: new Date("2026-06-18T03:00:00.000Z"),
+        origem: "AGREGADO_60M"
+      }
+    ];
+  };
+
+  const result = await HistoricoIntegridadeService.list({
+    maquinaId: "8",
+    periodo: "7d",
+    limite: "1000",
+    dataInicio: "2026-06-11T00:00:00.000Z",
+    dataFim: "2026-06-18T00:00:00.000Z"
+  });
+
+  assert.equal(filtrosRecebidos.maquinaId, "8");
+  assert.equal(filtrosRecebidos.filtros.bucketMinutes, 60);
+  assert.equal(filtrosRecebidos.filtros.dataInicio.toISOString(), "2026-06-11T00:00:00.000Z");
+  assert.equal(filtrosRecebidos.filtros.dataFim.toISOString(), "2026-06-18T00:00:00.000Z");
+  assert.deepEqual(result, [
+    {
+      maquinaId: 8,
+      integridade: 84.23,
+      scoreEstabilidade: 87.14,
+      criadoEm: new Date("2026-06-18T03:00:00.000Z"),
+      origem: "AGREGADO_60M"
+    }
+  ]);
+});
+
+test("list com periodo calcula dataInicio automaticamente a partir de dataFim", async () => {
+  let filtrosRecebidos;
+  HistoricoIntegridadeModel.findAggregatedByMaquina = async (maquinaId, filtros) => {
+    filtrosRecebidos = { maquinaId, filtros };
+    return [];
+  };
+
+  await HistoricoIntegridadeService.list({
+    maquinaId: "8",
+    periodo: "3d",
+    dataFim: "2026-06-18T12:00:00.000Z"
+  });
+
+  assert.equal(filtrosRecebidos.filtros.bucketMinutes, 15);
+  assert.equal(filtrosRecebidos.filtros.dataInicio.toISOString(), "2026-06-15T12:00:00.000Z");
+  assert.equal(filtrosRecebidos.filtros.dataFim.toISOString(), "2026-06-18T12:00:00.000Z");
 });
 
 test("listByMaquina valida existencia da maquina e delega filtros para list", async () => {
